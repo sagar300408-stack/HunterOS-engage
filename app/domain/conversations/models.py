@@ -55,6 +55,13 @@ class Conversation(Base):
         nullable=False,
     )
     customer_phone = Column(String(30), nullable=False)
+    # Phase 2: FK to the customer who owns this conversation.
+    # Nullable for backward compatibility with Phase 1 rows.
+    customer_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("customers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -62,6 +69,7 @@ class Conversation(Base):
     )
 
     # Relationships
+    customer = relationship("Customer", back_populates="conversations")
     messages = relationship(
         "Message",
         back_populates="conversation",
@@ -71,6 +79,7 @@ class Conversation(Base):
 
     __table_args__ = (
         Index("ix_conversations_customer_phone", "customer_phone"),
+        Index("ix_conversations_customer_id", "customer_id"),
     )
 
     def __repr__(self) -> str:

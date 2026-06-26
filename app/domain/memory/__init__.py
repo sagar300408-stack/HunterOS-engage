@@ -1,1 +1,1 @@
-"""Memory domain package — Phase 2."""
+"""Memory domain package — Phase 2: CustomerMemory, CustomerMemoryVersion, CustomerMemoryEvent."""

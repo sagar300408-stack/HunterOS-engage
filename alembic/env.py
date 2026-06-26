@@ -23,7 +23,13 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 # Load ORM models so Alembic can detect changes
-from app.domain.conversations.models import Base
+from app.domain.conversations.models import Base  # noqa: F401
+from app.domain.customers.models import Customer  # noqa: F401
+from app.domain.memory.models import (  # noqa: F401
+    CustomerMemory,
+    CustomerMemoryVersion,
+    CustomerMemoryEvent,
+)
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config

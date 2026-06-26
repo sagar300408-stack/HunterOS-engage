@@ -78,7 +78,14 @@ async def create_tables() -> None:
 
     Development only — use Alembic migrations in staging and production.
     """
-    from app.domain.conversations.models import Base
+    # Import all models so their metadata is registered on Base
+    from app.domain.conversations.models import Base  # noqa: F401
+    from app.domain.customers.models import Customer  # noqa: F401
+    from app.domain.memory.models import (  # noqa: F401
+        CustomerMemory,
+        CustomerMemoryVersion,
+        CustomerMemoryEvent,
+    )
 
     engine = get_engine()
     async with engine.begin() as conn:

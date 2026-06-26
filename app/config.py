@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     active_prompt_version: str = Field(default="v1", alias="ACTIVE_PROMPT_VERSION")
 
+    # ── Phase 2: Customer Memory ──────────────────────────────────────────────
+    # Update memory summary every N messages, or immediately on significant fact
+    memory_update_interval: int = Field(default=5, alias="MEMORY_UPDATE_INTERVAL")
+    # Start a new conversation thread after this many hours of inactivity
+    conversation_idle_hours: int = Field(default=24, alias="CONVERSATION_IDLE_HOURS")
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
