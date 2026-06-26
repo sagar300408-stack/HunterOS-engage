@@ -86,6 +86,7 @@ async def create_tables() -> None:
         CustomerMemoryVersion,
         CustomerMemoryEvent,
     )
+    from app.domain.intent.models import IntentHistory  # noqa: F401
 
     engine = get_engine()
     async with engine.begin() as conn:

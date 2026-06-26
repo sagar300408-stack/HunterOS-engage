@@ -1,18 +1,19 @@
 """
-Pipeline Stage 4 — AI Processing (Phase 2)
+Pipeline Stage 4 — AI Processing (Phase 3)
 
 Responsibilities:
-  - Build 4-block memory context (customer profile, facts, summary)
-  - Fetch conversation history from database (stateless)
-  - Call the OpenAI Chat Completions API
-  - After sending response: conditionally update customer memory
-  - Update customer last_interaction timestamp
+  - Build 4-block memory context (Phase 2)
+  - Run intent extraction and inject intent context block (Phase 3 — NEW)
+  - Fetch conversation history (stateless)
+  - Call OpenAI conversational response
+  - Post-response: conditional memory update + last_interaction stamp
   - Emit AIRequested and AIResponded events
 
-Phase 2 additions vs Phase 1:
-  - inject_memory() now receives session + customer (not just phone)
-  - Post-response memory update with smart trigger logic
-  - last_interaction stamped on every successful response
+Phase 3 additions vs Phase 2:
+  - classify_intent() called between memory injection and AI call
+  - Intent context block inserted into full_history
+  - message_id now accepted (required for intent_history FK)
+  - ai_result enriched with intent_result for downstream use
 """
 
 from uuid import UUID
@@ -27,6 +28,7 @@ from app.domain.memory import service as memory_service
 from app.events.dispatcher import dispatcher
 from app.events.message_events import AIRequested, AIResponded
 from app.integrations.openai.client import get_ai_response
+from app.pipeline.intent import classify_intent
 from app.pipeline.memory import inject_memory
 from app.utils.logger import get_logger
 
@@ -35,25 +37,32 @@ logger = get_logger(__name__)
 
 async def process_with_ai(
     conversation_id: UUID,
+    message_id: UUID,
     customer: Customer,
     user_content: str,
     session: AsyncSession,
 ) -> dict:
     """
-    Stage 4: Build context, call OpenAI, update memory, return structured response.
+    Stage 4: Build full context, extract intent, call OpenAI, update memory.
 
-    The system is stateless — history is always fetched from PostgreSQL,
-    making horizontal scaling safe with no shared state.
+    Context construction order (per spec):
+        1. System prompt (v3.txt)
+        2. Customer Profile block       (Phase 2 memory)
+        3. Structured Memory block      (Phase 2 memory)
+        4. Rolling Summary block        (Phase 2 memory)
+        5. Intent block                 (Phase 3 — NEW)
+        6. Recent conversation history
+        7. New user message
 
     Args:
         conversation_id: UUID of the active conversation.
+        message_id:      UUID of the incoming Message row.
         customer:        Customer ORM object from Stage 2.
         user_content:    The raw incoming message text.
         session:         Active async database session.
 
     Returns:
-        Full result dict from integrations/openai/client.py:
-        content, model, tokens, latency_ms, estimated_cost_usd, etc.
+        Enriched result dict — all OpenAI metadata plus intent_result key.
     """
     settings = get_settings()
 
@@ -76,15 +85,40 @@ async def process_with_ai(
     # ── Fetch conversation history (stateless) ────────────────────────────────
     history = await message_service.get_conversation_history(session, conversation_id)
 
-    # ── Inject memory context (Phase 2 — 4-block customer context) ────────────
+    # ── Stage 5: Inject memory context (4-block, Phase 2) ────────────────────
     memory_context = await inject_memory(session=session, customer=customer)
 
-    # Build the full context:
-    #   memory_context (profile + facts + summary) + prior history
-    # The new user message is appended as the user_message parameter in get_ai_response
-    full_history = memory_context + history[:-1]
+    # ── Stage 6: Intent extraction (Phase 3) ──────────────────────────────────
+    # Grab memory summary to give the intent extractor extra context
+    memory = await memory_service.get_customer_memory(session, customer.id)
+    memory_summary = memory.summary if memory else None
 
-    # ── Call OpenAI ───────────────────────────────────────────────────────────
+    intent_result = await classify_intent(
+        session=session,
+        customer=customer,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        user_content=user_content,
+        conversation_history=history[:-1],   # exclude the just-saved incoming msg
+        memory_summary=memory_summary,
+    )
+
+    # Build the intent context block injected into the AI call
+    intent_context = [{
+        "role": "system",
+        "content": (
+            "DETECTED CUSTOMER INTENT:\n"
+            + intent_result.build_context_block()
+            + "\n\nGuide your response to naturally move the customer toward "
+            "this next action without being explicit about the classification."
+        ),
+    }] if intent_result.confidence > 0.0 else []
+
+    # ── Build full history ────────────────────────────────────────────────────
+    # Order: memory blocks → intent block → conversation history
+    full_history = memory_context + intent_context + history[:-1]
+
+    # ── Call OpenAI conversational response ───────────────────────────────────
     ai_result = await get_ai_response(
         conversation_history=full_history,
         user_message=user_content,
@@ -102,8 +136,10 @@ async def process_with_ai(
         )
     )
 
-    # ── Stage 8: Conditional Memory Update ────────────────────────────────────
-    # Increment message count and check update trigger
+    # Attach intent result to ai_result for downstream use (Phase 5/6)
+    ai_result["intent_result"] = intent_result
+
+    # ── Stage 10: Conditional Memory Update (Phase 2) ─────────────────────────
     memory = await memory_service.get_or_create_memory(session, customer.id)
     memory.message_count += 1
     await session.flush()
@@ -121,7 +157,6 @@ async def process_with_ai(
             trigger=trigger,
             message_count=memory.message_count,
         )
-        # Fetch recent messages across conversations for extraction context
         recent_messages = await message_service.get_recent_messages_across_conversations(
             session, customer.id, limit=20
         )
@@ -137,12 +172,9 @@ async def process_with_ai(
             "memory_update_skipped",
             customer_id=str(customer.id),
             message_count=memory.message_count,
-            next_update_at=memory.message_count + (
-                settings.memory_update_interval - (memory.message_count % settings.memory_update_interval)
-            ),
         )
 
-    # ── Stage 9: Update last_interaction ──────────────────────────────────────
+    # ── Stage 11: Update last_interaction ─────────────────────────────────────
     await customer_service.update_last_interaction(session, customer.id)
 
     return ai_result

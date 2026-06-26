@@ -3,8 +3,9 @@ HunterOS Engage — Customer Domain Models
 
 The Customer is the root entity for every future module:
   - Phase 2: CustomerMemory, CustomerMemoryVersion, CustomerMemoryEvent
-  - Phase 3: Lead (customer_id FK)
-  - Phase 5: Dashboard analytics grouped by customer
+  - Phase 3: IntentHistory, buying_stage sync
+  - Phase 4: Dashboard analytics grouped by customer
+  - Phase 5: Scheduling, CRM integration
 
 Schema is additive — no existing column is removed.
 """
@@ -57,6 +58,9 @@ class Customer(Base):
     )
     preferred_language = Column(String(10), nullable=False, default="en")
     notes = Column(Text, nullable=True)
+    # Phase 3: Synced from latest IntentHistory.buying_stage after every extraction.
+    # Enables fast dashboard queries without joining intent_history.
+    buying_stage = Column(String(100), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -86,6 +90,12 @@ class Customer(Base):
         "CustomerMemoryEvent",
         back_populates="customer",
         order_by="CustomerMemoryEvent.created_at",
+        cascade="all, delete-orphan",
+    )
+    intent_history = relationship(
+        "IntentHistory",
+        back_populates="customer",
+        order_by="IntentHistory.created_at",
         cascade="all, delete-orphan",
     )
 

@@ -30,6 +30,7 @@ from app.domain.memory.models import (  # noqa: F401
     CustomerMemoryVersion,
     CustomerMemoryEvent,
 )
+from app.domain.intent.models import IntentHistory  # noqa: F401
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config

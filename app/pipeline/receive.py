@@ -142,4 +142,6 @@ async def receive(
         )
     )
 
-    return conversation, message_data, customer
+    # Phase 3: return the saved Message object so the pipeline has message.id
+    # for intent_history persistence without an extra DB query.
+    return conversation, message_data, customer, message

@@ -163,3 +163,35 @@ async def update_last_interaction(
             "customer_last_interaction_updated",
             customer_id=str(customer_id),
         )
+
+
+async def update_buying_stage(
+    session: AsyncSession,
+    customer_id: UUID,
+    buying_stage: str,
+) -> None:
+    """
+    Sync the latest detected buying_stage to the customer profile.
+
+    Called after every intent extraction so the customer row always reflects
+    the current stage. Enables Phase 4 dashboard queries without joining
+    intent_history.
+
+    Args:
+        session:      Active async database session.
+        customer_id:  UUID of the customer.
+        buying_stage: Stage string from IntentResult (e.g. "Research").
+    """
+    result = await session.execute(
+        select(Customer).where(Customer.id == customer_id)
+    )
+    customer = result.scalar_one_or_none()
+
+    if customer and buying_stage:
+        customer.buying_stage = buying_stage
+        await session.flush()
+        logger.debug(
+            "customer_buying_stage_updated",
+            customer_id=str(customer_id),
+            buying_stage=buying_stage,
+        )

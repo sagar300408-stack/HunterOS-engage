@@ -66,11 +66,12 @@ def create_app() -> FastAPI:
         title="HunterOS Engage",
         description=(
             "AI-Powered Customer Engagement Platform\n\n"
-            "Phase 2: Persistent Customer Memory — Customers are recognized, "
-            "remembered, and served with full context on every return.\n"
+            "Phase 3: Intent Engine — Every conversation is transformed into "
+            "structured business intelligence: intent, budget, timeline, urgency, "
+            "buying stage, and recommended next action.\n"
             "Built for production. Designed for every future phase."
         ),
-        version="2.0.0",
+        version="3.0.0",
         docs_url="/docs" if not settings.is_production else None,
         redoc_url="/redoc" if not settings.is_production else None,
         openapi_url="/openapi.json" if not settings.is_production else None,
@@ -87,8 +88,8 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": "HunterOS Engage",
-            "version": "2.0.0",
-            "phase": 2,
+            "version": "3.0.0",
+            "phase": 3,
         }
 
     return app

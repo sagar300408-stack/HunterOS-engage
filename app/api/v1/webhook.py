@@ -58,8 +58,8 @@ async def receive_webhook(
     """
     POST /api/v1/webhook — receive and process incoming WhatsApp messages.
 
-    Pipeline (Phase 2):
-        receive → process_with_ai (+ memory inject + memory update) → send_response → schedule_followup
+    Pipeline (Phase 3):
+        receive → process_with_ai (memory + intent + AI) → send_response → schedule_followup
     """
     try:
         payload = await request.json()
@@ -84,12 +84,13 @@ async def receive_webhook(
         if result is None:
             return {"status": "ok", "processed": False}
 
-        # Phase 2: unpack 3-tuple (conversation, message_data, customer)
-        conversation, message_data, customer = result
+        # Phase 3: unpack 4-tuple (conversation, message_data, customer, message)
+        conversation, message_data, customer, message = result
 
-        # ── Stage 4: AI Processing (includes memory inject + memory update) ───
+        # ── Stage 4: AI Processing (memory + intent + conversational AI) ──────
         ai_result = await process_with_ai(
             conversation_id=conversation.id,
+            message_id=message.id,
             customer=customer,
             user_content=message_data["content"],
             session=session,
@@ -103,7 +104,7 @@ async def receive_webhook(
             session=session,
         )
 
-        # ── Stage 5: Follow-up (stub) ─────────────────────────────────────────
+        # ── Stage 5: Follow-up (stub — Phase 6) ──────────────────────────────
         await schedule_followup(
             conversation_id=str(conversation.id),
             from_phone=message_data["from_phone"],

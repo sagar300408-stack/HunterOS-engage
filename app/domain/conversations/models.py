@@ -76,6 +76,12 @@ class Conversation(Base):
         order_by="Message.timestamp",
         cascade="all, delete-orphan",
     )
+    intent_history = relationship(
+        "IntentHistory",
+        back_populates="conversation",
+        order_by="IntentHistory.created_at",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("ix_conversations_customer_phone", "customer_phone"),
@@ -107,6 +113,12 @@ class Message(Base):
     conversation = relationship("Conversation", back_populates="messages")
     ai_metadata = relationship(
         "AIMetadata",
+        back_populates="message",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    intent_history = relationship(
+        "IntentHistory",
         back_populates="message",
         uselist=False,
         cascade="all, delete-orphan",
