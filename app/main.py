@@ -1,0 +1,98 @@
+"""
+HunterOS Engage — FastAPI Application Factory
+
+Responsibilities:
+  - Configure structured logging
+  - Initialize the database connection pool
+  - Register all versioned routers
+  - Expose health check endpoint
+  - Manage lifespan (startup + graceful shutdown)
+"""
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.api.v1 import webhook as webhook_v1
+from app.config import get_settings
+from app.integrations.postgres.database import create_tables, dispose_engine
+from app.utils.logger import configure_logging, get_logger
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan manager.
+
+    Startup:  configure logging → create DB tables (dev) → log ready
+    Shutdown: dispose DB engine → log shutdown
+    """
+    configure_logging()
+    logger = get_logger(__name__)
+    settings = get_settings()
+
+    logger.info(
+        "hunteros_engage_starting",
+        env=settings.app_env,
+        log_level=settings.log_level,
+        active_prompt_version=settings.active_prompt_version,
+        model=settings.openai_model,
+    )
+
+    # Auto-create tables in development.
+    # In staging/production, use: alembic upgrade head
+    if settings.is_development:
+        await create_tables()
+
+    logger.info("hunteros_engage_ready", routes_registered=True)
+
+    yield  # ── Application runs here ──────────────────────────────────────────
+
+    logger.info("hunteros_engage_shutting_down")
+    await dispose_engine()
+    logger.info("hunteros_engage_stopped")
+
+
+def create_app() -> FastAPI:
+    """
+    Build and configure the FastAPI application.
+
+    Returns the configured app instance for use with uvicorn:
+        uvicorn app.main:app --reload
+    """
+    settings = get_settings()
+
+    app = FastAPI(
+        title="HunterOS Engage",
+        description=(
+            "AI-Powered Customer Engagement Platform\n\n"
+            "Phase 1: WhatsApp → OpenAI → PostgreSQL pipeline.\n"
+            "Built for production. Designed for every future phase."
+        ),
+        version="1.0.0",
+        docs_url="/docs" if not settings.is_production else None,
+        redoc_url="/redoc" if not settings.is_production else None,
+        openapi_url="/openapi.json" if not settings.is_production else None,
+        lifespan=lifespan,
+    )
+
+    # ── Routers ───────────────────────────────────────────────────────────────
+    app.include_router(webhook_v1.router)
+
+    # ── System endpoints ──────────────────────────────────────────────────────
+    @app.get("/health", tags=["System"], summary="Health Check")
+    async def health_check() -> dict:
+        """Returns service health status. Used by load balancers and monitors."""
+        return {
+            "status": "healthy",
+            "service": "HunterOS Engage",
+            "version": "1.0.0",
+            "phase": 1,
+        }
+
+    return app
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+# uvicorn app.main:app --reload
+app = create_app()
