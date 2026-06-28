@@ -72,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentSection, onSelectSectio
           )
         })}
 
-        {process.env.ENABLE_DEVELOPER_TOOLS === 'true' && role === 'Founder' && (
+        {import.meta.env.VITE_ENABLE_DEVELOPER_TOOLS === 'true' && role === 'Founder' && (
           <>
             <hr className="border-[#334155] my-4" />
             <button
