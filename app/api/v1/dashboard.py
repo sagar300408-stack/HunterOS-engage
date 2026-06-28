@@ -83,8 +83,7 @@ async def get_overview(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> OverviewMetrics:
-    async with session.begin():
-        return await dash_service.get_overview_metrics(session, user.workspace_id)
+    return await dash_service.get_overview_metrics(session, user.workspace_id)
 
 
 # ── Conversations ─────────────────────────────────────────────────────────────
@@ -102,15 +101,14 @@ async def get_conversations(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> ConversationPage:
-    async with session.begin():
-        return await dash_service.get_conversations(
-            session=session,
-            workspace_id=user.workspace_id,
-            search=search,
-            buying_stage=buying_stage,
-            page=page,
-            page_size=page_size,
-        )
+    
+    return await dash_service.get_conversations(
+        session=session,
+        workspace_id=user.workspace_id,
+        search=search,
+        buying_stage=buying_stage,
+        page=page,
+        page_size=page_size,        )
 
 
 @router.get(
@@ -123,8 +121,7 @@ async def get_conversation_detail(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> ConversationDetail:
-    async with session.begin():
-        result = await dash_service.get_conversation_detail(session, conversation_id)
+    result = await dash_service.get_conversation_detail(session, conversation_id)
     if not result:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return result
@@ -146,16 +143,15 @@ async def get_customers(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> CustomerPage:
-    async with session.begin():
-        return await dash_service.get_customers(
-            session=session,
-            workspace_id=user.workspace_id,
-            search=search,
-            buying_stage=buying_stage,
-            status=status,
-            page=page,
-            page_size=page_size,
-        )
+    return await dash_service.get_customers(
+        session=session,
+        workspace_id=user.workspace_id,
+        search=search,
+        buying_stage=buying_stage,
+        status=status,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get(
@@ -168,8 +164,7 @@ async def get_customer_profile(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> CustomerProfile:
-    async with session.begin():
-        result = await dash_service.get_customer_profile(session, customer_id)
+    result = await dash_service.get_customer_profile(session, customer_id)
     if not result:
         raise HTTPException(status_code=404, detail="Customer not found")
     return result
@@ -188,15 +183,14 @@ async def update_customer(
     session: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("edit_memory")),
 ) -> None:
-    async with session.begin():
-        await dash_service.update_customer(
-            session=session,
-            customer_id=customer_id,
-            updates=body.model_dump(exclude_none=True),
-            actor_user_id=user.id,
-            ip_address=request.client.host if request.client else None,
-            workspace_id=user.workspace_id,
-        )
+    await dash_service.update_customer(
+        session=session,
+        customer_id=customer_id,
+        updates=body.model_dump(exclude_none=True),
+        actor_user_id=user.id,
+        ip_address=request.client.host if request.client else None,
+        workspace_id=user.workspace_id,
+    )
     # Broadcast update to live dashboard clients
     await ws_manager.broadcast({
         "event": "customer_updated",
@@ -217,13 +211,12 @@ async def get_analytics(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> AnalyticsData:
-    async with session.begin():
-        return await dash_service.get_analytics(
+    return await dash_service.get_analytics(
             session=session,
             workspace_id=user.workspace_id,
             date_from=date_from,
             date_to=date_to,
-        )
+    )
 
 
 # ── System Health ─────────────────────────────────────────────────────────────
@@ -237,8 +230,8 @@ async def get_system_health(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> SystemHealth:
-    async with session.begin():
-        return await dash_service.get_system_health(session)
+    
+    return await dash_service.get_system_health(session)
 
 
 # ── Activity Feed ─────────────────────────────────────────────────────────────
@@ -253,8 +246,7 @@ async def get_activity(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> list[ActivityEvent]:
-    async with session.begin():
-        return await dash_service.get_activity_feed(session, user.workspace_id, limit)
+    return await dash_service.get_activity_feed(session, user.workspace_id, limit)
 
 
 # ── Lead Pipeline ─────────────────────────────────────────────────────────────
@@ -268,8 +260,7 @@ async def get_leads(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> LeadPipeline:
-    async with session.begin():
-        return await dash_service.get_lead_pipeline(session, user.workspace_id)
+    return await dash_service.get_lead_pipeline(session, user.workspace_id)
 
 
 @router.put(
@@ -285,16 +276,16 @@ async def update_lead_stage(
     session: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("change_lead_stage")),
 ) -> None:
-    async with session.begin():
-        await dash_service.update_lead_stage(
-            session=session,
-            customer_id=customer_id,
-            new_stage=body.buying_stage,
-            actor_user_id=user.id,
-            reason=body.reason,
-            ip_address=request.client.host if request.client else None,
-            workspace_id=user.workspace_id,
-        )
+    
+    await dash_service.update_lead_stage(
+        session=session,
+        customer_id=customer_id,
+        new_stage=body.buying_stage,
+        actor_user_id=user.id,
+        reason=body.reason,
+        ip_address=request.client.host if request.client else None,
+        workspace_id=user.workspace_id,
+    )
     await ws_manager.broadcast({
         "event": "lead_stage_changed",
         "data": {
@@ -316,8 +307,7 @@ async def get_queue(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> QueueStatus:
-    async with session.begin():
-        return await dash_service.get_queue_status(session, user.workspace_id)
+    return await dash_service.get_queue_status(session, user.workspace_id)
 
 
 # ── Audit Log ─────────────────────────────────────────────────────────────────
@@ -333,8 +323,8 @@ async def get_audit_log(
     session: AsyncSession = Depends(get_db),
     user: User = Depends(require_permission("view_all")),
 ) -> list[AuditLogSchema]:
-    async with session.begin():
-        return await dash_service.get_audit_log(session, user.workspace_id, limit)
+    
+    return await dash_service.get_audit_log(session, user.workspace_id, limit)
 
 
 # ── Search ────────────────────────────────────────────────────────────────────
@@ -351,13 +341,12 @@ async def search(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> SearchResults:
-    async with session.begin():
-        return await dash_service.search_everything(
-            session=session,
-            query=q,
-            workspace_id=user.workspace_id,
-            limit=limit,
-        )
+    return await dash_service.search_everything(
+        session=session,
+        query=q,
+        workspace_id=user.workspace_id,
+        limit=limit,
+    )
 
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────

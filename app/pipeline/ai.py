@@ -23,7 +23,7 @@ from app.domain.customers.models import Customer
 from app.domain.memory import service as memory_service
 from app.events.dispatcher import dispatcher
 from app.events.message_events import AIRequested, AIResponded
-from app.integrations.openai.client import get_ai_response
+from app.integrations.openai.provider import get_ai_provider
 from app.pipeline.intent import classify_intent
 from app.pipeline.memory import inject_memory
 from app.utils.logger import get_logger
@@ -144,7 +144,7 @@ async def process_with_ai(
 
     # ── Call OpenAI conversational response ───────────────────────────────────
     t0 = time.monotonic()
-    ai_result = await get_ai_response(
+    ai_result = await get_ai_provider().get_ai_response(
         conversation_history=full_history,
         user_message=user_content,
     )

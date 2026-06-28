@@ -30,6 +30,10 @@ import { AuditLogViewer } from '../components/audit/AuditLogViewer'
 import { Shield, Users, RefreshCw } from 'lucide-react'
 import type { NavSection } from '../types'
 
+const DeveloperToolsSection = process.env.ENABLE_DEVELOPER_TOOLS === 'true'
+  ? React.lazy(() => import('./DeveloperToolsPage').then(m => ({ default: m.DeveloperToolsPage })))
+  : () => null
+
 export const DashboardPage = () => {
   const queryClient = useQueryClient()
   const [section, setSection] = useState<NavSection>('overview')
@@ -311,6 +315,12 @@ export const DashboardPage = () => {
 
             {section === 'audit' && (
               <AuditLogViewer logs={auditLogs} loading={loadingAudit} onRefresh={refetchAudit} />
+            )}
+
+            {section === 'developer_tools' && (
+              <React.Suspense fallback={<div className="h-64 card skeleton"></div>}>
+                <DeveloperToolsSection />
+              </React.Suspense>
             )}
           </div>
 

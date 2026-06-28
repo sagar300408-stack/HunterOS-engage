@@ -22,6 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.customers.models import Customer, CustomerStatus
 from app.utils.logger import get_logger
+from app.utils.context import is_demo_context
+from app.utils.clock import SystemClock
 
 logger = get_logger(__name__)
 
@@ -85,6 +87,7 @@ async def get_or_create_customer(
         phone=phone,
         name=name,
         status=CustomerStatus.new,
+        is_demo=is_demo_context.get(),
     )
     session.add(customer)
     await session.flush()  # get UUID before commit
@@ -157,7 +160,7 @@ async def update_last_interaction(
     customer = result.scalar_one_or_none()
 
     if customer:
-        customer.last_interaction = datetime.now(timezone.utc)
+        customer.last_interaction = SystemClock.now()
         await session.flush()
         logger.debug(
             "customer_last_interaction_updated",

@@ -24,6 +24,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Boolean,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -67,6 +68,7 @@ class Conversation(Base):
         UUID(as_uuid=True),
         nullable=True,
     )
+    is_demo = Column(Boolean, default=False, server_default="false", nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

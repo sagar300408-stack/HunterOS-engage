@@ -298,3 +298,4 @@ export type NavSection =
   | 'queue'
   | 'system'
   | 'audit'
+  | 'developer_tools'

@@ -78,6 +78,8 @@ from app.domain.intent.models import IntentHistory
 from app.domain.leads.service import qualify_lead, _score_to_grade
 from app.domain.memory.models import CustomerMemory, CustomerMemoryEvent
 from app.utils.logger import get_logger
+from app.utils.context import is_demo_context
+from app.utils.clock import SystemClock
 
 logger = get_logger(__name__)
 
@@ -144,7 +146,7 @@ async def get_overview_metrics(
     workspace_id: Optional[UUID] = None,
 ) -> OverviewMetrics:
     """Compute all 9 KPI cards in a minimal number of DB queries."""
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = SystemClock.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Total customers
     total_customers = await session.scalar(select(func.count(Customer.id)))
@@ -169,7 +171,7 @@ async def get_overview_metrics(
     )
 
     # Active conversations (those with messages in last 24h)
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff = SystemClock.now() - timedelta(hours=24)
     active_convos = await session.scalar(
         select(func.count(func.distinct(Message.conversation_id))).where(
             Message.timestamp >= cutoff
@@ -635,9 +637,9 @@ async def get_analytics(
     date_to: Optional[date] = None,
 ) -> AnalyticsData:
     if not date_from:
-        date_from = (datetime.now(timezone.utc) - timedelta(days=30)).date()
+        date_from = (SystemClock.now() - timedelta(days=30)).date()
     if not date_to:
-        date_to = datetime.now(timezone.utc).date()
+        date_to = SystemClock.now().date()
 
     from_dt = datetime.combine(date_from, datetime.min.time()).replace(tzinfo=timezone.utc)
     to_dt   = datetime.combine(date_to, datetime.max.time()).replace(tzinfo=timezone.utc)
@@ -854,7 +856,7 @@ async def get_queue_status(
     session: AsyncSession,
     workspace_id: Optional[UUID] = None,
 ) -> QueueStatus:
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = SystemClock.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     pending  = await session.scalar(select(func.count(BackgroundJob.id)).where(BackgroundJob.status == JobStatus.pending))
     running  = await session.scalar(select(func.count(BackgroundJob.id)).where(BackgroundJob.status == JobStatus.running))
@@ -900,10 +902,40 @@ async def write_audit_log(
         target_id=target_id,
         payload=payload,
         ip_address=ip_address,
+        is_demo=is_demo_context.get(),
         created_at=datetime.now(timezone.utc),
     )
     session.add(log)
     await session.flush()
+
+
+async def create_background_job(
+    session: AsyncSession,
+    job_type: str,
+    status: JobStatus = JobStatus.pending,
+    run_count: int = 0,
+    last_error: Optional[str] = None,
+    job_metadata: Optional[dict] = None,
+    scheduled_at: Optional[datetime] = None,
+    started_at: Optional[datetime] = None,
+    completed_at: Optional[datetime] = None,
+    workspace_id: Optional[UUID] = None,
+) -> BackgroundJob:
+    job = BackgroundJob(
+        workspace_id=workspace_id or DEFAULT_WORKSPACE_ID,
+        job_type=job_type,
+        status=status,
+        run_count=run_count,
+        last_error=last_error,
+        job_metadata=job_metadata,
+        scheduled_at=scheduled_at or SystemClock.now(),
+        started_at=started_at,
+        completed_at=completed_at,
+        is_demo=is_demo_context.get(),
+    )
+    session.add(job)
+    await session.flush()
+    return job
 
 
 async def get_audit_log(

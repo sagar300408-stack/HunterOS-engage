@@ -60,6 +60,10 @@ class Settings(BaseSettings):
         default="00000000-0000-0000-0000-000000000001",
         alias="DEFAULT_WORKSPACE_ID",
     )
+    enable_developer_tools: bool = Field(
+        default=False,
+        alias="ENABLE_DEVELOPER_TOOLS"
+    )
 
     @property
     def is_production(self) -> bool:

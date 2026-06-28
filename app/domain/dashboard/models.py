@@ -23,6 +23,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Boolean,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -135,6 +136,7 @@ class AuditLog(Base):
     target_id    = Column(UUID(as_uuid=True), nullable=True)
     payload      = Column(JSONB, nullable=True)           # before/after diff
     ip_address   = Column(String(45), nullable=True)      # for compliance
+    is_demo      = Column(Boolean, default=False, server_default="false", nullable=False)
     created_at   = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -247,6 +249,7 @@ class BackgroundJob(Base):
     run_count    = Column(Integer, nullable=False, default=0)
     last_error   = Column(Text, nullable=True)
     job_metadata = Column(JSONB, nullable=True)   # renamed from 'metadata' — reserved by SQLAlchemy
+    is_demo      = Column(Boolean, default=False, server_default="false", nullable=False)
     scheduled_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.utcnow())
     started_at   = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)

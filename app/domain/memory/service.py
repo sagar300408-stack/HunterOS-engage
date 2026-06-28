@@ -27,6 +27,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
+from app.utils.clock import SystemClock
 
 from openai import AsyncOpenAI
 from sqlalchemy import select
@@ -238,7 +239,7 @@ async def update_customer_memory(
     # ── 3. Write updated memory ────────────────────────────────────────────────
     memory.summary = extracted.get("summary", memory.summary)
     memory.structured_data = extracted.get("structured_data", memory.structured_data)
-    memory.last_updated = datetime.now(timezone.utc)
+    memory.last_updated = SystemClock.now()
     await session.flush()
 
     # ── 4. Emit events for each detected significant fact ─────────────────────
@@ -299,7 +300,7 @@ async def append_memory_event(
         customer_id=customer_id,
         event_type=event_type,
         payload=payload,
-        created_at=datetime.now(timezone.utc),
+        created_at=SystemClock.now(),
     )
     session.add(event)
     await session.flush()
@@ -360,7 +361,7 @@ async def _snapshot_memory_version(
         customer_id=customer_id,
         summary=memory.summary,
         structured_data=memory.structured_data,
-        created_at=datetime.now(timezone.utc),
+        created_at=SystemClock.now(),
     )
     session.add(version)
     await session.flush()

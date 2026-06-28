@@ -21,6 +21,9 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Load ORM models so Alembic can detect changes
 from app.domain.conversations.models import Base  # noqa: F401

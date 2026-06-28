@@ -29,6 +29,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
+from app.utils.clock import SystemClock
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -190,7 +191,7 @@ async def save_intent(
         memory_influenced=intent_result.raw_extraction.get("memory_influenced"),
         detected_keywords=intent_result.raw_extraction.get("detected_keywords"),
         workspace_id=workspace_id,
-        created_at=datetime.now(timezone.utc),
+        created_at=SystemClock.now(),
     )
     session.add(row)
     await session.flush()

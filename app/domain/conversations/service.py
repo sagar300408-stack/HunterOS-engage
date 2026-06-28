@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
+from app.utils.clock import SystemClock
 from app.domain.conversations.models import (
     AIMetadata,
     Conversation,
@@ -27,6 +28,7 @@ from app.domain.conversations.models import (
 )
 from app.domain.conversations.schemas import SaveMessageDTO
 from app.utils.logger import get_logger
+from app.utils.context import is_demo_context
 
 logger = get_logger(__name__)
 
@@ -54,7 +56,7 @@ async def get_or_create_conversation(
         customer_id:   UUID of the Customer row (Phase 2+). None for legacy rows.
     """
     settings = get_settings()
-    idle_cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.conversation_idle_hours)
+    idle_cutoff = SystemClock.now() - timedelta(hours=settings.conversation_idle_hours)
 
     result = await session.execute(
         select(Conversation)
@@ -85,7 +87,7 @@ async def get_or_create_conversation(
             return conversation
 
         # Past idle window — log the gap and fall through to create a new one
-        idle_hours = (datetime.now(timezone.utc) - conv_created).total_seconds() / 3600
+        idle_hours = (SystemClock.now() - conv_created).total_seconds() / 3600
         logger.info(
             "conversation_idle_window_exceeded",
             idle_hours=round(idle_hours, 1),
@@ -97,7 +99,8 @@ async def get_or_create_conversation(
     conversation = Conversation(
         customer_phone=customer_phone,
         customer_id=customer_id,
-        created_at=datetime.now(timezone.utc),
+        created_at=SystemClock.now(),
+        is_demo=is_demo_context.get(),
     )
     session.add(conversation)
     await session.flush()

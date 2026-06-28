@@ -11,7 +11,8 @@ def normalize_phone(phone: str) -> str:
 
 def utcnow() -> datetime:
     """Return the current UTC time as a timezone-aware datetime."""
-    return datetime.now(timezone.utc)
+    from app.utils.clock import SystemClock
+    return SystemClock.now()
 
 
 def extract_message_data(payload: dict) -> Optional[dict]:

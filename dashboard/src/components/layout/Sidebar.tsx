@@ -71,6 +71,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentSection, onSelectSectio
             </button>
           )
         })}
+
+        {process.env.ENABLE_DEVELOPER_TOOLS === 'true' && role === 'Founder' && (
+          <>
+            <hr className="border-[#334155] my-4" />
+            <button
+              onClick={() => onSelectSection('developer_tools')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                currentSection === 'developer_tools'
+                  ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/10'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <Sliders className="h-4.5 w-4.5 text-amber-500" />
+              Developer Tools
+            </button>
+          </>
+        )}
       </nav>
 
       {/* Operator profile card */}

@@ -14,7 +14,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Index, String, Text
+from sqlalchemy import Column, DateTime, Enum, Index, String, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -63,6 +63,7 @@ class Customer(Base):
     buying_stage = Column(String(100), nullable=True)
     # Phase 4: workspace_id for multi-tenancy. Nullable for Phase 1-3 row compatibility.
     workspace_id = Column(UUID(as_uuid=True), nullable=True)
+    is_demo = Column(Boolean, default=False, server_default="false", nullable=False)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

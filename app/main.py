@@ -100,6 +100,12 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_v1.router)
     app.include_router(dashboard_v1.ws_router)   # WebSocket at /ws/dashboard
 
+    if settings.enable_developer_tools:
+        from app.developer_tools.middleware import LatencyMiddleware
+        app.add_middleware(LatencyMiddleware)
+        from app.developer_tools.router import router as dev_tools_router
+        app.include_router(dev_tools_router)
+
     # ── System endpoints ──────────────────────────────────────────────────────
     @app.get("/health", tags=["System"], summary="Health Check")
     async def health_check() -> dict:
@@ -107,8 +113,8 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": "HunterOS Engage",
-            "version": "4.0.0",
-            "phase": 4,
+            "version": "1.0.0",
+            "phase": 1,
         }
 
     return app

@@ -20,8 +20,9 @@ from app.domain.conversations.schemas import (
 )
 from app.events.dispatcher import dispatcher
 from app.events.message_events import ReplySent
-from app.integrations.whatsapp.client import send_text_message
+from app.integrations.whatsapp.provider import get_whatsapp_provider
 from app.utils.logger import get_logger
+from app.utils.clock import SystemClock
 
 logger = get_logger(__name__)
 
@@ -52,7 +53,7 @@ async def send_response(
         direction=MessageDirectionEnum.outgoing,
         content=content,
         wa_message_id=None,  # populated below after send
-        timestamp=datetime.now(timezone.utc),
+        timestamp=SystemClock.now(),
         ai_metadata=AIMetadataSchema(
             model=ai_result["model"],
             prompt_tokens=ai_result["prompt_tokens"],
@@ -74,7 +75,7 @@ async def send_response(
     )
 
     # ── Send via WhatsApp ─────────────────────────────────────────────────────
-    wa_message_id = await send_text_message(to=to_phone, body=content)
+    wa_message_id = await get_whatsapp_provider().send_text_message(to=to_phone, body=content)
 
     logger.info(
         "reply_sent",
