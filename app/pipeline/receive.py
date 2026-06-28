@@ -142,6 +142,29 @@ async def receive(
         )
     )
 
+    # ── Log Pipeline Steps for Event Replay (Phase 4) ────────────────────────
+    try:
+        from app.domain.dashboard.service import log_pipeline_step
+        # 1. Message Received
+        await log_pipeline_step(
+            session=session,
+            message_id=message.id,
+            step="message_received",
+            payload={"content": message_data["content"], "from_phone": from_phone, "wa_message_id": wa_message_id},
+            workspace_id=customer.workspace_id,
+        )
+        # 2. Customer Identified
+        await log_pipeline_step(
+            session=session,
+            message_id=message.id,
+            step="customer_identified",
+            payload={"customer_id": str(customer.id), "name": customer.name, "is_new": is_new_customer},
+            workspace_id=customer.workspace_id,
+        )
+    except Exception as e:
+        logger.error("failed_to_log_receive_pipeline_steps", error=str(e))
+
     # Phase 3: return the saved Message object so the pipeline has message.id
     # for intent_history persistence without an extra DB query.
     return conversation, message_data, customer, message
+

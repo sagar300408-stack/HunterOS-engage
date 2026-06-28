@@ -97,12 +97,42 @@ async def receive_webhook(
         )
 
         # ── Stage 6: Respond ──────────────────────────────────────────────────
+        import time
+        t0 = time.monotonic()
         await send_response(
             to_phone=message_data["from_phone"],
             conversation_id=conversation.id,
             ai_result=ai_result,
             session=session,
         )
+        t_respond = int((time.monotonic() - t0) * 1000)
+
+        # Log Stage 7: reply_sent (Phase 4)
+        try:
+            from app.domain.dashboard.service import log_pipeline_step
+            await log_pipeline_step(
+                session=session,
+                message_id=message.id,
+                step="reply_sent",
+                duration_ms=t_respond,
+                payload={"reply": ai_result["content"], "to": message_data["from_phone"]},
+                workspace_id=customer.workspace_id,
+            )
+        except Exception as e:
+            logger.error("failed_to_log_reply_sent_step", error=str(e))
+
+        # Broadcast live update to WebSocket clients (Phase 4)
+        try:
+            from app.integrations.websocket.manager import ws_manager
+            await ws_manager.broadcast({
+                "event": "conversation_updated",
+                "data": {
+                    "conversation_id": str(conversation.id),
+                    "from_phone": message_data["from_phone"],
+                }
+            })
+        except Exception as e:
+            logger.error("failed_to_broadcast_websocket_event", error=str(e))
 
         # ── Stage 5: Follow-up (stub — Phase 6) ──────────────────────────────
         await schedule_followup(

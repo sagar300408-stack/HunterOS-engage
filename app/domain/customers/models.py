@@ -61,6 +61,8 @@ class Customer(Base):
     # Phase 3: Synced from latest IntentHistory.buying_stage after every extraction.
     # Enables fast dashboard queries without joining intent_history.
     buying_stage = Column(String(100), nullable=True)
+    # Phase 4: workspace_id for multi-tenancy. Nullable for Phase 1-3 row compatibility.
+    workspace_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

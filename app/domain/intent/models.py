@@ -118,8 +118,17 @@ class IntentHistory(Base):
     buying_stage = Column(String(100), nullable=True)
     next_action  = Column(String(255), nullable=True)
 
-    # ── Full extraction payload (for audit and future fields) ─────────────────
+    # ── Full extraction payload ───────────────────────────────────────────────
     extracted_json = Column(JSONB, nullable=True)
+
+    # ── Phase 4: AI Explainability ─────────────────────────────────────────────
+    # Why the model reached this classification — shown in the Explainability Panel.
+    reasoning         = Column(Text, nullable=True)   # narrative explanation
+    memory_influenced = Column(Text, nullable=True)   # which memory facts shaped the classification
+    detected_keywords = Column(JSONB, nullable=True)  # list of keyword/phrase matches
+
+    # ── Phase 4: Multi-tenancy ─────────────────────────────────────────────────
+    workspace_id = Column(UUID(as_uuid=True), nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),

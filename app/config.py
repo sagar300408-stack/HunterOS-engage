@@ -42,6 +42,25 @@ class Settings(BaseSettings):
     # Start a new conversation thread after this many hours of inactivity
     conversation_idle_hours: int = Field(default=24, alias="CONVERSATION_IDLE_HOURS")
 
+    # ── Phase 4: Dashboard ───────────────────────────────────────────────────────
+    # Secret key for signing JWT tokens. Must be at least 32 random characters.
+    dashboard_secret_key: str = Field(
+        default="change-me-in-production-32-chars-min",
+        alias="DASHBOARD_SECRET_KEY",
+    )
+    # Comma-separated CORS origins for the React dashboard dev server.
+    # Example: "http://localhost:5173,https://dashboard.hunteros.ai"
+    dashboard_cors_origins: str = Field(
+        default="http://localhost:5173",
+        alias="DASHBOARD_CORS_ORIGINS",
+    )
+    # Default workspace UUID for single-tenant bootstrapping.
+    # Existing rows without workspace_id are treated as belonging to this workspace.
+    default_workspace_id: str = Field(
+        default="00000000-0000-0000-0000-000000000001",
+        alias="DEFAULT_WORKSPACE_ID",
+    )
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"

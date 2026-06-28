@@ -5,6 +5,7 @@ Responsibilities:
   - Configure structured logging
   - Initialize the database connection pool
   - Register all versioned routers
+  - Configure CORS for the React dashboard
   - Expose health check endpoint
   - Manage lifespan (startup + graceful shutdown)
 """
@@ -12,7 +13,10 @@ Responsibilities:
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1 import auth as auth_v1
+from app.api.v1 import dashboard as dashboard_v1
 from app.api.v1 import webhook as webhook_v1
 from app.config import get_settings
 from app.integrations.postgres.database import create_tables, dispose_engine
@@ -24,7 +28,7 @@ async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
 
-    Startup:  configure logging → create DB tables (dev) → log ready
+    Startup:  configure logging → create DB tables (dev) → seed admin user → log ready
     Shutdown: dispose DB engine → log shutdown
     """
     configure_logging()
@@ -43,6 +47,8 @@ async def lifespan(app: FastAPI):
     # In staging/production, use: alembic upgrade head
     if settings.is_development:
         await create_tables()
+        from app.startup.seeder import seed_default_admin
+        await seed_default_admin()
 
     logger.info("hunteros_engage_ready", routes_registered=True)
 
@@ -66,20 +72,33 @@ def create_app() -> FastAPI:
         title="HunterOS Engage",
         description=(
             "AI-Powered Customer Engagement Platform\n\n"
-            "Phase 3: Intent Engine — Every conversation is transformed into "
-            "structured business intelligence: intent, budget, timeline, urgency, "
-            "buying stage, and recommended next action.\n"
+            "Phase 4: Live Dashboard — Operational mission control with RBAC, "
+            "multi-tenancy, audit logging, AI explainability, event replay, "
+            "queue monitoring, cost analytics, and real-time WebSocket updates.\n"
             "Built for production. Designed for every future phase."
         ),
-        version="3.0.0",
+        version="4.0.0",
         docs_url="/docs" if not settings.is_production else None,
         redoc_url="/redoc" if not settings.is_production else None,
         openapi_url="/openapi.json" if not settings.is_production else None,
         lifespan=lifespan,
     )
 
+    # ── CORS — allow React dashboard dev server ───────────────────────────────
+    origins = [o.strip() for o in settings.dashboard_cors_origins.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(webhook_v1.router)
+    app.include_router(auth_v1.router)
+    app.include_router(dashboard_v1.router)
+    app.include_router(dashboard_v1.ws_router)   # WebSocket at /ws/dashboard
 
     # ── System endpoints ──────────────────────────────────────────────────────
     @app.get("/health", tags=["System"], summary="Health Check")
@@ -88,8 +107,8 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": "HunterOS Engage",
-            "version": "3.0.0",
-            "phase": 3,
+            "version": "4.0.0",
+            "phase": 4,
         }
 
     return app

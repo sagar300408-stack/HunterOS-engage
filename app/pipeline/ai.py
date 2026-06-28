@@ -1,22 +1,18 @@
 """
-Pipeline Stage 4 — AI Processing (Phase 3)
+Pipeline Stage 4 — AI Processing (Phase 3 + Phase 4 Events)
 
 Responsibilities:
   - Build 4-block memory context (Phase 2)
-  - Run intent extraction and inject intent context block (Phase 3 — NEW)
+  - Run intent extraction and inject intent context block (Phase 3)
   - Fetch conversation history (stateless)
   - Call OpenAI conversational response
   - Post-response: conditional memory update + last_interaction stamp
   - Emit AIRequested and AIResponded events
-
-Phase 3 additions vs Phase 2:
-  - classify_intent() called between memory injection and AI call
-  - Intent context block inserted into full_history
-  - message_id now accepted (required for intent_history FK)
-  - ai_result enriched with intent_result for downstream use
+  - Log pipeline events for Event Replay (Phase 4 — NEW)
 """
 
 from uuid import UUID
+import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,24 +41,14 @@ async def process_with_ai(
     """
     Stage 4: Build full context, extract intent, call OpenAI, update memory.
 
-    Context construction order (per spec):
+    Context construction order:
         1. System prompt (v3.txt)
-        2. Customer Profile block       (Phase 2 memory)
-        3. Structured Memory block      (Phase 2 memory)
-        4. Rolling Summary block        (Phase 2 memory)
-        5. Intent block                 (Phase 3 — NEW)
+        2. Customer Profile block
+        3. Structured Memory block
+        4. Rolling Summary block
+        5. Intent block
         6. Recent conversation history
         7. New user message
-
-    Args:
-        conversation_id: UUID of the active conversation.
-        message_id:      UUID of the incoming Message row.
-        customer:        Customer ORM object from Stage 2.
-        user_content:    The raw incoming message text.
-        session:         Active async database session.
-
-    Returns:
-        Enriched result dict — all OpenAI metadata plus intent_result key.
     """
     settings = get_settings()
 
@@ -86,13 +72,30 @@ async def process_with_ai(
     history = await message_service.get_conversation_history(session, conversation_id)
 
     # ── Stage 5: Inject memory context (4-block, Phase 2) ────────────────────
+    t0 = time.monotonic()
     memory_context = await inject_memory(session=session, customer=customer)
+    t_memory = int((time.monotonic() - t0) * 1000)
 
-    # ── Stage 6: Intent extraction (Phase 3) ──────────────────────────────────
     # Grab memory summary to give the intent extractor extra context
     memory = await memory_service.get_customer_memory(session, customer.id)
     memory_summary = memory.summary if memory else None
 
+    # Log Stage 3: memory_loaded
+    try:
+        from app.domain.dashboard.service import log_pipeline_step
+        await log_pipeline_step(
+            session=session,
+            message_id=message_id,
+            step="memory_loaded",
+            duration_ms=t_memory,
+            payload={"summary": memory_summary, "message_count": memory.message_count if memory else 0},
+            workspace_id=customer.workspace_id,
+        )
+    except Exception as e:
+        logger.error("failed_to_log_memory_loaded_step", error=str(e))
+
+    # ── Stage 6: Intent extraction (Phase 3) ──────────────────────────────────
+    t0 = time.monotonic()
     intent_result = await classify_intent(
         session=session,
         customer=customer,
@@ -102,6 +105,27 @@ async def process_with_ai(
         conversation_history=history[:-1],   # exclude the just-saved incoming msg
         memory_summary=memory_summary,
     )
+    t_intent = int((time.monotonic() - t0) * 1000)
+
+    # Log Stage 4: intent_extracted
+    try:
+        from app.domain.dashboard.service import log_pipeline_step
+        await log_pipeline_step(
+            session=session,
+            message_id=message_id,
+            step="intent_extracted",
+            duration_ms=t_intent,
+            payload={
+                "intent": str(intent_result.intent),
+                "confidence": intent_result.confidence,
+                "urgency": str(intent_result.urgency),
+                "buying_stage": intent_result.buying_stage,
+                "reasoning": intent_result.raw_extraction.get("reasoning"),
+            },
+            workspace_id=customer.workspace_id,
+        )
+    except Exception as e:
+        logger.error("failed_to_log_intent_extracted_step", error=str(e))
 
     # Build the intent context block injected into the AI call
     intent_context = [{
@@ -119,10 +143,31 @@ async def process_with_ai(
     full_history = memory_context + intent_context + history[:-1]
 
     # ── Call OpenAI conversational response ───────────────────────────────────
+    t0 = time.monotonic()
     ai_result = await get_ai_response(
         conversation_history=full_history,
         user_message=user_content,
     )
+    t_ai = int((time.monotonic() - t0) * 1000)
+
+    # Log Stage 5: response_generated
+    try:
+        from app.domain.dashboard.service import log_pipeline_step
+        await log_pipeline_step(
+            session=session,
+            message_id=message_id,
+            step="response_generated",
+            duration_ms=t_ai,
+            payload={
+                "response": ai_result["content"],
+                "model": ai_result["model"],
+                "total_tokens": ai_result["total_tokens"],
+                "cost": float(ai_result["estimated_cost_usd"]),
+            },
+            workspace_id=customer.workspace_id,
+        )
+    except Exception as e:
+        logger.error("failed_to_log_response_generated_step", error=str(e))
 
     # ── Emit AIResponded event ────────────────────────────────────────────────
     dispatcher.dispatch(
@@ -150,7 +195,9 @@ async def process_with_ai(
         interval=settings.memory_update_interval,
     )
 
+    t_mem_update = 0
     if should_update:
+        t0 = time.monotonic()
         logger.info(
             "memory_update_triggered",
             customer_id=str(customer.id),
@@ -167,12 +214,31 @@ async def process_with_ai(
             ai_response=ai_result["content"],
             trigger=trigger,
         )
+        t_mem_update = int((time.monotonic() - t0) * 1000)
     else:
         logger.debug(
             "memory_update_skipped",
             customer_id=str(customer.id),
             message_count=memory.message_count,
         )
+
+    # Log Stage 6: memory_updated
+    try:
+        from app.domain.dashboard.service import log_pipeline_step
+        await log_pipeline_step(
+            session=session,
+            message_id=message_id,
+            step="memory_updated",
+            duration_ms=t_mem_update if should_update else None,
+            payload={
+                "updated": should_update,
+                "trigger": trigger,
+                "current_summary": memory.summary,
+            },
+            workspace_id=customer.workspace_id,
+        )
+    except Exception as e:
+        logger.error("failed_to_log_memory_updated_step", error=str(e))
 
     # ── Stage 11: Update last_interaction ─────────────────────────────────────
     await customer_service.update_last_interaction(session, customer.id)

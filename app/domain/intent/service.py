@@ -159,6 +159,7 @@ async def save_intent(
     conversation_id: UUID,
     message_id: UUID,
     intent_result: IntentResult,
+    workspace_id: Optional[UUID] = None,
 ) -> IntentHistory:
     """
     Persist an IntentResult to intent_history.
@@ -184,6 +185,11 @@ async def save_intent(
         buying_stage=intent_result.buying_stage,
         next_action=intent_result.next_action,
         extracted_json=intent_result.raw_extraction,
+        # Phase 4 explainability fields
+        reasoning=intent_result.raw_extraction.get("reasoning"),
+        memory_influenced=intent_result.raw_extraction.get("memory_influenced"),
+        detected_keywords=intent_result.raw_extraction.get("detected_keywords"),
+        workspace_id=workspace_id,
         created_at=datetime.now(timezone.utc),
     )
     session.add(row)
@@ -194,6 +200,7 @@ async def save_intent(
         intent_history_id=str(row.id),
         customer_id=str(customer_id),
         intent=str(intent_result.intent),
+        has_reasoning=bool(row.reasoning),
     )
 
     return row
@@ -304,13 +311,17 @@ Return a JSON object with EXACTLY this structure:
     "confidence": <float 0.0-1.0>
   }},
   "urgency": "<high | medium | low | unknown>",
-  "buying_stage": "<Research | Comparing Options | Ready to Schedule | Negotiation | Purchase Ready | Existing Customer | null>"
+  "buying_stage": "<Research | Comparing Options | Ready to Schedule | Negotiation | Purchase Ready | Existing Customer | null>",
+  "reasoning": "<1-2 sentence explanation of WHY this intent was chosen>",
+  "memory_influenced": "<which prior memory facts, if any, influenced this classification. null if memory was empty or not relevant>",
+  "detected_keywords": ["<keyword1>", "<keyword2>"]
 }}
 
 Rules:
 - Set null for fields that cannot be determined from the conversation
 - confidence reflects certainty from THIS conversation — not assumptions
 - buying_stage should reflect the customer's position in the purchase journey
+- detected_keywords should list exact words or phrases from the message that drove the intent classification
 - Return ONLY the JSON object"""
 
     try:

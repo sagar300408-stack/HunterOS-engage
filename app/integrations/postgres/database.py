@@ -72,6 +72,29 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+from contextlib import asynccontextmanager  # noqa: E402
+
+
+@asynccontextmanager
+async def get_session():
+    """
+    Async context manager yielding a session — for use outside FastAPI DI.
+    Usage:
+        async with get_session() as session:
+            async with session.begin():
+                ...
+    """
+    factory = get_session_factory()
+    async with factory() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
 async def create_tables() -> None:
     """
     Create all tables from ORM metadata.
@@ -87,6 +110,12 @@ async def create_tables() -> None:
         CustomerMemoryEvent,
     )
     from app.domain.intent.models import IntentHistory  # noqa: F401
+    from app.domain.dashboard.models import (  # noqa: F401
+        User,
+        AuditLog,
+        PipelineEvent,
+        BackgroundJob,
+    )
 
     engine = get_engine()
     async with engine.begin() as conn:

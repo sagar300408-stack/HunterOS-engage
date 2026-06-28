@@ -62,6 +62,11 @@ class Conversation(Base):
         ForeignKey("customers.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Phase 4: workspace_id for multi-tenancy. Default = dev workspace.
+    workspace_id = Column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -121,6 +126,12 @@ class Message(Base):
         "IntentHistory",
         back_populates="message",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    pipeline_events = relationship(
+        "PipelineEvent",
+        back_populates="message",
+        order_by="PipelineEvent.created_at",
         cascade="all, delete-orphan",
     )
 
