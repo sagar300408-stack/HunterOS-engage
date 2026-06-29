@@ -36,7 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentSection, onSelectSectio
     { id: 'audit' as NavSection, label: 'Audit Trail', icon: History },
     { id: 'system' as NavSection, label: 'System Health', icon: ShieldCheck },
   ]
-
+console.log("DEV TOOLS:", import.meta.env.VITE_ENABLE_DEVELOPER_TOOLS)
+console.log("ROLE:", role)
   return (
     <aside className="w-64 border-r border-[#334155] bg-[#1e293b] flex flex-col h-full shrink-0">
       {/* Brand logo */}
