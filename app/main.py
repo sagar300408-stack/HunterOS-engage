@@ -21,6 +21,7 @@ from app.api.v1 import webhook as webhook_v1
 from app.config import get_settings
 from app.integrations.postgres.database import create_tables, dispose_engine
 from app.utils.logger import configure_logging, get_logger
+from app.api.v1.dev import router as dev_router
 
 
 @asynccontextmanager
@@ -120,6 +121,9 @@ def create_app() -> FastAPI:
     return app
 
 
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 # uvicorn app.main:app --reload
 app = create_app()
+app.include_router(dev_router)

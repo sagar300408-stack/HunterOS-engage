@@ -23,6 +23,7 @@ from app.pipeline.receive import receive
 from app.pipeline.respond import send_response
 from app.utils.logger import get_logger
 from app.utils.context import is_demo_context
+from app.services.communication import process_whatsapp_pipeline
 
 router = APIRouter(prefix="/api/v1", tags=["Webhook v1"])
 logger = get_logger(__name__)
