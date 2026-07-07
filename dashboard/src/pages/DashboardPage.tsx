@@ -22,12 +22,13 @@ import { ConversationFeed } from '../components/conversations/ConversationFeed'
 import { ConversationViewer } from '../components/conversations/ConversationViewer'
 import { CustomerProfile } from '../components/customers/CustomerProfile'
 import { LeadPipeline } from '../components/leads/LeadPipeline'
+import { SchedulePage } from './SchedulePage'
 import { AnalyticsCharts } from '../components/analytics/AnalyticsCharts'
 import { ActivityTimeline } from '../components/activity/ActivityTimeline'
 import { QueueMonitor } from '../components/system/QueueMonitor'
 import { SystemHealth } from '../components/system/SystemHealth'
 import { AuditLogViewer } from '../components/audit/AuditLogViewer'
-import { Shield, Users, RefreshCw } from 'lucide-react'
+import { Shield, Users, RefreshCw, Calendar } from 'lucide-react'
 import type { NavSection } from '../types'
 
 const DeveloperToolsSection = process.env.ENABLE_DEVELOPER_TOOLS === 'true'
@@ -186,6 +187,7 @@ export const DashboardPage = () => {
                 {section === 'queue' && 'Pending background triggers and task schedulers'}
                 {section === 'audit' && 'Immutable action log for compliance verification'}
                 {section === 'system' && 'API link states, database status, and operational warnings'}
+                {section === 'schedule' && 'Calendar management and upcoming engagement tracking'}
               </p>
             </div>
             
@@ -295,6 +297,10 @@ export const DashboardPage = () => {
                 loading={loadingLeads}
                 onMoveLead={handleMoveLead}
               />
+            )}
+            
+            {section === 'schedule' && (
+              <SchedulePage />
             )}
 
             {section === 'analytics' && (

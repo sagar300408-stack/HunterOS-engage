@@ -40,6 +40,12 @@ from app.domain.dashboard.models import (  # noqa: F401
     PipelineEvent,
     BackgroundJob,
 )
+from app.domain.scheduling.models import (  # noqa: F401
+    ScheduledEvent,
+    SchedulingCandidate,
+    EventAuditLog,
+    CustomerAvailabilityPreferences,
+)
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config

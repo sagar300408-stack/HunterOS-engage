@@ -9,6 +9,9 @@ import {
   Activity,
   DollarSign,
   UserPlus,
+  Calendar,
+  Clock as ClockIcon,
+  RefreshCw,
 } from 'lucide-react'
 import type { OverviewMetrics } from '../../types'
 
@@ -84,6 +87,27 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ metrics, loading }) =>
       icon: DollarSign,
       color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/10',
       description: 'Est. OpenAI API usage cost',
+    },
+    {
+      label: 'Upcoming Events',
+      value: metrics?.upcoming_events?.value,
+      icon: Calendar,
+      color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/10',
+      description: 'Scheduled in next 7 days',
+    },
+    {
+      label: 'Pending Callbacks',
+      value: metrics?.pending_callbacks?.value,
+      icon: ClockIcon,
+      color: 'text-amber-400 bg-amber-500/10 border-amber-500/10',
+      description: 'Waiting for call',
+    },
+    {
+      label: 'Pending Follow-ups',
+      value: metrics?.pending_followups?.value,
+      icon: RefreshCw,
+      color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/10',
+      description: 'Awaiting action',
     },
   ]
 

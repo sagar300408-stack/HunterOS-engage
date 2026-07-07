@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import auth as auth_v1
 from app.api.v1 import dashboard as dashboard_v1
+from app.api.v1 import scheduling as scheduling_v1
 from app.api.v1 import webhook as webhook_v1
 from app.config import get_settings
 from app.integrations.postgres.database import create_tables, dispose_engine
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(webhook_v1.router)
     app.include_router(auth_v1.router)
     app.include_router(dashboard_v1.router)
+    app.include_router(scheduling_v1.router)
     app.include_router(dashboard_v1.ws_router)   # WebSocket at /ws/dashboard
 
     if settings.enable_developer_tools:

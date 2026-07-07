@@ -11,6 +11,7 @@ import {
   Cpu,
   LogOut,
   Sliders,
+  Calendar,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import type { NavSection } from '../../types'
@@ -30,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentSection, onSelectSectio
     { id: 'conversations' as NavSection, label: 'Live Chat Feed', icon: MessageSquare },
     { id: 'customers' as NavSection, label: 'Customers', icon: Users },
     { id: 'leads' as NavSection, label: 'Lead Pipeline', icon: Kanban },
+    { id: 'schedule' as NavSection, label: 'Schedule', icon: Calendar },
     { id: 'analytics' as NavSection, label: 'AI Cost & Stats', icon: BarChart3 },
     { id: 'activity' as NavSection, label: 'AI Activity Feed', icon: Activity },
     { id: 'queue' as NavSection, label: 'Queue Monitor', icon: Cpu },

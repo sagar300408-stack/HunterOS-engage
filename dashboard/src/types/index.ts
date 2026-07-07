@@ -18,6 +18,9 @@ export interface OverviewMetrics {
   ai_success_rate: MetricCard
   memory_updates_today: MetricCard
   total_cost_today_usd: MetricCard
+  upcoming_events?: MetricCard
+  pending_callbacks?: MetricCard
+  pending_followups?: MetricCard
 }
 
 export interface IntentSummary {
@@ -293,9 +296,111 @@ export type NavSection =
   | 'conversations'
   | 'customers'
   | 'leads'
+  | 'schedule'
   | 'analytics'
   | 'activity'
   | 'queue'
   | 'system'
   | 'audit'
   | 'developer_tools'
+
+// ── Phase 5: Scheduling Engine ─────────────────────────────────────────────
+
+export type EventType = 'meeting' | 'site_visit' | 'callback' | 'followup' | 'reminder' | 'task'
+export type EventStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'rescheduled'
+export type EventPriority = 'high' | 'medium' | 'low'
+
+export interface ScheduledEventSummary {
+  id: string
+  event_type: EventType
+  title: string
+  status: EventStatus
+  priority: EventPriority
+  scheduled_for?: string
+  customer_id?: string
+  assigned_to?: string
+  created_by_ai: boolean
+  created_at: string
+}
+
+export interface ScheduledEvent extends ScheduledEventSummary {
+  workspace_id: string
+  description?: string
+  duration_minutes?: number
+  conversation_id?: string
+  assignment_strategy: string
+  created_by?: string
+  crm_synced: boolean
+  metadata?: Record<string, unknown>
+  follow_up_policy?: Record<string, unknown>
+  allowed_transitions: string[]
+  updated_at: string
+  completed_at?: string
+  cancelled_at?: string
+}
+
+export interface EventPage {
+  items: ScheduledEventSummary[]
+  total: number
+  page: number
+  page_size: number
+  has_next: boolean
+}
+
+export interface ScheduleOverview {
+  total_events: number
+  pending: number
+  confirmed: number
+  in_progress: number
+  completed_today: number
+  cancelled_today: number
+  upcoming_7_days: number
+  pending_callbacks: number
+  pending_followups: number
+  active_candidates: number
+  events_by_type: Record<string, number>
+}
+
+export interface SchedulingCandidate {
+  id: string
+  workspace_id: string
+  customer_id: string
+  conversation_id?: string
+  suggested_event_type: EventType
+  suggested_title?: string
+  status: 'pending_info' | 'ready' | 'promoted' | 'abandoned'
+  missing_fields: string[]
+  collected_data: Record<string, unknown>
+  created_by_ai: boolean
+  created_at: string
+  updated_at: string
+  promoted_event_id?: string
+}
+
+export interface EventAuditEntry {
+  id: string
+  actor_type: 'user' | 'ai' | 'system'
+  actor_id?: string
+  action: string
+  from_status?: string
+  to_status?: string
+  payload?: Record<string, unknown>
+  created_at: string
+}
+
+export interface ConflictResult {
+  has_conflict: boolean
+  conflicting_event_ids: string[]
+  suggested_slots: string[]
+}
+
+export interface CustomerAvailabilityPreferences {
+  id?: string
+  customer_id: string
+  preferred_time_of_day?: 'morning' | 'afternoon' | 'evening' | 'any'
+  unavailable_days?: string[]
+  preferred_meeting_mode?: 'in_person' | 'online' | 'phone' | 'any'
+  timezone: string
+  notes?: string
+  updated_at?: string
+}
