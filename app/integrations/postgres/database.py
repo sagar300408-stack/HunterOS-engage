@@ -72,6 +72,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+get_db_session = get_db
+
+
 from contextlib import asynccontextmanager  # noqa: E402
 
 
