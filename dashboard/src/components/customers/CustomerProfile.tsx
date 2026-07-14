@@ -3,7 +3,9 @@ import {
   Users, Save, Edit3, ShieldAlert, Cpu, Heart, MapPin, Calendar, CircleDollarSign
 } from 'lucide-react'
 import { updateCustomer } from '../../api/dashboard'
-import type { CustomerProfile as ProfileType } from '../../types'
+import { fetchLeadHealth, fetchSalesTimeline } from '../../api/followup'
+import type { CustomerProfile as ProfileType, LeadHealthSummary, SalesTimelineEntry } from '../../types'
+import LeadHealthBadge from '../followup/LeadHealthBadge'
 
 interface CustomerProfileProps {
   profile: ProfileType | undefined
@@ -12,7 +14,25 @@ interface CustomerProfileProps {
 }
 
 export const CustomerProfile: React.FC<CustomerProfileProps> = ({ profile, loading, onRefresh }) => {
-  const [activeTab, setActiveTab] = useState<'memory' | 'qual' | 'edit'>('memory')
+  const [activeTab, setActiveTab] = useState<'memory' | 'qual' | 'edit' | 'health'>('memory')
+  
+  const [health, setHealth] = useState<LeadHealthSummary | null>(null)
+  const [timeline, setTimeline] = useState<SalesTimelineEntry[]>([])
+  const [loadingHealth, setLoadingHealth] = useState(false)
+
+  React.useEffect(() => {
+    if (profile?.id && activeTab === 'health') {
+      setLoadingHealth(true)
+      Promise.all([
+        fetchLeadHealth(profile.id).catch(() => null),
+        fetchSalesTimeline(profile.id).catch(() => [])
+      ]).then(([h, t]) => {
+        setHealth(h)
+        setTimeline(t)
+        setLoadingHealth(false)
+      })
+    }
+  }, [profile?.id, activeTab])
   
   // Edit Form State
   const [name, setName] = useState('')
@@ -127,6 +147,16 @@ export const CustomerProfile: React.FC<CustomerProfileProps> = ({ profile, loadi
             }`}
           >
             Edit Profile
+          </button>
+          <button
+            onClick={() => setActiveTab('health')}
+            className={`flex-1 pb-2 border-b-2 text-center transition-all ${
+              activeTab === 'health'
+                ? 'border-indigo-500 text-slate-200 font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Lead Health
           </button>
         </div>
       </div>
@@ -307,6 +337,54 @@ export const CustomerProfile: React.FC<CustomerProfileProps> = ({ profile, loadi
               {saving ? 'Saving...' : 'Apply Details'}
             </button>
           </form>
+        )}
+
+        {activeTab === 'health' && (
+          <div className="space-y-5 fade-in text-xs">
+            {loadingHealth ? (
+              <div className="animate-pulse space-y-4">
+                <div className="h-32 bg-slate-800/50 rounded-lg"></div>
+                <div className="h-48 bg-slate-800/50 rounded-lg"></div>
+              </div>
+            ) : (
+              <>
+                {health ? (
+                  <LeadHealthBadge
+                    score={health.score}
+                    band={health.band}
+                    reasons={health.reasons}
+                    positive_signals={health.positive_signals}
+                    recommendation={health.recommendation}
+                    mode="full"
+                  />
+                ) : (
+                  <div className="p-4 text-center text-slate-500">Health score not available yet.</div>
+                )}
+
+                <div className="mt-6">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Sales Memory Timeline</h4>
+                  <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-700 before:to-transparent">
+                    {timeline.length === 0 ? (
+                      <div className="text-center text-slate-500 py-4 relative z-10 bg-[#0f172a]">No timeline events.</div>
+                    ) : (
+                      timeline.map(item => (
+                        <div key={item.id} className="relative z-10 flex gap-4">
+                          <div className="h-5 w-5 rounded-full bg-slate-800 border-2 border-indigo-500 mt-1 shrink-0"></div>
+                          <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50 flex-1">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-semibold text-slate-200">{item.title}</span>
+                              <span className="text-[10px] text-slate-500">{new Date(item.created_at).toLocaleDateString()}</span>
+                            </div>
+                            {item.description && <p className="text-slate-400 text-xs">{item.description}</p>}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
 

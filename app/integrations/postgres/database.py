@@ -119,6 +119,12 @@ async def create_tables() -> None:
         PipelineEvent,
         BackgroundJob,
     )
+    from app.domain.followup.models import (  # noqa: F401
+        FollowUpQueue,
+        FollowUpExecution,
+        LeadHealthScore,
+        SalesMemoryTimeline,
+    )
 
     engine = get_engine()
     async with engine.begin() as conn:

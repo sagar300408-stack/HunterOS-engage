@@ -404,3 +404,127 @@ export interface CustomerAvailabilityPreferences {
   notes?: string
   updated_at?: string
 }
+// ── Phase 6 Follow-Up Engine ──────────────────────────────────────────────────
+
+export interface LeadHealthSummary {
+  score: number;
+  band: 'Excellent' | 'Good' | 'Moderate' | 'At Risk' | 'Critical';
+  reasons: string[];
+  positive_signals: string[];
+  recommendation?: string;
+}
+
+export interface SalesTimelineEntry {
+  id: string;
+  event_type: string;
+  title: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface FollowUpQueueSummary {
+  id: string;
+  customer_id: string;
+  customer_name?: string;
+  customer_phone?: string;
+  status: 'scheduled' | 'executing' | 'sent' | 'cancelled' | 'paused' | 'replied';
+  reason: string;
+  strategy?: string;
+  priority: 'high' | 'normal' | 'low';
+  scheduled_for: string;
+  human_paused: boolean;
+  retry_count: int;
+}
+
+export interface FollowUpQueueDetail extends FollowUpQueueSummary {
+  generated_message?: string;
+  final_message?: string;
+  channel: string;
+  explainability_report?: any;
+  confidence_score?: number;
+  risk_score?: number;
+  cancellation_reason?: string;
+  created_at: string;
+  updated_at: string;
+  executed_at?: string;
+  executions: any[];
+}
+
+export interface FollowUpOverviewStats {
+  pending_followups: number;
+  due_today: number;
+  sent_today: number;
+  failed_today: number;
+  paused_needs_review: number;
+  strategy_distribution: Record<string, number>;
+}
+
+export interface FollowUpQueuePage {
+  items: FollowUpQueueSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+}
+// ── Phase 6 Follow-Up Engine ──────────────────────────────────────────────────
+
+export interface LeadHealthSummary {
+  score: number;
+  band: 'Excellent' | 'Good' | 'Moderate' | 'At Risk' | 'Critical';
+  reasons: string[];
+  positive_signals: string[];
+  recommendation?: string;
+}
+
+export interface SalesTimelineEntry {
+  id: string;
+  event_type: string;
+  title: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface FollowUpQueueSummary {
+  id: string;
+  customer_id: string;
+  customer_name?: string;
+  customer_phone?: string;
+  status: 'scheduled' | 'executing' | 'sent' | 'cancelled' | 'paused' | 'replied';
+  reason: string;
+  strategy?: string;
+  priority: 'high' | 'normal' | 'low';
+  scheduled_for: string;
+  human_paused: boolean;
+  retry_count: number;
+}
+
+export interface FollowUpQueueDetail extends FollowUpQueueSummary {
+  generated_message?: string;
+  final_message?: string;
+  channel: string;
+  explainability_report?: any;
+  confidence_score?: number;
+  risk_score?: number;
+  cancellation_reason?: string;
+  created_at: string;
+  updated_at: string;
+  executed_at?: string;
+  executions: any[];
+}
+
+export interface FollowUpOverviewStats {
+  pending_followups: number;
+  due_today: number;
+  sent_today: number;
+  failed_today: number;
+  paused_needs_review: number;
+  strategy_distribution: Record<string, number>;
+}
+
+export interface FollowUpQueuePage {
+  items: FollowUpQueueSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+}

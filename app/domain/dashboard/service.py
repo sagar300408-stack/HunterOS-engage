@@ -207,6 +207,36 @@ async def get_overview_metrics(
         ).where(Message.timestamp >= today_start)
     )
 
+    # Scheduling Metrics (Phase 5)
+    try:
+        from app.domain.scheduling.models import ScheduledEvent
+        upcoming_events = await session.scalar(
+            select(func.count(ScheduledEvent.id)).where(
+                ScheduledEvent.status.in_(["pending", "confirmed"]),
+                ScheduledEvent.scheduled_for >= today_start
+            )
+        )
+        pending_callbacks = await session.scalar(
+            select(func.count(ScheduledEvent.id)).where(
+                ScheduledEvent.status == "pending",
+                ScheduledEvent.event_type == "callback"
+            )
+        )
+    except Exception:
+        upcoming_events = 0
+        pending_callbacks = 0
+
+    # Follow-up Metrics (Phase 6)
+    try:
+        from app.domain.followup.models import FollowUpQueue
+        pending_followups = await session.scalar(
+            select(func.count(FollowUpQueue.id)).where(
+                FollowUpQueue.status.in_(["scheduled", "executing"])
+            )
+        )
+    except Exception:
+        pending_followups = 0
+
     def card(label, value, unit=None, trend=None, direction=None) -> MetricCard:
         return MetricCard(
             label=label,
@@ -226,6 +256,9 @@ async def get_overview_metrics(
         ai_success_rate=card("AI Success Rate", success_rate, unit="%"),
         memory_updates_today=card("Memory Updates Today", mem_updates or 0),
         total_cost_today_usd=card("AI Cost Today", round(float(cost_today or 0), 4), unit="USD"),
+        upcoming_events=card("Upcoming Events", upcoming_events or 0),
+        pending_callbacks=card("Pending Callbacks", pending_callbacks or 0),
+        pending_followups=card("Pending Follow-ups", pending_followups or 0),
     )
 
 

@@ -23,6 +23,7 @@ import { ConversationViewer } from '../components/conversations/ConversationView
 import { CustomerProfile } from '../components/customers/CustomerProfile'
 import { LeadPipeline } from '../components/leads/LeadPipeline'
 import { SchedulePage } from './SchedulePage'
+import FollowUpPage from './FollowUpPage'
 import { AnalyticsCharts } from '../components/analytics/AnalyticsCharts'
 import { ActivityTimeline } from '../components/activity/ActivityTimeline'
 import { QueueMonitor } from '../components/system/QueueMonitor'
@@ -188,6 +189,7 @@ export const DashboardPage = () => {
                 {section === 'audit' && 'Immutable action log for compliance verification'}
                 {section === 'system' && 'API link states, database status, and operational warnings'}
                 {section === 'schedule' && 'Calendar management and upcoming engagement tracking'}
+                {section === 'followup' && 'Pending follow-up tasks and customer outreach'}
               </p>
             </div>
             
@@ -301,6 +303,10 @@ export const DashboardPage = () => {
             
             {section === 'schedule' && (
               <SchedulePage />
+            )}
+
+            {section === 'followup' && (
+              <FollowUpPage />
             )}
 
             {section === 'analytics' && (

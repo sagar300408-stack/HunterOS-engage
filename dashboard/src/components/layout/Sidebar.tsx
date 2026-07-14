@@ -12,6 +12,8 @@ import {
   LogOut,
   Sliders,
   Calendar,
+  Rocket,
+  RefreshCw,
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import type { NavSection } from '../../types'
@@ -32,7 +34,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentSection, onSelectSectio
     { id: 'customers' as NavSection, label: 'Customers', icon: Users },
     { id: 'leads' as NavSection, label: 'Lead Pipeline', icon: Kanban },
     { id: 'schedule' as NavSection, label: 'Schedule', icon: Calendar },
-    { id: 'analytics' as NavSection, label: 'AI Cost & Stats', icon: BarChart3 },
+    { id: 'followup' as NavSection, label: 'Follow-ups', icon: RefreshCw },
+    { id: 'analytics' as NavSection, label: 'Analytics', icon: BarChart3 },
     { id: 'activity' as NavSection, label: 'AI Activity Feed', icon: Activity },
     { id: 'queue' as NavSection, label: 'Queue Monitor', icon: Cpu },
     { id: 'audit' as NavSection, label: 'Audit Trail', icon: History },
