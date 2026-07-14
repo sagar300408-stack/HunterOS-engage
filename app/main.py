@@ -117,9 +117,12 @@ def create_app() -> FastAPI:
     app.include_router(webhook_v1.router)
     app.include_router(auth_v1.router)
     app.include_router(dashboard_v1.router)
+    app.include_router(scheduling_v1.router, prefix="/api/v1")
     
     app.include_router(followup_router, prefix="/api/v1")
-    app.include_router(dashboard_v1.ws_router)   # WebSocket at /ws/dashboard
+    app.include_router(dashboard_v1.ws_router)
+    from app.api.v1.dev import router as dev_router
+    app.include_router(dev_router)
 
     if settings.enable_developer_tools:
         from app.developer_tools.middleware import LatencyMiddleware
@@ -146,4 +149,3 @@ def create_app() -> FastAPI:
 # ── Entry point ───────────────────────────────────────────────────────────────
 # uvicorn app.main:app --reload
 app = create_app()
-app.include_router(dev_router)
