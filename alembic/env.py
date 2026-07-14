@@ -46,6 +46,12 @@ from app.domain.scheduling.models import (  # noqa: F401
     EventAuditLog,
     CustomerAvailabilityPreferences,
 )
+from app.domain.followup.models import (  # noqa: F401
+    FollowUpQueue,
+    FollowUpExecution,
+    LeadHealthScore,
+    SalesMemoryTimeline,
+)
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config

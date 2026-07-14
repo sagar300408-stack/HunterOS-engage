@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.integrations.postgres.database import get_db_context
+from app.integrations.postgres.database import get_session
 from app.domain.followup.models import FollowUpQueue, FollowUpExecution
 from app.domain.followup.state_machine import transition, can_retry
 from app.domain.followup.channel_router import send_message
@@ -31,7 +31,7 @@ POLL_INTERVAL_SECONDS = 15
 async def process_due_followups():
     """Find and execute all due follow-ups."""
     try:
-        async with get_db_context() as session:
+        async with get_session() as session:
             # 1. Find due items, locked for update
             now = datetime.now(tz=timezone.utc)
             
@@ -71,7 +71,7 @@ async def process_due_followups():
 
 async def _execute_followup(followup_id):
     """Execute a single follow-up."""
-    async with get_db_context() as session:
+    async with get_session() as session:
         fu = await session.get(FollowUpQueue, followup_id)
         if not fu or fu.status != "executing":
             return

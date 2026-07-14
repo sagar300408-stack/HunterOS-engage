@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from app.events.dispatcher import dispatcher
 from app.events.message_events import MessageStored, ReplySent
-from app.integrations.postgres.database import get_db_context
+from app.integrations.postgres.database import get_session
 from app.domain.followup.service import schedule_followup
 from app.domain.followup.health_engine import upsert_health_score
 from app.domain.followup.sales_memory import record_customer_replied
@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 async def _handle_message_async(conversation_id: UUID):
     """Async background worker to process follow-up logic after a message."""
     try:
-        async with get_db_context() as session:
+        async with get_session() as session:
             # 1. Get customer ID
             conv = await session.get(Conversation, conversation_id)
             if not conv or not conv.customer_id:
@@ -54,7 +54,7 @@ def on_message_stored(event: MessageStored):
         # Also record customer replied milestone
         async def _record_reply():
             try:
-                async with get_db_context() as session:
+                async with get_session() as session:
                     conv = await session.get(Conversation, event.conversation_id)
                     if conv and conv.customer_id:
                         await record_customer_replied(session, conv.customer_id, DEFAULT_WORKSPACE_ID)
@@ -81,7 +81,7 @@ def on_reply_sent(event: ReplySent):
     # Note: Event doesn't have conversation_id directly, but we can look it up by phone
     async def _handle_reply():
         try:
-            async with get_db_context() as session:
+            async with get_session() as session:
                 from app.domain.customers.models import Customer
                 cust = await session.scalar(select(Customer).where(Customer.phone == event.to_phone))
                 if cust:

@@ -92,6 +92,6 @@ class SalesMemoryTimeline(Base):
     event_type = Column(String(100), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    metadata = Column(JSONB, nullable=True)  # Extra context
+    event_metadata = Column("metadata", JSONB, nullable=True)  # Extra context
     
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)

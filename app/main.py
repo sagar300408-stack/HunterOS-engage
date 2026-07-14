@@ -21,12 +21,11 @@ from app.api.v1 import dashboard as dashboard_v1
 from app.api.v1 import scheduling as scheduling_v1
 from app.api.v1 import webhook as webhook_v1
 from app.api.v1.followup import router as followup_router
-from app.api.v1.knowledge import router as knowledge_router
-from app.api.v1.scheduling import router as scheduling_router
+
 from app.config import get_settings
-from app.events.conversation_subscribers import register_subscribers as register_conversation_subscribers
+
 from app.events.followup_subscribers import register_subscribers as register_followup_subscribers
-from app.events.scheduling_subscribers import register_subscribers as register_scheduling_subscribers
+
 from app.integrations.postgres.database import create_tables, dispose_engine
 from app.utils.logger import configure_logging, get_logger
 from app.worker.followup_worker import worker_loop as followup_worker_loop
@@ -60,8 +59,8 @@ async def lifespan(app: FastAPI):
         await seed_default_admin()
 
     # Start Event Subscriptions
-    register_conversation_subscribers()
-    register_scheduling_subscribers()
+    
+    
     register_followup_subscribers()
     logger.info("Event subscribers registered")
 
@@ -118,8 +117,7 @@ def create_app() -> FastAPI:
     app.include_router(webhook_v1.router)
     app.include_router(auth_v1.router)
     app.include_router(dashboard_v1.router)
-    app.include_router(knowledge_router, prefix="/api/v1")
-    app.include_router(scheduling_router, prefix="/api/v1")
+    
     app.include_router(followup_router, prefix="/api/v1")
     app.include_router(dashboard_v1.ws_router)   # WebSocket at /ws/dashboard
 
