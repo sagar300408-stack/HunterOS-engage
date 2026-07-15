@@ -10,7 +10,8 @@ from app.events.model.base_event import UniversalBaseEvent
 class ConsumerRegistry:
     """
     Maintains subscriptions of EventConsumers to Event Classes.
-    Resolves which consumers should receive a given event based on class inheritance.
+    Resolves which consumers should receive a given event based on class inheritance,
+    and returns them ordered by priority (highest first).
     """
 
     def __init__(self):
@@ -35,9 +36,8 @@ class ConsumerRegistry:
 
     def get_subscribers(self, event_class: Type[UniversalBaseEvent]) -> List[EventConsumer]:
         """
-        Returns all consumers subscribed to the exact event_class or any of its base classes.
-        For example, if an event is `CustomerRepliedEvent(ConversationEvent)`,
-        this returns consumers subscribed to `CustomerRepliedEvent`, `ConversationEvent`, and `UniversalBaseEvent`.
+        Returns all consumers subscribed to the exact event_class or any of its base classes,
+        sorted descending by priority.
         """
         subscribers: Set[EventConsumer] = set()
         
@@ -47,4 +47,5 @@ class ConsumerRegistry:
                 if cls in self._subscriptions:
                     subscribers.update(self._subscriptions[cls])
                     
-        return list(subscribers)
+        # Sort consumers by priority (highest first)
+        return sorted(list(subscribers), key=lambda c: c.get_priority(), reverse=True)

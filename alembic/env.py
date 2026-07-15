@@ -52,6 +52,7 @@ from app.domain.followup.models import (  # noqa: F401
     LeadHealthScore,
     SalesMemoryTimeline,
 )
+from app.events.store.models import EventRecord  # noqa: F401
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config

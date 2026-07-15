@@ -9,6 +9,14 @@ class EventConsumer(ABC):
     Universal interface for all Event Consumers in HunterOS.
     """
 
+    def get_priority(self) -> int:
+        """
+        Consumers with higher priority are executed first.
+        Infrastructure consumers (like EventStore) should return a high priority (e.g. 100).
+        Application consumers default to 0.
+        """
+        return 0
+
     @abstractmethod
     def get_subscriptions(self) -> List[Type[UniversalBaseEvent]]:
         """
@@ -19,7 +27,7 @@ class EventConsumer(ABC):
         pass
 
     @abstractmethod
-    def handle_event(self, event: UniversalBaseEvent) -> None:
+    async def handle_event(self, event: UniversalBaseEvent) -> None:
         """
         Process the incoming event. Consumers must handle their own internal errors.
         """
@@ -32,7 +40,7 @@ class EventPublisher(ABC):
     """
 
     @abstractmethod
-    def publish(self, event: UniversalBaseEvent) -> None:
+    async def publish(self, event: UniversalBaseEvent) -> None:
         """
         Publish an event to all interested consumers.
         This operation must be non-blocking from the publisher's perspective.

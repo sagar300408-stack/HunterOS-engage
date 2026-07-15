@@ -1,4 +1,5 @@
 import logging
+import asyncio
 
 from app.events.bus.exceptions import EventValidationError
 from app.events.bus.interfaces import EventPublisher
@@ -11,16 +12,17 @@ logger = logging.getLogger(__name__)
 
 class EventBus(EventPublisher):
     """
-    Lightweight, synchronous, in-process Event Bus for HunterOS Phase 7 Milestone 1.
-    Routes events to subscribers via the ConsumerRegistry.
+    Lightweight, in-process Event Bus for HunterOS Phase 7 Milestone 2.
+    Routes events to subscribers via the ConsumerRegistry asynchronously.
     """
 
     def __init__(self, registry: ConsumerRegistry):
         self._registry = registry
 
-    def publish(self, event: UniversalBaseEvent) -> None:
+    async def publish(self, event: UniversalBaseEvent) -> None:
         """
         Publishes the event to all consumers subscribed to the event's class or base classes.
+        Consumers are resolved in priority order.
         """
         self._validate_event(event)
 
@@ -39,7 +41,10 @@ class EventBus(EventPublisher):
 
         for consumer in subscribers:
             try:
-                consumer.handle_event(event)
+                # We await each consumer sequentially. 
+                # This ensures high-priority infrastructure consumers run to completion
+                # before application consumers.
+                await consumer.handle_event(event)
             except Exception as exc:
                 # Isolate consumer failures: one failing consumer must not block the others
                 logger.error(

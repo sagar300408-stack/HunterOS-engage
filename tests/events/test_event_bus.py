@@ -2,6 +2,7 @@ import uuid
 from typing import List, Type
 
 import pytest
+import pytest_asyncio
 
 from app.events.bus.event_bus import EventBus
 from app.events.bus.exceptions import ConsumerRegistrationError
@@ -19,7 +20,7 @@ class DummyCustomerRepliedConsumer(EventConsumer):
     def get_subscriptions(self) -> List[Type[UniversalBaseEvent]]:
         return [CustomerRepliedEvent]
 
-    def handle_event(self, event: UniversalBaseEvent) -> None:
+    async def handle_event(self, event: UniversalBaseEvent) -> None:
         self.received_events.append(event)
 
 
@@ -30,7 +31,21 @@ class DummyConversationCategoryConsumer(EventConsumer):
     def get_subscriptions(self) -> List[Type[UniversalBaseEvent]]:
         return [ConversationEvent]
 
-    def handle_event(self, event: UniversalBaseEvent) -> None:
+    async def handle_event(self, event: UniversalBaseEvent) -> None:
+        self.received_events.append(event)
+
+
+class DummyHighPriorityConsumer(EventConsumer):
+    def __init__(self):
+        self.received_events = []
+
+    def get_priority(self) -> int:
+        return 100
+
+    def get_subscriptions(self) -> List[Type[UniversalBaseEvent]]:
+        return [UniversalBaseEvent]
+
+    async def handle_event(self, event: UniversalBaseEvent) -> None:
         self.received_events.append(event)
 
 
@@ -38,7 +53,7 @@ class FailingConsumer(EventConsumer):
     def get_subscriptions(self) -> List[Type[UniversalBaseEvent]]:
         return [CustomerRepliedEvent]
 
-    def handle_event(self, event: UniversalBaseEvent) -> None:
+    async def handle_event(self, event: UniversalBaseEvent) -> None:
         raise ValueError("I always fail!")
 
 
@@ -51,23 +66,27 @@ def test_registry_registration():
     assert consumer in subscribers
 
 
-def test_registry_inheritance_routing():
+def test_registry_inheritance_routing_and_priority():
     registry = ConsumerRegistry()
     
     specific_consumer = DummyCustomerRepliedConsumer()
     category_consumer = DummyConversationCategoryConsumer()
+    high_priority_consumer = DummyHighPriorityConsumer()
     
     registry.register(specific_consumer)
     registry.register(category_consumer)
+    registry.register(high_priority_consumer)
 
-    # Both should be resolved when a CustomerRepliedEvent is published
     subscribers = registry.get_subscribers(CustomerRepliedEvent)
     
+    # Priority sorting should place high_priority_consumer first
+    assert subscribers[0] == high_priority_consumer
     assert specific_consumer in subscribers
     assert category_consumer in subscribers
 
 
-def test_event_bus_dispatch():
+@pytest.mark.asyncio
+async def test_event_bus_dispatch():
     registry = ConsumerRegistry()
     consumer = DummyCustomerRepliedConsumer()
     registry.register(consumer)
@@ -82,13 +101,14 @@ def test_event_bus_dispatch():
         wa_message_id="123"
     )
 
-    bus.publish(event)
+    await bus.publish(event)
     
     assert len(consumer.received_events) == 1
     assert consumer.received_events[0] == event
 
 
-def test_event_bus_isolates_failures():
+@pytest.mark.asyncio
+async def test_event_bus_isolates_failures():
     registry = ConsumerRegistry()
     
     failing_consumer = FailingConsumer()
@@ -108,7 +128,7 @@ def test_event_bus_isolates_failures():
     )
 
     # This should not raise the ValueError from FailingConsumer
-    bus.publish(event)
+    await bus.publish(event)
     
     # The working consumer should still have received the event
     assert len(working_consumer.received_events) == 1
