@@ -121,6 +121,11 @@ def create_app() -> FastAPI:
     
     app.include_router(followup_router, prefix="/api/v1")
     app.include_router(dashboard_v1.ws_router)
+    
+    from app.domain.livestream.router import router as livestream_router
+    from app.domain.livestream.router import ws_router as livestream_ws_router
+    app.include_router(livestream_router)
+    app.include_router(livestream_ws_router)
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
 
