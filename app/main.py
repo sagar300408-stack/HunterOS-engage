@@ -75,6 +75,14 @@ async def lifespan(app: FastAPI):
     from app.domain.insight.bootstrap import bootstrap_insights
     bootstrap_insights()
     logger.info("Insight generators registered")
+    
+    from app.domain.recommendation.bootstrap import bootstrap_recommendations
+    bootstrap_recommendations()
+    logger.info("Recommendation generators registered")
+    
+    from app.domain.briefing.bootstrap import bootstrap_briefings
+    bootstrap_briefings()
+    logger.info("Executive Briefing templates registered")
 
     # Start background workers
     app.state.followup_worker_task = asyncio.create_task(followup_worker_loop())
@@ -147,6 +155,12 @@ def create_app() -> FastAPI:
     
     from app.domain.insight.router import router as insight_router
     app.include_router(insight_router, prefix="/api/v1")
+    
+    from app.domain.recommendation.router import router as recommendation_router
+    app.include_router(recommendation_router, prefix="/api/v1")
+    
+    from app.domain.briefing.router import router as briefing_router
+    app.include_router(briefing_router, prefix="/api/v1")
     
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)

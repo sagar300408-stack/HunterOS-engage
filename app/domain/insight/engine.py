@@ -68,5 +68,8 @@ class InsightEngine:
                 
             except Exception as e:
                 logger.error(f"Failed to generate insight using {generator.definition.name}: {e}")
+        from app.domain.recommendation.engine import RecommendationEngine
+        recommendation_engine = RecommendationEngine(self.session)
+        await recommendation_engine.generate_recommendations(workspace_id, target_type, target_id)
                 
         return snapshots
