@@ -99,5 +99,8 @@ class KpiIntelligenceEngine:
             
             saved_snapshot = await self.kpi_repo.save_snapshot(snapshot)
             snapshots.append(saved_snapshot)
+        from app.domain.health.engine import OperationalHealthEngine
+        health_engine = OperationalHealthEngine(self.session)
+        await health_engine.refresh_health(workspace_id, target_type, target_id)
             
         return snapshots

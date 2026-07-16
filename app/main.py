@@ -67,6 +67,14 @@ async def lifespan(app: FastAPI):
     from app.domain.kpi.bootstrap import bootstrap_kpis
     bootstrap_kpis()
     logger.info("KPI calculators registered")
+    
+    from app.domain.health.bootstrap import bootstrap_health
+    bootstrap_health()
+    logger.info("Operational Health evaluators registered")
+    
+    from app.domain.insight.bootstrap import bootstrap_insights
+    bootstrap_insights()
+    logger.info("Insight generators registered")
 
     # Start background workers
     app.state.followup_worker_task = asyncio.create_task(followup_worker_loop())
@@ -133,6 +141,12 @@ def create_app() -> FastAPI:
     
     from app.domain.kpi.router import router as kpi_router
     app.include_router(kpi_router, prefix="/api/v1")
+    
+    from app.domain.health.router import router as health_router
+    app.include_router(health_router, prefix="/api/v1")
+    
+    from app.domain.insight.router import router as insight_router
+    app.include_router(insight_router, prefix="/api/v1")
     
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
