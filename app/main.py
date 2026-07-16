@@ -63,6 +63,10 @@ async def lifespan(app: FastAPI):
     
     register_followup_subscribers()
     logger.info("Event subscribers registered")
+    
+    from app.domain.kpi.bootstrap import bootstrap_kpis
+    bootstrap_kpis()
+    logger.info("KPI calculators registered")
 
     # Start background workers
     app.state.followup_worker_task = asyncio.create_task(followup_worker_loop())
@@ -126,6 +130,10 @@ def create_app() -> FastAPI:
     from app.domain.livestream.router import ws_router as livestream_ws_router
     app.include_router(livestream_router)
     app.include_router(livestream_ws_router)
+    
+    from app.domain.kpi.router import router as kpi_router
+    app.include_router(kpi_router, prefix="/api/v1")
+    
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
 
