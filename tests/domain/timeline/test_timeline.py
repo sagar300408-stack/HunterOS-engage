@@ -16,7 +16,7 @@ from app.domain.memory.models import CustomerMemory
 from app.domain.timeline.models import TimelineEntry, TimelineSeverity
 from app.domain.timeline.repository import TimelineRepository
 from app.domain.timeline.schemas import TimelineEntryResponse
-from app.domain.timeline.service import TimelineProjectionEngine, TimelineQueryService
+from app.domain.timeline.service import TimelineProjection, TimelineQueryService
 from app.events.categories.conversation_events import CustomerRepliedEvent
 from app.events.categories.scheduling_events import MeetingBookedEvent
 from app.events.model.actor_types import ActorType
@@ -47,7 +47,7 @@ async def async_session(engine, session_maker):
 @pytest.mark.asyncio
 async def test_timeline_projection_customer_reply(async_session):
     repo = TimelineRepository()
-    engine = TimelineProjectionEngine(repo)
+    engine = TimelineProjection(repo)
     query_svc = TimelineQueryService(repo)
     
     workspace_id = uuid.uuid4()
@@ -83,7 +83,7 @@ async def test_timeline_projection_customer_reply(async_session):
 @pytest.mark.asyncio
 async def test_timeline_projection_meeting_booked(async_session):
     repo = TimelineRepository()
-    engine = TimelineProjectionEngine(repo)
+    engine = TimelineProjection(repo)
     query_svc = TimelineQueryService(repo)
     
     workspace_id = uuid.uuid4()

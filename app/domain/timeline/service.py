@@ -5,20 +5,43 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.timeline.models import TimelineEntry
 from app.domain.timeline.repository import TimelineRepository
-from app.domain.timeline.schemas import TimelineEntryResponse
 from app.domain.timeline.strategies.registry import timeline_strategy_registry
 from app.events.model.base_event import UniversalBaseEvent
+from app.events.model.categories import EventCategory
 from app.events.projections.base import BaseEventProjection
 
 
-class TimelineProjectionEngine(BaseEventProjection):
+class TimelineProjection(BaseEventProjection):
     """
-    Engine responsible for converting UniversalBaseEvents into TimelineEntries.
+    Projection responsible for converting UniversalBaseEvents into TimelineEntries.
     """
+    @property
+    def name(self) -> str:
+        return "TimelineProjection"
+
+    @property
+    def version(self) -> str:
+        return "1.0.0"
+
+    @property
+    def description(self) -> str:
+        return "Generates human-readable activity timeline entries from business events."
+
+    @property
+    def subscribed_categories(self) -> List[EventCategory]:
+        return [
+            EventCategory.CONVERSATION,
+            EventCategory.SCHEDULING,
+            EventCategory.FOLLOWUP,
+            EventCategory.LEAD,
+            EventCategory.CUSTOMER,
+            EventCategory.WORKSPACE
+        ]
+
     def __init__(self, repository: TimelineRepository):
         self.repository = repository
 
-    async def project_event(self, event: UniversalBaseEvent, session: AsyncSession) -> Optional[TimelineEntry]:
+    async def project_event(self, event: UniversalBaseEvent, session: AsyncSession, **kwargs: Any) -> Optional[TimelineEntry]:
         """
         Projects an event to a TimelineEntry without mutating the original event.
         Uses the Strategy Registry to extract structured data and severity.

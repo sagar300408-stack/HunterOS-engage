@@ -54,6 +54,7 @@ from app.domain.followup.models import (  # noqa: F401
 )
 from app.events.store.models import EventRecord  # noqa: F401
 from app.domain.timeline.models import TimelineEntry  # noqa: F401
+from app.domain.analytics.models import AnalyticsDailyMetric  # noqa: F401
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config
