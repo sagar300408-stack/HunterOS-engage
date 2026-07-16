@@ -19,3 +19,4 @@ class EventCategory(str, Enum):
     NOTIFICATION = "NOTIFICATION"
     AI_DECISION = "AI_DECISION"
     PLATFORM = "PLATFORM"
+    ACTION = "ACTION"

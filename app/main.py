@@ -83,6 +83,10 @@ async def lifespan(app: FastAPI):
     from app.domain.briefing.bootstrap import bootstrap_briefings
     bootstrap_briefings()
     logger.info("Executive Briefing templates registered")
+    
+    from app.domain.integration.bootstrap import bootstrap_integrations
+    bootstrap_integrations()
+    logger.info("Integration Connectors registered")
 
     # Start background workers
     app.state.followup_worker_task = asyncio.create_task(followup_worker_loop())
@@ -161,6 +165,12 @@ def create_app() -> FastAPI:
     
     from app.domain.briefing.router import router as briefing_router
     app.include_router(briefing_router, prefix="/api/v1")
+    
+    from app.domain.integration.router import router as integration_router
+    app.include_router(integration_router, prefix="/api/v1")
+    
+    from app.domain.action.router import router as action_router
+    app.include_router(action_router, prefix="/api/v1")
     
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
