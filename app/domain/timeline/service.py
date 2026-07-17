@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.timeline.models import TimelineEntry
 from app.domain.timeline.repository import TimelineRepository
+from app.domain.timeline.schemas import TimelineEntryResponse
 from app.domain.timeline.strategies.registry import timeline_strategy_registry
 from app.events.model.base_event import UniversalBaseEvent
 from app.events.model.categories import EventCategory
