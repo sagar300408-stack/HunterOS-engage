@@ -21,3 +21,4 @@ class EventCategory(str, Enum):
     PLATFORM = "PLATFORM"
     ACTION = "ACTION"
     APPROVAL = "APPROVAL"
+    MARKETPLACE = "MARKETPLACE"

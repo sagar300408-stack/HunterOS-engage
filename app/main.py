@@ -178,6 +178,9 @@ def create_app() -> FastAPI:
     from app.domain.operations.router import router as operations_router
     app.include_router(operations_router, prefix="/api/v1")
     
+    from app.domain.marketplace.router import router as marketplace_router
+    app.include_router(marketplace_router, prefix="/api/v1")
+    
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
 

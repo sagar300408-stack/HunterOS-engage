@@ -22,6 +22,7 @@ from app.domain.followup import models as followup_models
 from app.domain.intent import models as intent_models
 from app.domain.memory import models as memory_models
 from app.domain.approval import models as approval_models
+from app.domain.marketplace import models as marketplace_models
 
 @pytest.mark.asyncio
 async def test_policy_evaluator():
