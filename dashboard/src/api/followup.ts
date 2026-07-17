@@ -1,4 +1,4 @@
-import  api  from './dashboard'
+import  api  from './client'
 import type { 
   FollowUpQueuePage, 
   FollowUpQueueDetail, 
