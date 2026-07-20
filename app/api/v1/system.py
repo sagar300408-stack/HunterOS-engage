@@ -14,5 +14,21 @@ async def system_info():
 @router.get("/version")
 async def system_version():
     return {
-        "version": settings.VERSION
+        "version": getattr(settings, "VERSION", "1.0.0"),
+        "status": "stable"
+    }
+
+@router.get("/changelog")
+async def system_changelog():
+    """
+    Returns the latest release notes and changelog from docs/release-notes.
+    In a real system, this would read from docs/release-notes/changelog.md.
+    """
+    return {
+        "version": "1.0.0",
+        "changes": [
+            "Introduced Enterprise Integration Platform",
+            "Added Webhook parsing",
+            "Included CLI Tooling"
+        ]
     }

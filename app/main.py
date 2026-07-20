@@ -139,6 +139,11 @@ def create_app() -> FastAPI:
     
     from app.domain.observability.middleware.observability import ObservabilityMiddleware
     app.add_middleware(ObservabilityMiddleware)
+    
+    from fastapi.staticfiles import StaticFiles
+    import os
+    if os.path.exists("docs"):
+        app.mount("/static/docs", StaticFiles(directory="docs"), name="docs_static")
 
     # ── Register Event Consumers ───────────────────────────────────────────────────────────────
     app.include_router(webhook_v1.router)
