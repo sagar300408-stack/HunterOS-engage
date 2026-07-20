@@ -13,7 +13,7 @@ import pytest
 from app.domain.conversations.models import Base, Conversation, Message   # noqa: F401
 from app.domain.customers.models import Customer                          # noqa: F401
 from app.domain.intent.models import IntentHistory                        # noqa: F401
-from app.domain.dashboard.models import User, AuditLog                   # noqa: F401
+from app.domain.security.models import User, AuditLog                   # noqa: F401
 from app.domain.memory.models import CustomerMemory, CustomerMemoryEvent  # noqa: F401
 from app.domain.followup.models import FollowUpQueue, FollowUpExecution  # noqa: F401
 

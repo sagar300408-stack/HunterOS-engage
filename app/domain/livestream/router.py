@@ -16,7 +16,7 @@ from app.api.v1.auth_deps import get_current_user
 from app.domain.analytics.repository import AnalyticsRepository
 from app.domain.analytics.schemas import AnalyticsMetricResponse
 from app.domain.analytics.service import AnalyticsQueryService
-from app.domain.dashboard.models import User
+from app.domain.security.models import User
 from app.domain.livestream.manager import livestream_manager
 from app.domain.timeline.repository import TimelineRepository
 from app.domain.timeline.schemas import TimelineEntryResponse

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from app.api.v1.auth_deps import get_current_user
-from app.domain.dashboard.models import User, UserRole
+from app.domain.security.models import User, UserRole
 
 class TestDeveloperTools:
     def test_dev_tools_disabled_returns_404(self, mock_settings):

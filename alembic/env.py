@@ -34,12 +34,8 @@ from app.domain.memory.models import (  # noqa: F401
     CustomerMemoryEvent,
 )
 from app.domain.intent.models import IntentHistory  # noqa: F401
-from app.domain.dashboard.models import (  # noqa: F401
-    User,
-    AuditLog,
-    PipelineEvent,
-    BackgroundJob,
-)
+from app.domain.dashboard.models import PipelineEvent, BackgroundJob  # noqa: F401
+from app.domain.security.models import User, AuditLog, UserSession, SecurityPolicy  # noqa: F401
 from app.domain.scheduling.models import (  # noqa: F401
     ScheduledEvent,
     SchedulingCandidate,

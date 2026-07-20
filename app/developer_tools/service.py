@@ -16,7 +16,8 @@ from app.utils.context import is_demo_context
 from app.utils.clock import SystemClock
 from app.domain.customers.models import Customer
 from app.domain.conversations.models import Conversation, Message, AIMetadata
-from app.domain.dashboard.models import AuditLog, BackgroundJob, JobStatus, UserRole
+from app.domain.dashboard.models import BackgroundJob, JobStatus
+from app.domain.security.models import AuditLog, UserRole
 from app.domain.dashboard.service import write_audit_log, create_background_job
 from app.api.v1.webhook import receive_webhook
 from app.developer_tools.schemas import ResetSchema

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth_deps import get_current_user
-from app.domain.dashboard.models import User, DEFAULT_WORKSPACE_ID
+from app.domain.security.models import User, DEFAULT_WORKSPACE_ID
 from app.domain.followup import service, analytics, health_engine, sales_memory
 from app.domain.followup.schemas import (
     FollowUpQueuePage,

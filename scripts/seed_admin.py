@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from sqlalchemy import select
 from app.integrations.postgres.database import get_session_factory, get_engine
-from app.domain.dashboard.models import User, UserRole, DEFAULT_WORKSPACE_ID
+from app.domain.security.models import User, UserRole, DEFAULT_WORKSPACE_ID
 from app.domain.dashboard.service import hash_password
 
 ADMIN_EMAIL    = "admin@hunteros.com"

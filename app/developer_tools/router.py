@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from app.config import get_settings
 from app.api.v1.auth_deps import get_current_user
 from app.integrations.postgres.database import get_db
-from app.domain.dashboard.models import User, UserRole
+from app.domain.security.models import User, UserRole
 from app.domain.dashboard.service import create_background_job
 from app.developer_tools.schemas import (
     SimulationStateSchema,

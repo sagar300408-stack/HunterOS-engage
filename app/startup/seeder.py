@@ -15,7 +15,7 @@ async def seed_default_admin() -> None:
     from sqlalchemy import func, select
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.domain.dashboard.models import DEFAULT_WORKSPACE_ID, User, UserRole
+    from app.domain.security.models import DEFAULT_WORKSPACE_ID, User, UserRole
     from app.domain.dashboard.service import hash_password
     from app.integrations.postgres.database import get_engine
 

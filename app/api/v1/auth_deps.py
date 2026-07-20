@@ -20,7 +20,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.dashboard.models import User, role_can
+from app.domain.security.models import User
+from app.domain.security.engines.authorization import role_can
 from app.domain.dashboard.service import get_user_from_token
 from app.integrations.postgres.database import get_db
 

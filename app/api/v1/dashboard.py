@@ -42,7 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth_deps import get_current_user, require_permission
 from app.domain.dashboard import service as dash_service
-from app.domain.dashboard.models import DEFAULT_WORKSPACE_ID, User
+from app.domain.security.models import DEFAULT_WORKSPACE_ID, User
 from app.domain.dashboard.schemas import (
     ActivityEvent,
     AnalyticsData,

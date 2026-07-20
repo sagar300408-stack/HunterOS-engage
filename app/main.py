@@ -210,6 +210,9 @@ def create_app() -> FastAPI:
     
     from app.api.v1.system import router as system_router
     app.include_router(system_router, prefix="/api/v1")
+    
+    from app.domain.security.router import router as security_router
+    app.include_router(security_router, prefix="/api/v1")
 
     @app.on_event("startup")
     async def startup_event():
