@@ -60,6 +60,7 @@ from app.domain.ui.models import UserPreference, NotificationPreference, Dashboa
 from app.domain.observability.models import Alert, Incident, MetricRecord  # noqa: F401
 from app.domain.reliability.models import PerformanceBenchmark, ReliabilityEvent, DeploymentRecord  # noqa: F401
 from app.domain.integration.models import SyncJob  # noqa: F401
+from app.domain.pilot.models import PilotDeployment, PilotFeedback, PilotMetrics  # noqa: F401
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config
