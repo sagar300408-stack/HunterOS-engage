@@ -128,7 +128,7 @@ Key log events: `webhook_verified`, `incoming_message_received`, `ai_processing_
 
 | Phase | Feature |
 |-------|---------|
-| **1** ✅ | WhatsApp + OpenAI + PostgreSQL pipeline |
+| **1**  | WhatsApp + OpenAI + PostgreSQL pipeline |
 | 2 | Customer Memory & Profiles |
 | 3 | Intent Detection & Lead Scoring |
 | 4 | Follow-up Engine & Scheduling |
