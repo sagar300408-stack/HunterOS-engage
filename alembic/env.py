@@ -55,6 +55,12 @@ from app.domain.followup.models import (  # noqa: F401
 from app.events.store.models import EventRecord  # noqa: F401
 from app.domain.timeline.models import TimelineEntry  # noqa: F401
 from app.domain.analytics.models import AnalyticsDailyMetric  # noqa: F401
+from app.domain.friction.models import FrictionEvent, FrictionRule  # noqa: F401
+from app.domain.collaboration.models import CollaborationTask, TaskIntent, CollaborationPolicy  # noqa: F401
+from app.domain.roi.models import ImpactEvent, ValueAttribution, ROIMetric, ExecutiveNarrative, StrategicForecast  # noqa: F401
+from app.domain.context.models import OrganizationNode, ProductService, WorkflowDefinition, BusinessPolicy, CustomerContext, TeamMemberContext, KnowledgeDocument, BusinessOntology, KnowledgeGraphEdge, ContextConflict  # noqa: F401
+from app.domain.onboarding.models import WorkspaceProvisioning, IntegrationConnection, ImportJob, ValidationResult, GoLiveAssessment, OperationalCapabilityMatrix, WorkspaceMaturity  # noqa: F401
+from app.domain.ui.models import UserPreference, NotificationPreference, DashboardDefinition, NavigationNode, FeatureFlag, UXAnalyticsEvent  # noqa: F401
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config

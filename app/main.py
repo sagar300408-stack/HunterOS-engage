@@ -204,6 +204,32 @@ def create_app() -> FastAPI:
     
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
+    
+    from app.api.v1.health import router as health_router
+    app.include_router(health_router, prefix="/api/v1")
+    
+    from app.api.v1.system import router as system_router
+    app.include_router(system_router, prefix="/api/v1")
+
+    @app.on_event("startup")
+    async def startup_event():
+        """
+        Startup Validation Checks.
+        Prevents the application from starting if critical dependencies fail.
+        """
+        import logging
+        from app.core.config import settings
+        logger = logging.getLogger("hunteros.startup")
+        logger.info(f"Starting {settings.APP_NAME} v{settings.VERSION} in {settings.ENVIRONMENT} mode")
+        
+        # Verify DATABASE_URL is set
+        if "postgresql" not in settings.DATABASE_URL:
+            logger.error("CRITICAL: Invalid DATABASE_URL configuration.")
+            raise RuntimeError("Invalid DATABASE_URL configuration")
+            
+        # Verify CELERY configuration
+        if not settings.CELERY_BROKER_URL:
+            logger.warning("WARNING: Celery Broker URL not configured. Background tasks will fail.")
 
     if settings.enable_developer_tools:
         from app.developer_tools.middleware import LatencyMiddleware

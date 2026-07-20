@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hunteros
+description: A Helm chart for Kubernetes deployment of HunterOS Engage
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
