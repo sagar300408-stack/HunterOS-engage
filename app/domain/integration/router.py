@@ -1,76 +1,48 @@
 from typing import List
 from uuid import UUID
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from app.database import get_db
-from app.domain.integration.repository import IntegrationRepository
-from app.domain.integration.engine import IntegrationEngine
-from app.domain.integration.schemas import IntegrationConnectionResponse, ConnectRequest, ConnectorMetadata
-from app.domain.integration.credentials import JsonCredentialProvider
+from app.api.deps import RequirePermissions
+from app.integrations.postgres.database import get_db
+from app.domain.integration.models import IntegrationConnection, SyncJob
+from app.domain.integration.engines.gateway import IntegrationGateway
+from app.domain.integration.engines.sync import SynchronizationEngine
 
-router = APIRouter(prefix="/integration", tags=["integration"])
+router = APIRouter(prefix="/api/v1/integrations", tags=["Integration Platform"])
 
-
-def get_integration_engine(request: Request, db: AsyncSession = Depends(get_db)) -> IntegrationEngine:
-    # Phase 9.1: Using JsonCredentialProvider. 
-    # In future, this could inject a KMS/Vault provider.
-    cred_provider = JsonCredentialProvider()
-    return IntegrationEngine(session=db, cred_provider=cred_provider, event_bus=request.app.state.event_bus)
-
-
-@router.get("/available", response_model=List[ConnectorMetadata])
-async def get_available_connectors(engine: IntegrationEngine = Depends(get_integration_engine)):
+@router.get("", dependencies=[Depends(RequirePermissions("view_all"))])
+async def list_integrations(db: AsyncSession = Depends(get_db)):
     """
-    List all available connectors in the marketplace.
+    List all configured integrations for the workspace.
     """
-    return engine.get_available_connectors()
+    stmt = select(IntegrationConnection)
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
+@router.post("/{integration_id}/webhook")
+async def webhook_receiver(integration_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    Public webhook receiver for a specific integration.
+    """
+    return await IntegrationGateway.process_webhook(db, integration_id, request)
 
-@router.get("/workspace/{workspace_id}/connections", response_model=List[IntegrationConnectionResponse])
-async def get_active_connections(workspace_id: UUID, db: AsyncSession = Depends(get_db)):
+@router.post("/{integration_id}/sync", dependencies=[Depends(RequirePermissions("edit_all"))])
+async def trigger_manual_sync(integration_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
-    List all active connections for a workspace.
+    Manually triggers an incremental sync for an integration.
     """
-    repo = IntegrationRepository(db)
-    return await repo.get_active_connections_by_workspace(workspace_id)
+    job = await SynchronizationEngine.trigger_incremental_sync(db, integration_id)
+    return {"job_id": str(job.id), "status": job.status}
 
-
-@router.post("/workspace/{workspace_id}/connect", response_model=IntegrationConnectionResponse)
-async def connect_provider(
-    workspace_id: UUID, 
-    req: ConnectRequest, 
-    engine: IntegrationEngine = Depends(get_integration_engine)
-):
+@router.get("/{integration_id}/jobs", dependencies=[Depends(RequirePermissions("view_all"))])
+async def list_sync_jobs(integration_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
-    Establish a new integration connection.
+    Returns sync history for a connector.
     """
-    try:
-        connection = await engine.connect_provider(
-            workspace_id=workspace_id,
-            connector_id=req.connector_id,
-            name=req.name,
-            credentials=req.credentials,
-            settings=req.settings
-        )
-        return connection
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/connection/{connection_id}/disconnect")
-async def disconnect_provider(
-    connection_id: UUID, 
-    engine: IntegrationEngine = Depends(get_integration_engine)
-):
-    """
-    Disconnects a provider, clearing its credentials.
-    """
-    try:
-        await engine.disconnect_provider(connection_id)
-        return {"status": "success", "message": "Disconnected successfully"}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    stmt = select(SyncJob).where(SyncJob.integration_id == integration_id).order_by(SyncJob.started_at.desc())
+    result = await db.execute(stmt)
+    return result.scalars().all()

@@ -39,3 +39,10 @@ class BaseConnector(abc.ABC):
         Pulls events from the external system. (To be fully utilized in Milestone 9.4).
         """
         pass
+
+    @abc.abstractmethod
+    async def parse_webhook(self, payload: Dict[str, Any], headers: Dict[str, str]) -> list:
+        """
+        Parses a vendor-specific webhook payload into a list of normalized event dictionaries.
+        """
+        pass
