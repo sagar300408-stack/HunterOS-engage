@@ -59,3 +59,8 @@ def bootstrap_event_consumers(event_bus: EventBus):
     from app.domain.impact.consumer import ImpactEventConsumer
     impact_consumer = ImpactEventConsumer()
     event_bus.register_consumer(impact_consumer)
+
+    # 6. Register Context Engine Consumer (Priority -20)
+    from app.domain.context.consumer import ContextEventConsumer
+    context_consumer = ContextEventConsumer()
+    event_bus.register_consumer(context_consumer)

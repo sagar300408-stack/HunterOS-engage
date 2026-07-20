@@ -59,3 +59,17 @@ from app.domain.impact.models import (                                    # noqa
     ValueAttribution,
     ExecutiveImpactReport,
 )
+
+# Context domain models
+from app.domain.context.models import (                                   # noqa: F401
+    OrganizationNode,
+    ProductService,
+    WorkflowDefinition,
+    BusinessPolicy,
+    CustomerContext,
+    TeamMemberContext,
+    KnowledgeDocument,
+    BusinessOntology,
+    KnowledgeGraphEdge,
+    ContextConflict
+)
