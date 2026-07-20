@@ -58,6 +58,7 @@ from app.domain.context.models import OrganizationNode, ProductService, Workflow
 from app.domain.onboarding.models import WorkspaceProvisioning, IntegrationConnection, ImportJob, ValidationResult, GoLiveAssessment, OperationalCapabilityMatrix, WorkspaceMaturity  # noqa: F401
 from app.domain.ui.models import UserPreference, NotificationPreference, DashboardDefinition, NavigationNode, FeatureFlag, UXAnalyticsEvent  # noqa: F401
 from app.domain.observability.models import Alert, Incident, MetricRecord  # noqa: F401
+from app.domain.reliability.models import PerformanceBenchmark, ReliabilityEvent, DeploymentRecord  # noqa: F401
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config
