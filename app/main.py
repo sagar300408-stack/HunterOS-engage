@@ -184,6 +184,12 @@ def create_app() -> FastAPI:
     from app.domain.autonomous.router import router as autonomous_router
     app.include_router(autonomous_router, prefix="/api/v1")
     
+    from app.domain.intelligence.router import router as intelligence_router
+    app.include_router(intelligence_router, prefix="/api/v1")
+    
+    from app.domain.collaboration.router import router as collaboration_router
+    app.include_router(collaboration_router, prefix="/api/v1")
+    
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
 

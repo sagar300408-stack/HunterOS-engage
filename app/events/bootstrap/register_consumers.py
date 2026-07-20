@@ -44,3 +44,13 @@ def bootstrap_event_consumers(event_bus: EventBus):
     
     # Register the single projection manager consumer to the event bus
     event_bus.register_consumer(projection_manager)
+
+    # 3. Register Operational Intelligence Engine Consumer (Priority -10)
+    from app.domain.intelligence.consumer import IntelligenceEventConsumer
+    intelligence_consumer = IntelligenceEventConsumer()
+    event_bus.register_consumer(intelligence_consumer)
+    
+    # 4. Register Collaboration Engine Consumer (Priority 10)
+    from app.domain.collaboration.consumer import CollaborationEventConsumer
+    collaboration_consumer = CollaborationEventConsumer()
+    event_bus.register_consumer(collaboration_consumer)

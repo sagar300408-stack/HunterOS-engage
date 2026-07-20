@@ -24,3 +24,6 @@ class EventCategory(str, Enum):
     MARKETPLACE = "MARKETPLACE"
     INTEGRATION = "INTEGRATION"
     AUTONOMOUS = "AUTONOMOUS"
+    FRICTION = "FRICTION"
+    LEAD = "LEAD"
+    SLA = "SLA"
