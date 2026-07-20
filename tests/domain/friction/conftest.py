@@ -73,3 +73,24 @@ from app.domain.context.models import (                                   # noqa
     KnowledgeGraphEdge,
     ContextConflict
 )
+
+# Onboarding domain models
+from app.domain.onboarding.models import (                                # noqa: F401
+    WorkspaceProvisioning,
+    IntegrationConnection,
+    ImportJob,
+    ValidationResult,
+    GoLiveAssessment,
+    OperationalCapabilityMatrix,
+    WorkspaceMaturity
+)
+
+# UI domain models
+from app.domain.ui.models import (                                        # noqa: F401
+    UserPreference,
+    NotificationPreference,
+    DashboardDefinition,
+    NavigationNode,
+    FeatureFlag,
+    UXAnalyticsEvent
+)

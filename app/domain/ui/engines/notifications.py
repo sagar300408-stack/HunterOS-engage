@@ -1,0 +1,3 @@
+class NotificationsEngine:
+    pass
+

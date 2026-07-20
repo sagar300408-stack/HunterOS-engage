@@ -64,3 +64,13 @@ def bootstrap_event_consumers(event_bus: EventBus):
     from app.domain.context.consumer import ContextEventConsumer
     context_consumer = ContextEventConsumer()
     event_bus.register_consumer(context_consumer)
+
+    # 7. Register Onboarding Event Consumer (Priority 100)
+    from app.domain.onboarding.consumer import OnboardingEventConsumer
+    onboarding_consumer = OnboardingEventConsumer()
+    event_bus.register_consumer(onboarding_consumer)
+
+    # 8. Register UI Event Consumer (Priority 1000)
+    from app.domain.ui.consumer import UIEventConsumer
+    ui_consumer = UIEventConsumer()
+    event_bus.register_consumer(ui_consumer)
