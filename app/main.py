@@ -131,13 +131,16 @@ def create_app() -> FastAPI:
     origins = [o.strip() for o in settings.dashboard_cors_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=[str(origin) for origin in settings.CORS_ORIGINS],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    from app.domain.observability.middleware.observability import ObservabilityMiddleware
+    app.add_middleware(ObservabilityMiddleware)
 
-    # ── Routers ───────────────────────────────────────────────────────────────
+    # ── Register Event Consumers ───────────────────────────────────────────────────────────────
     app.include_router(webhook_v1.router)
     app.include_router(auth_v1.router)
     app.include_router(dashboard_v1.router)
@@ -213,6 +216,9 @@ def create_app() -> FastAPI:
     
     from app.domain.security.router import router as security_router
     app.include_router(security_router, prefix="/api/v1")
+    
+    from app.domain.observability.router import router as observability_router
+    app.include_router(observability_router)
 
     @app.on_event("startup")
     async def startup_event():
