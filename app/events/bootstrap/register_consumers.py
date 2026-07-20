@@ -54,3 +54,8 @@ def bootstrap_event_consumers(event_bus: EventBus):
     from app.domain.collaboration.consumer import CollaborationEventConsumer
     collaboration_consumer = CollaborationEventConsumer()
     event_bus.register_consumer(collaboration_consumer)
+
+    # 5. Register Impact Engine Consumer (Priority 20)
+    from app.domain.impact.consumer import ImpactEventConsumer
+    impact_consumer = ImpactEventConsumer()
+    event_bus.register_consumer(impact_consumer)

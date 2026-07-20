@@ -48,3 +48,14 @@ from app.domain.collaboration.models import (                             # noqa
     TaskFeedback,
     LearningRule,
 )
+
+# Impact domain models
+from app.domain.impact.models import (                                    # noqa: F401
+    FinancialConfig,
+    BusinessTargets,
+    BaselineMetrics,
+    ImpactEvent,
+    EvidenceTrace,
+    ValueAttribution,
+    ExecutiveImpactReport,
+)
