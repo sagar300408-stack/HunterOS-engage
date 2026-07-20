@@ -230,6 +230,11 @@ def create_app() -> FastAPI:
     
     from app.domain.pilot.router import router as pilot_router
     app.include_router(pilot_router, prefix="/api/v1")
+    
+    from app.domain.customer_success.router import router as cs_router
+    from app.domain.customer_success.router import support_router
+    app.include_router(cs_router, prefix="/api/v1")
+    app.include_router(support_router, prefix="/api/v1")
 
     @app.on_event("startup")
     async def startup_event():
