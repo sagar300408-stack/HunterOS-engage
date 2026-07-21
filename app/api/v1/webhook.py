@@ -1,8 +1,9 @@
 """
 Versioned webhook route — /api/v1/webhook
 
-This is a thin route layer. No business logic lives here.
-All processing is delegated to the pipeline stages.
+This is a pure controller as per HunterOS Phase 7 Architecture.
+It ONLY maps the HTTP request to a RawWebhookEvent, publishes it to the EventBus,
+and returns 200 immediately. No orchestration lives here.
 
 Why 200 always on POST?
   Meta marks your webhook as failed if it receives anything other than 200.
@@ -17,13 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.meta.webhook import verify_hub_challenge
 from app.integrations.postgres.database import get_db
-from app.pipeline.ai import process_with_ai
-from app.pipeline.followup import schedule_followup
-from app.pipeline.receive import receive
-from app.pipeline.respond import send_response
 from app.utils.logger import get_logger
 from app.utils.context import is_demo_context
-from app.services.communication import process_whatsapp_pipeline
+from app.events.message_events import RawWebhookEvent
 
 router = APIRouter(prefix="/api/v1", tags=["Webhook v1"])
 logger = get_logger(__name__)
@@ -51,17 +48,17 @@ async def verify_webhook(
 @router.post(
     "/webhook",
     summary="Receive WhatsApp Message",
-    description="Processes incoming WhatsApp messages through the full pipeline.",
+    description="Publishes incoming WhatsApp messages to the EventBus.",
 )
 async def receive_webhook(
     request: Request,
     session: AsyncSession = Depends(get_db),
 ) -> dict:
     """
-    POST /api/v1/webhook — receive and process incoming WhatsApp messages.
-
-    Pipeline (Phase 3):
-        receive → process_with_ai (memory + intent + AI) → send_response → schedule_followup
+    POST /api/v1/webhook — receive incoming WhatsApp messages.
+    
+    Phase 7 Architecture: This is a pure controller. 
+    It publishes a RawWebhookEvent and returns 200 immediately.
     """
     try:
         payload = await request.json()
@@ -82,68 +79,15 @@ async def receive_webhook(
             )
             return {"status": "ignored", "reason": "not_whatsapp_business_account"}
 
-        # ── Stage 1 + 2: Receive + Customer Identification ────────────────────
-        result = await receive(payload, session)
-
-        if result is None:
-            return {"status": "ok", "processed": False}
-
-        # Phase 3: unpack 4-tuple (conversation, message_data, customer, message)
-        conversation, message_data, customer, message = result
-
-        # ── Stage 4: AI Processing (memory + intent + conversational AI) ──────
-        ai_result = await process_with_ai(
-            conversation_id=conversation.id,
-            message_id=message.id,
-            customer=customer,
-            user_content=message_data["content"],
-            session=session,
-        )
-
-        # ── Stage 6: Respond ──────────────────────────────────────────────────
-        import time
-        t0 = time.monotonic()
-        await send_response(
-            to_phone=message_data["from_phone"],
-            conversation_id=conversation.id,
-            ai_result=ai_result,
-            session=session,
-        )
-        t_respond = int((time.monotonic() - t0) * 1000)
-
-        # Log Stage 7: reply_sent (Phase 4)
-        try:
-            from app.domain.dashboard.service import log_pipeline_step
-            await log_pipeline_step(
-                session=session,
-                message_id=message.id,
-                step="reply_sent",
-                duration_ms=t_respond,
-                payload={"reply": ai_result["content"], "to": message_data["from_phone"]},
-                workspace_id=customer.workspace_id,
-            )
-        except Exception as e:
-            logger.error("failed_to_log_reply_sent_step", error=str(e))
-
-        # Broadcast live update to WebSocket clients (Phase 4)
-        try:
-            from app.integrations.websocket.manager import ws_manager
-            await ws_manager.broadcast({
-                "event": "conversation_updated",
-                "data": {
-                    "conversation_id": str(conversation.id),
-                    "from_phone": message_data["from_phone"],
-                }
-            })
-        except Exception as e:
-            logger.error("failed_to_broadcast_websocket_event", error=str(e))
-
-        # ── Stage 5: Follow-up (stub — Phase 6) ──────────────────────────────
-        await schedule_followup(
-            conversation_id=str(conversation.id),
-            from_phone=message_data["from_phone"],
-            ai_response=ai_result["content"],
-        )
+        # Create the event
+        event = RawWebhookEvent(payload=payload)
+        
+        # Publish to the EventBus (which persists it synchronously in the DB transaction and queues a Celery task)
+        event_bus = request.app.state.event_bus
+        await event_bus.publish(session, event)
+        
+        # Commit the transaction so the event is persisted (Celery task will pick it up)
+        await session.commit()
 
         return {"status": "ok", "processed": True}
 

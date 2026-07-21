@@ -1,6 +1,11 @@
 import logging
 from celery import Celery
+from kombu import Queue
+
 from app.core.config import settings
+
+# Import the new dispatch task
+from app.events.tasks import dispatch_event
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +23,43 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     task_time_limit=3600,
+    task_routes={
+        "app.events.tasks.dispatch_event": {"queue": "event_dispatch"},
+    },
+    task_queues=(
+        Queue('celery', routing_key='celery'),  # default queue
+        Queue('event_dispatch', routing_key='event_dispatch'), # high-throughput event dispatch queue
+    )
 )
+
+@celery_app.on_after_configure.connect
+def setup_periodic_tasks(sender, **kwargs):
+    # Setup periodic tasks if any
+    pass
+
+from celery.signals import worker_process_init
+
+@worker_process_init.connect
+def init_worker(**kwargs):
+    """
+    Bootstrap the consumer registry for the celery worker processes.
+    """
+    from app.events.bus.registry import ConsumerRegistry
+    from app.events.bootstrap.register_consumers import bootstrap_event_consumers
+    from app.events.tasks import set_celery_registry
+
+    logger.info("Initializing ConsumerRegistry in Celery Worker")
+    registry = ConsumerRegistry()
+    bootstrap_event_consumers(registry)
+    
+    # Register followup subscribers manually
+    from app.events.followup_subscribers import register_subscribers
+    for consumer in register_subscribers():
+        registry.register(consumer)
+
+    set_celery_registry(registry)
+    logger.info("ConsumerRegistry successfully initialized.")
+
 
 @celery_app.task(bind=True, max_retries=3)
 def process_data_import(self, job_id: str):

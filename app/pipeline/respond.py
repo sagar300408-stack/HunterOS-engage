@@ -18,8 +18,7 @@ from app.domain.conversations.schemas import (
     MessageDirectionEnum,
     SaveMessageDTO,
 )
-from app.events.dispatcher import dispatcher
-from app.events.message_events import ReplySent
+
 from app.integrations.whatsapp.provider import get_whatsapp_provider
 from app.utils.logger import get_logger
 from app.utils.clock import SystemClock
@@ -74,21 +73,5 @@ async def send_response(
         conversation_id=str(conversation_id),
     )
 
-    # ── Send via WhatsApp ─────────────────────────────────────────────────────
-    wa_message_id = await get_whatsapp_provider().send_text_message(to=to_phone, body=content)
-
-    logger.info(
-        "reply_sent",
-        to_phone=to_phone,
-        wa_message_id=wa_message_id,
-        content_preview=content[:80],
-    )
-
-    # ── Emit ReplySent event ──────────────────────────────────────────────────
-    dispatcher.dispatch(
-        ReplySent(
-            to_phone=to_phone,
-            content=content,
-            wa_message_id=wa_message_id,
-        )
-    )
+    # ── Emit MessageReadyToSendEvent ──────────────────────────────────────────
+    # Event creation moved to consumer or handled via Outbox directly

@@ -21,7 +21,7 @@ from app.domain.conversations import service as message_service
 from app.domain.customers import service as customer_service
 from app.domain.customers.models import Customer
 from app.domain.memory import service as memory_service
-from app.events.dispatcher import dispatcher
+
 from app.events.message_events import AIRequested, AIResponded
 from app.integrations.openai.provider import get_ai_provider
 from app.pipeline.intent import classify_intent
@@ -60,13 +60,7 @@ async def process_with_ai(
     )
 
     # ── Emit AIRequested event ────────────────────────────────────────────────
-    dispatcher.dispatch(
-        AIRequested(
-            conversation_id=conversation_id,
-            from_phone=customer.phone,
-            user_content=user_content,
-        )
-    )
+    # Event creation moved to consumer
 
     # ── Fetch conversation history (stateless) ────────────────────────────────
     history = await message_service.get_conversation_history(session, conversation_id)
@@ -170,16 +164,7 @@ async def process_with_ai(
         logger.error("failed_to_log_response_generated_step", error=str(e))
 
     # ── Emit AIResponded event ────────────────────────────────────────────────
-    dispatcher.dispatch(
-        AIResponded(
-            conversation_id=conversation_id,
-            response_content=ai_result["content"],
-            model=ai_result["model"],
-            total_tokens=ai_result["total_tokens"],
-            latency_ms=ai_result["latency_ms"],
-            estimated_cost_usd=ai_result["estimated_cost_usd"],
-        )
-    )
+    # Event creation moved to consumer
 
     # Attach intent result to ai_result for downstream use (Phase 5/6)
     ai_result["intent_result"] = intent_result

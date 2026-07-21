@@ -1,66 +1,59 @@
 import logging
-import asyncio
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.bus.exceptions import EventValidationError
 from app.events.bus.interfaces import EventPublisher
-from app.events.bus.registry import ConsumerRegistry
 from app.events.model.base_event import UniversalBaseEvent
 from app.events.model.categories import EventCategory
+from app.events.store.service import EventStoreService
 
 logger = logging.getLogger(__name__)
 
 
 class EventBus(EventPublisher):
     """
-    Lightweight, in-process Event Bus for HunterOS Phase 7 Milestone 2.
-    Routes events to subscribers via the ConsumerRegistry asynchronously.
+    Transactional Outbox Event Bus for HunterOS Phase 7.
+    
+    1. Persists the event synchronously within the DB transaction.
+    2. Enqueues a Celery task to distribute the event asynchronously.
     """
 
-    def __init__(self, registry: ConsumerRegistry):
-        self._registry = registry
+    def __init__(self, store_service: EventStoreService):
+        self._store_service = store_service
 
-    async def publish(self, event: UniversalBaseEvent) -> None:
+    async def publish(self, session: AsyncSession, event: UniversalBaseEvent) -> None:
         """
-        Publishes the event to all consumers subscribed to the event's class or base classes.
-        Consumers are resolved in priority order.
+        Validates, persists, and queues the event.
+        Must be called with an active database session.
         """
         self._validate_event(event)
 
-        event_class = type(event)
-        subscribers = self._registry.get_subscribers(event_class)
+        # 1. Persist (Stage 4 of Architecture)
+        await self._store_service.persist_event(session, event)
 
         logger.info(
-            "event_published",
+            "event_persisted_to_outbox",
             extra={
                 "event_id": str(event.event_id),
                 "event_name": getattr(event, "event_name", "unknown"),
                 "category": event.category.value if event.category else None,
-                "subscriber_count": len(subscribers),
             }
         )
-
-        for consumer in subscribers:
-            try:
-                # We await each consumer sequentially. 
-                # This ensures high-priority infrastructure consumers run to completion
-                # before application consumers.
-                await consumer.handle_event(event)
-            except Exception as exc:
-                # Isolate consumer failures: one failing consumer must not block the others
-                logger.error(
-                    "consumer_error",
-                    extra={
-                        "event_id": str(event.event_id),
-                        "consumer": consumer.__class__.__name__,
-                        "error": str(exc)
-                    },
-                    exc_info=True
-                )
+        
+        # 2. Queue for distribution (Stage 5 of Architecture)
+        from app.events.tasks import dispatch_event
+        # Queueing happens immediately. If the DB transaction rolls back, 
+        # the Celery task will fail to find the event and can be discarded/ignored.
+        # Alternatively, we could enqueue on commit, but Celery tasks usually handle 
+        # missing DB records via retries until the transaction commits.
+        dispatch_event.apply_async(
+            args=[str(event.event_id)],
+            queue="event_dispatch"
+        )
 
     def _validate_event(self, event: UniversalBaseEvent) -> None:
         """
         Ensures the event conforms to architectural constraints.
-        Pydantic handles basic structural validation on instantiation, but we add custom checks here.
         """
         if not isinstance(event, UniversalBaseEvent):
             raise EventValidationError("Published event must inherit from UniversalBaseEvent.")

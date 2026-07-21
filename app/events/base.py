@@ -1,20 +1,10 @@
-"""Base event dataclass for all HunterOS domain events."""
+"""
+TOMBSTONED: This file is deprecated as of HunterOS Phase 7 Architecture Realignment.
+Please use `app.events.model.base_event.UniversalBaseEvent` instead.
+"""
+from app.events.model.base_event import UniversalBaseEvent
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from uuid import UUID, uuid4
-
-
-@dataclass
 class BaseEvent:
-    """
-    All domain events inherit from BaseEvent.
-
-    Every event carries a unique ID and a precise timestamp,
-    making them safe to store, replay, or ship to a message broker.
-    """
-
-    event_id: UUID = field(default_factory=uuid4)
-    occurred_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    def __init__(self, *args, **kwargs):
+        import warnings
+        warnings.warn("BaseEvent is deprecated. Use UniversalBaseEvent instead.", DeprecationWarning, stacklevel=2)

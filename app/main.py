@@ -24,7 +24,11 @@ from app.api.v1.followup import router as followup_router
 
 from app.config import get_settings
 
-from app.events.followup_subscribers import register_subscribers as register_followup_subscribers
+from app.events.bootstrap.register_consumers import bootstrap_event_consumers
+from app.events.bus.registry import ConsumerRegistry
+from app.events.bus.event_bus import EventBus
+from app.events.store.repository import EventStoreRepository
+from app.events.store.service import EventStoreService
 
 from app.integrations.postgres.database import create_tables, dispose_engine
 from app.utils.logger import configure_logging, get_logger
@@ -58,12 +62,24 @@ async def lifespan(app: FastAPI):
         from app.startup.seeder import seed_default_admin
         await seed_default_admin()
 
-    # Start Event Subscriptions
+    # Initialize Event Bus and Dependencies
+    registry = ConsumerRegistry()
+    bootstrap_event_consumers(registry)
     
+    # Register Follow-up subscribers manually until properly moved to bootstrap
+    from app.events.followup_subscribers import register_subscribers as register_followup_subscribers
+    for consumer in register_followup_subscribers():
+        registry.register(consumer)
+        
+    store_service = EventStoreService(EventStoreRepository())
+    event_bus = EventBus(store_service)
+    event_bus._registry = registry  # Attach registry directly as event_bus constructor took store_service
     
-    register_followup_subscribers()
-    logger.info("Event subscribers registered")
+    app.state.event_bus = event_bus
+    app.state.consumer_registry = registry
     
+    logger.info("Event Bus initialized and subscribers registered")
+
     from app.domain.kpi.bootstrap import bootstrap_kpis
     bootstrap_kpis()
     logger.info("KPI calculators registered")
@@ -277,8 +293,6 @@ def create_app() -> FastAPI:
         }
 
     return app
-
-
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

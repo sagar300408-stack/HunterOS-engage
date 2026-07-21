@@ -4,73 +4,74 @@ from app.domain.analytics.repository import AnalyticsRepository
 from app.domain.analytics.service import AnalyticsProjection
 from app.domain.livestream.service import LiveStreamProjection
 
-from app.events.bus.event_bus import EventBus
+from app.events.bus.registry import ConsumerRegistry
 from app.events.projections.manager import ProjectionManager
 
-from app.events.store.consumer import EventStoreConsumer
-from app.events.store.repository import EventStoreRepository
-from app.events.store.service import EventStoreService
 
-
-def bootstrap_event_consumers(event_bus: EventBus):
+def bootstrap_event_consumers(registry: ConsumerRegistry):
     """
     Central bootstrap location for registering all operational and projection consumers 
-    with the HunterOS Event Bus.
+    with the HunterOS Consumer Registry.
     """
     
-    # 1. Register Event Store (Priority 100)
-    store_repo = EventStoreRepository()
-    store_service = EventStoreService(store_repo)
-    event_store_consumer = EventStoreConsumer(store_service)
-    
-    event_bus.register_consumer(event_store_consumer)
-    
-    # 2. Register Projection Framework (Priority 50)
+    # 1. Register Projection Framework (Priority 50)
     projection_manager = ProjectionManager()
     
-    #   2a. Timeline Projection
+    #   1a. Timeline Projection
     timeline_repo = TimelineRepository()
     timeline_projection = TimelineProjection(timeline_repo)
     projection_manager.register_projection(timeline_projection)
     
-    #   2b. Analytics Projection
+    #   1b. Analytics Projection
     analytics_repo = AnalyticsRepository()
     analytics_projection = AnalyticsProjection(analytics_repo)
     projection_manager.register_projection(analytics_projection)
     
-    #   2c. Live Stream Projection
+    #   1c. Live Stream Projection
     livestream_projection = LiveStreamProjection()
     projection_manager.register_projection(livestream_projection)
     
-    # Register the single projection manager consumer to the event bus
-    event_bus.register_consumer(projection_manager)
+    # Register the single projection manager consumer
+    registry.register(projection_manager)
 
-    # 3. Register Operational Intelligence Engine Consumer (Priority -10)
+    # 2. Register Operational Intelligence Engine Consumer (Priority -10)
     from app.domain.intelligence.consumer import IntelligenceEventConsumer
     intelligence_consumer = IntelligenceEventConsumer()
-    event_bus.register_consumer(intelligence_consumer)
+    registry.register(intelligence_consumer)
     
-    # 4. Register Collaboration Engine Consumer (Priority 10)
+    # 3. Register Collaboration Engine Consumer (Priority 10)
     from app.domain.collaboration.consumer import CollaborationEventConsumer
     collaboration_consumer = CollaborationEventConsumer()
-    event_bus.register_consumer(collaboration_consumer)
+    registry.register(collaboration_consumer)
 
-    # 5. Register Impact Engine Consumer (Priority 20)
+    # 4. Register Impact Engine Consumer (Priority 20)
     from app.domain.impact.consumer import ImpactEventConsumer
     impact_consumer = ImpactEventConsumer()
-    event_bus.register_consumer(impact_consumer)
+    registry.register(impact_consumer)
 
-    # 6. Register Context Engine Consumer (Priority -20)
+    # 5. Register Context Engine Consumer (Priority -20)
     from app.domain.context.consumer import ContextEventConsumer
     context_consumer = ContextEventConsumer()
-    event_bus.register_consumer(context_consumer)
+    registry.register(context_consumer)
 
-    # 7. Register Onboarding Event Consumer (Priority 100)
+    # 6. Register Onboarding Event Consumer (Priority 100)
     from app.domain.onboarding.consumer import OnboardingEventConsumer
     onboarding_consumer = OnboardingEventConsumer()
-    event_bus.register_consumer(onboarding_consumer)
+    registry.register(onboarding_consumer)
 
-    # 8. Register UI Event Consumer (Priority 1000)
+    # 7. Register UI Event Consumer (Priority 1000)
     from app.domain.ui.consumer import UIEventConsumer
     ui_consumer = UIEventConsumer()
-    event_bus.register_consumer(ui_consumer)
+    registry.register(ui_consumer)
+
+    # 8. Register Pipeline Consumers
+    from app.domain.conversations.consumers.webhook_consumer import WebhookReceiveConsumer
+    from app.domain.conversations.consumers.ai_consumer import AIProcessingConsumer
+    from app.domain.conversations.consumers.response_consumer import ResponseConsumer
+    from app.domain.integration.consumers.whatsapp_send_consumer import WhatsAppSendConsumer
+
+    registry.register(WebhookReceiveConsumer())
+    registry.register(AIProcessingConsumer())
+    registry.register(ResponseConsumer())
+    registry.register(WhatsAppSendConsumer())
+

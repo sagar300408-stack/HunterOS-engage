@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.events.model.base_event import UniversalBaseEvent
 from app.events.store.models import EventRecord
 from app.events.store.repository import EventStoreRepository
+from app.events.model.lifecycle import EventLifecycleState
 
 class EventStoreService:
     """
@@ -36,7 +37,9 @@ class EventStoreService:
             payload=payload_json,
             metadata_payload=event.metadata,
             ai_model_version=event.ai_model_version,
-            ai_reason=event.ai_reason
+            ai_reason=event.ai_reason,
+            lifecycle_state=EventLifecycleState.PERSISTED.value,
+            retry_count=0
         )
         
         await self._repository.save_event(session, record)

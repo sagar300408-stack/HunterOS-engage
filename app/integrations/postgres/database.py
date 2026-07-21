@@ -104,6 +104,15 @@ async def create_tables() -> None:
 
     Development only — use Alembic migrations in staging and production.
     """
+    from app.config import get_settings
+    settings = get_settings()
+    
+    if not settings.is_development:
+        raise RuntimeError(
+            "create_tables() is strictly forbidden in production. "
+            "Use Alembic migrations instead: `alembic upgrade head`"
+        )
+        
     # Import all models so their metadata is registered on Base
     from app.domain.conversations.models import Base  # noqa: F401
     from app.domain.customers.models import Customer  # noqa: F401

@@ -66,16 +66,7 @@ async def receive(
         content_preview=message_data["content"][:80],
     )
 
-    # ── Emit MessageReceived event ────────────────────────────────────────────
-    dispatcher.dispatch(
-        MessageReceived(
-            wa_message_id=wa_message_id,
-            from_phone=from_phone,
-            content=message_data["content"],
-            timestamp=message_data["timestamp"],
-            contact_name=contact_name,
-        )
-    )
+
 
     # ── Deduplication ─────────────────────────────────────────────────────────
     if await message_service.is_duplicate_message(session, wa_message_id):
@@ -133,16 +124,7 @@ async def receive(
     )
     message = await message_service.save_message(session, dto)
 
-    # ── Emit MessageStored event ──────────────────────────────────────────────
-    dispatcher.dispatch(
-        MessageStored(
-            message_id=message.id,
-            conversation_id=conversation.id,
-            from_phone=from_phone,
-        )
-    )
-
-    # ── Log Pipeline Steps for Event Replay (Phase 4) ────────────────────────
+    # ── Event creation moved to consumer ──────────────────────────────────────    # ── Log Pipeline Steps for Event Replay (Phase 4) ────────────────────────
     try:
         from app.domain.dashboard.service import log_pipeline_step
         # 1. Message Received
