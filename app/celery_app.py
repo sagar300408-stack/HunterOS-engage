@@ -80,12 +80,12 @@ def generate_weekly_roi_report(workspace_id: str):
 # Basic Beat Schedule Configuration
 celery_app.conf.beat_schedule = {
     "run-weekly-roi-reports": {
-        "task": "app.worker.generate_weekly_roi_report",
+        "task": "app.celery_app.generate_weekly_roi_report",
         "schedule": 604800.0, # Every 7 days in seconds
         "args": ("ALL_WORKSPACES",)
     },
     "poll-due-followups": {
-        "task": "app.worker.poll_due_followups",
+        "task": "app.celery_app.poll_due_followups",
         "schedule": 15.0, # Every 15 seconds
     },
 }

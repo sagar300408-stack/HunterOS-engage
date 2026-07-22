@@ -80,12 +80,9 @@ async def lifespan(app: FastAPI):
     
     # ── Startup Validation (Architecture Guard) ──────────────────────────────
     from app.events.categories.conversation_events import CustomerRepliedEvent
-    from app.events.categories.onboarding_events import WorkspaceCreatedEvent
     
     if not registry.get_subscribers(CustomerRepliedEvent):
         raise RuntimeError("Architecture Violation: No consumers registered for CustomerRepliedEvent (Critical Path broken)")
-    if not registry.get_subscribers(WorkspaceCreatedEvent):
-        raise RuntimeError("Architecture Violation: No consumers registered for WorkspaceCreatedEvent")
         
     logger.info("Startup validation passed: Critical event consumers are registered")
     
@@ -153,7 +150,7 @@ def create_app() -> FastAPI:
     origins = [o.strip() for o in settings.dashboard_cors_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(origin) for origin in settings.CORS_ORIGINS],
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

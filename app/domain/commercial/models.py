@@ -49,9 +49,7 @@ class License(Base):
     issued_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.utcnow())
     expires_at = Column(DateTime(timezone=True), nullable=True)
     
-    __table_args__ = (
-        Index("ix_commercial_licenses_workspace_id", "workspace_id"),
-    )
+    __table_args__ = ()
 
 
 # ── Subscription ───────────────────────────────────────────────────────────────

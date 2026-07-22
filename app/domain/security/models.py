@@ -16,10 +16,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
-from app.domain.conversations.models import Base
-
 # ── Default workspace for single-tenant / development mode ────────────────────
 DEFAULT_WORKSPACE_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+from app.domain.conversations.models import Base
 
 
 # ── Role enum ──────────────────────────────────────────────────────────────────

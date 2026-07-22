@@ -14,7 +14,7 @@ class IntelligenceEventConsumer(EventConsumer):
     Orchestrates the entire Operational Intelligence Pipeline.
     """
     
-    async def get_priority(self) -> int:
+    def get_priority(self) -> int:
         return -10
 
     def get_subscriptions(self) -> list[type]:
