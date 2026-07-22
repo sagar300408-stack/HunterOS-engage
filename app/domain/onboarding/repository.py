@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 
 from app.domain.onboarding.models import (
     WorkspaceProvisioning,
-    IntegrationConnection,
+    OnboardingIntegrationConnection,
     ImportJob,
     ValidationResult,
     GoLiveAssessment,
@@ -23,9 +23,9 @@ class OnboardingRepository:
         )
         return result.scalars().first()
 
-    async def get_integrations(self, workspace_id: uuid.UUID) -> List[IntegrationConnection]:
+    async def get_integrations(self, workspace_id: uuid.UUID) -> List[OnboardingIntegrationConnection]:
         result = await self.session.execute(
-            select(IntegrationConnection).where(IntegrationConnection.workspace_id == workspace_id)
+            select(OnboardingIntegrationConnection).where(OnboardingIntegrationConnection.workspace_id == workspace_id)
         )
         return result.scalars().all()
 

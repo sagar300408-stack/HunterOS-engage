@@ -8,13 +8,15 @@ from app.domain.operations.schemas import OperationalRequest
 from app.domain.operations.engine import OperationsEngine
 from app.domain.approval.engine import ApprovalEngine
 from app.domain.action.engine import ActionEngine
-from app.domain.integration.router import get_integration_engine
+from app.domain.integration.engine import IntegrationEngine
+from app.domain.integration.credentials import JsonCredentialProvider
 
 router = APIRouter(prefix="/operations", tags=["operations"])
 
 
 def get_operations_engine(request: Request, db: AsyncSession = Depends(get_db)) -> OperationsEngine:
-    integration_engine = get_integration_engine(request, db)
+    cred_provider = JsonCredentialProvider()
+    integration_engine = IntegrationEngine(db, cred_provider, request.app.state.event_bus)
     action_engine = ActionEngine(session=db, event_bus=request.app.state.event_bus, integration_engine=integration_engine)
     approval_engine = ApprovalEngine(session=db, event_bus=request.app.state.event_bus)
     return OperationsEngine(approval_engine=approval_engine, action_engine=action_engine)

@@ -35,7 +35,7 @@ class WorkspaceProvisioning(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime, nullable=True)
 
-class IntegrationConnection(Base):
+class OnboardingIntegrationConnection(Base):
     __tablename__ = "onboarding_integrations"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     workspace_id = Column(UUID(as_uuid=True), index=True, nullable=False)

@@ -4,7 +4,7 @@ import uuid
 from typing import Dict, Any
 
 from app.domain.pilot.models import PilotDeployment, PilotMetrics
-from app.domain.roi.engines.calculator import ROICalculator
+from app.domain.impact.engines.roi import ROICalculator
 
 class PilotROIEngine:
     """

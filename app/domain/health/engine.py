@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class OperationalHealthEngine:
     def __init__(self, session: AsyncSession) -> None:
+        self.session = session
         self.health_repo = HealthRepository(session)
         self.kpi_repo = KpiRepository(session)
         
@@ -63,10 +64,6 @@ class OperationalHealthEngine:
                 snapshots.append(saved_snapshot)
             except Exception as e:
                 logger.error(f"Failed to evaluate health domain {evaluator.definition.name}: {e}")
-        from app.domain.insight.engine import InsightEngine
-        insight_engine = InsightEngine(self.session)
-        await insight_engine.generate_insights(workspace_id, target_type, target_id)
-                
         return snapshots
 
     def _determine_trend(self, current_score: float, previous_snapshot: Optional[HealthSnapshot]) -> HealthTrend:

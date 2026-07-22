@@ -78,6 +78,17 @@ async def lifespan(app: FastAPI):
     app.state.event_bus = event_bus
     app.state.consumer_registry = registry
     
+    # ── Startup Validation (Architecture Guard) ──────────────────────────────
+    from app.events.categories.conversation_events import CustomerRepliedEvent
+    from app.events.categories.onboarding_events import WorkspaceCreatedEvent
+    
+    if not registry.get_subscribers(CustomerRepliedEvent):
+        raise RuntimeError("Architecture Violation: No consumers registered for CustomerRepliedEvent (Critical Path broken)")
+    if not registry.get_subscribers(WorkspaceCreatedEvent):
+        raise RuntimeError("Architecture Violation: No consumers registered for WorkspaceCreatedEvent")
+        
+    logger.info("Startup validation passed: Critical event consumers are registered")
+    
     logger.info("Event Bus initialized and subscribers registered")
 
     from app.domain.kpi.bootstrap import bootstrap_kpis
@@ -104,16 +115,11 @@ async def lifespan(app: FastAPI):
     bootstrap_integrations()
     logger.info("Integration Connectors registered")
 
-    # Start background workers
-    app.state.followup_worker_task = asyncio.create_task(followup_worker_loop())
-
     logger.info("hunteros_engage_ready", routes_registered=True)
 
     yield  # ── Application runs here ──────────────────────────────────────────
 
     logger.info("hunteros_engage_shutting_down")
-    if hasattr(app.state, "followup_worker_task"):
-        app.state.followup_worker_task.cancel()
     await dispose_engine()
     logger.info("hunteros_engage_stopped")
 

@@ -7,13 +7,14 @@ from app.database import get_db
 from app.domain.action.repository import ActionRepository
 from app.domain.action.engine import ActionEngine
 from app.domain.action.schemas import ActionExecutionResponse, SubmitActionRequest
-from app.domain.integration.router import get_integration_engine
-
+from app.domain.integration.engine import IntegrationEngine
+from app.domain.integration.credentials import JsonCredentialProvider
 router = APIRouter(prefix="/action", tags=["action"])
 
 
 def get_action_engine(request: Request, db: AsyncSession = Depends(get_db)) -> ActionEngine:
-    integration_engine = get_integration_engine(request, db)
+    cred_provider = JsonCredentialProvider()
+    integration_engine = IntegrationEngine(db, cred_provider, request.app.state.event_bus)
     return ActionEngine(session=db, event_bus=request.app.state.event_bus, integration_engine=integration_engine)
 
 

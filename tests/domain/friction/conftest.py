@@ -77,7 +77,7 @@ from app.domain.context.models import (                                   # noqa
 # Onboarding domain models
 from app.domain.onboarding.models import (                                # noqa: F401
     WorkspaceProvisioning,
-    IntegrationConnection,
+    OnboardingIntegrationConnection,
     ImportJob,
     ValidationResult,
     GoLiveAssessment,

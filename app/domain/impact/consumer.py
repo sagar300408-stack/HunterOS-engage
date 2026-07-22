@@ -1,8 +1,10 @@
-from app.events.bus.event_bus import EventConsumer, HunterEvent
+from app.events.bus.interfaces import EventConsumer
+from app.events.model.base_event import UniversalBaseEvent
+from typing import List
 from app.domain.impact.engines.collector import ImpactCollector
 from app.domain.impact.repository import ImpactRepository
 from app.domain.impact.models import ImpactEvent
-from app.integrations.postgres.database import SessionLocal
+from app.integrations.postgres.database import get_session
 
 class ImpactEventConsumer(EventConsumer):
     """
@@ -13,16 +15,18 @@ class ImpactEventConsumer(EventConsumer):
     def name(self) -> str:
         return "impact_roi_collector"
 
-    @property
-    def priority(self) -> int:
+    def get_subscriptions(self) -> List[type[UniversalBaseEvent]]:
+        return [UniversalBaseEvent]
+
+    def get_priority(self) -> int:
         return 20 # Runs after core processing
 
-    async def process(self, event: HunterEvent) -> None:
+    async def handle_event(self, event: UniversalBaseEvent) -> None:
         # Ignore our own reports being generated
-        if event.type.startswith("impact."):
+        if getattr(event, 'event_name', '').startswith("impact."):
             return
             
-        async with SessionLocal() as session:
+        async with get_session() as session:
             repo = ImpactRepository(session)
             
             # Map HunterEvent to ImpactEvent

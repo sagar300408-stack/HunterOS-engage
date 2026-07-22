@@ -18,7 +18,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.customers.models import Customer
-from app.domain.dashboard.models import DEFAULT_WORKSPACE_ID
+from app.domain.security.models import DEFAULT_WORKSPACE_ID
 from app.domain.followup.models import FollowUpQueue
 from app.domain.followup.schemas import (
     UpdateMessageRequest,

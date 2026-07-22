@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from sqlalchemy import select
 from app.integrations.postgres.database import get_session_factory, create_tables
 from app.domain.friction.models import SLAPolicy
-from app.domain.dashboard.models import DEFAULT_WORKSPACE_ID
+from app.domain.security.models import DEFAULT_WORKSPACE_ID
 
 
 DEFAULT_SLA_POLICIES = [

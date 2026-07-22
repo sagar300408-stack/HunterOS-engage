@@ -84,14 +84,15 @@ class TestDeveloperTools:
         mock_settings.enable_developer_tools = True
         simulation_state.time_offset_seconds = 0
         
-        t0 = SystemClock.now()
-        simulation_state.time_offset_seconds = 3600
-        
-        t1 = SystemClock.now()
-        diff = (t1 - t0).total_seconds()
-        
-        # Expect ~1 hour difference (allow minor system lag tolerance)
-        assert 3590 < diff < 3610
-        
-        # Reset
-        simulation_state.time_offset_seconds = 0
+        with patch("app.utils.clock.get_settings", return_value=mock_settings):
+            t0 = SystemClock.now()
+            simulation_state.time_offset_seconds = 3600
+            
+            t1 = SystemClock.now()
+            diff = (t1 - t0).total_seconds()
+            
+            # Expect ~1 hour difference (allow minor system lag tolerance)
+            assert 3590 < diff < 3610
+            
+            # Reset
+            simulation_state.time_offset_seconds = 0

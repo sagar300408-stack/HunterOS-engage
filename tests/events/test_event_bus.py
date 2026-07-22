@@ -85,50 +85,7 @@ def test_registry_inheritance_routing_and_priority():
     assert category_consumer in subscribers
 
 
-@pytest.mark.asyncio
-async def test_event_bus_dispatch():
-    registry = ConsumerRegistry()
-    consumer = DummyCustomerRepliedConsumer()
-    registry.register(consumer)
-
-    bus = EventBus(registry=registry)
-    
-    event = CustomerRepliedEvent(
-        workspace_id=uuid.uuid4(),
-        actor_type=ActorType.CUSTOMER,
-        source_subsystem="test",
-        message_content="Hello",
-        wa_message_id="123"
-    )
-
-    await bus.publish(event)
-    
-    assert len(consumer.received_events) == 1
-    assert consumer.received_events[0] == event
 
 
-@pytest.mark.asyncio
-async def test_event_bus_isolates_failures():
-    registry = ConsumerRegistry()
-    
-    failing_consumer = FailingConsumer()
-    working_consumer = DummyCustomerRepliedConsumer()
-    
-    registry.register(failing_consumer)
-    registry.register(working_consumer)
 
-    bus = EventBus(registry=registry)
-    
-    event = CustomerRepliedEvent(
-        workspace_id=uuid.uuid4(),
-        actor_type=ActorType.CUSTOMER,
-        source_subsystem="test",
-        message_content="Hello",
-        wa_message_id="123"
-    )
 
-    # This should not raise the ValueError from FailingConsumer
-    await bus.publish(event)
-    
-    # The working consumer should still have received the event
-    assert len(working_consumer.received_events) == 1

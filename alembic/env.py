@@ -51,18 +51,11 @@ from app.domain.followup.models import (  # noqa: F401
 from app.events.store.models import EventRecord  # noqa: F401
 from app.domain.timeline.models import TimelineEntry  # noqa: F401
 from app.domain.analytics.models import AnalyticsDailyMetric, ProductUsageEvent, FeatureAdoption, CustomerHealthSnapshot, ProductExperiment  # noqa: F401
-from app.domain.friction.models import FrictionEvent, FrictionRule  # noqa: F401
+from app.domain.friction.models import FrictionEvent  # noqa: F401
 from app.domain.customer_success.models import CustomerLifecycle, SuccessPlaybook, ExecutiveReview, SupportTicket  # noqa: F401
 from app.domain.commercial.models import License, Subscription, Invoice, SalesPipelineLead  # noqa: F401
-from app.domain.collaboration.models import CollaborationTask, TaskIntent, CollaborationPolicy  # noqa: F401
-from app.domain.roi.models import ImpactEvent, ValueAttribution, ROIMetric, ExecutiveNarrative, StrategicForecast  # noqa: F401
-from app.domain.context.models import OrganizationNode, ProductService, WorkflowDefinition, BusinessPolicy, CustomerContext, TeamMemberContext, KnowledgeDocument, BusinessOntology, KnowledgeGraphEdge, ContextConflict  # noqa: F401
-from app.domain.onboarding.models import WorkspaceProvisioning, IntegrationConnection, ImportJob, ValidationResult, GoLiveAssessment, OperationalCapabilityMatrix, WorkspaceMaturity  # noqa: F401
-from app.domain.ui.models import UserPreference, NotificationPreference, DashboardDefinition, NavigationNode, FeatureFlag, UXAnalyticsEvent  # noqa: F401
-from app.domain.observability.models import Alert, Incident, MetricRecord  # noqa: F401
-from app.domain.reliability.models import PerformanceBenchmark, ReliabilityEvent, DeploymentRecord  # noqa: F401
-from app.domain.integration.models import SyncJob  # noqa: F401
-from app.domain.pilot.models import PilotDeployment, PilotFeedback, PilotMetrics  # noqa: F401
+from app.domain.collaboration.models import CollaborationTask  # noqa: F401
+
 
 # Alembic Config object (gives access to alembic.ini values)
 config = context.config

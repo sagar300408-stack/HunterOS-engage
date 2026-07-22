@@ -7,7 +7,8 @@ from sqlalchemy.orm import sessionmaker
 from app.domain.conversations.models import Base
 from app.domain.customers.models import Customer
 from app.domain.intent.models import IntentHistory
-from app.domain.dashboard.models import PipelineEvent, AuditLog
+from app.domain.dashboard.models import PipelineEvent
+from app.domain.security.models import AuditLog
 from app.domain.followup.models import FollowUpQueue, FollowUpExecution, LeadHealthScore, SalesMemoryTimeline
 from app.domain.memory.models import CustomerMemory
 from app.events.categories.conversation_events import CustomerRepliedEvent

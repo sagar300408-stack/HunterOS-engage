@@ -184,3 +184,5 @@ class AIMetadata(Base):
             f"<AIMetadata message_id={self.message_id} "
             f"model={self.model} tokens={self.total_tokens}>"
         )
+# Import at bottom to avoid circular dependencies and ensure relationships can resolve
+from app.domain.dashboard.models import PipelineEvent

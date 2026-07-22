@@ -1,5 +1,7 @@
-from app.events.bus.event_bus import EventConsumer, HunterEvent
-from app.integrations.postgres.database import SessionLocal
+from app.events.bus.interfaces import EventConsumer
+from app.events.model.base_event import UniversalBaseEvent
+from typing import List
+from app.integrations.postgres.database import get_session
 
 class UIEventConsumer(EventConsumer):
     """
@@ -10,9 +12,11 @@ class UIEventConsumer(EventConsumer):
     def name(self) -> str:
         return "ui_experience_consumer"
 
-    @property
-    def priority(self) -> int:
+    def get_subscriptions(self) -> List[type[UniversalBaseEvent]]:
+        return [UniversalBaseEvent]
+
+    def get_priority(self) -> int:
         return 1000 # Run last, purely for presentation/analytics updates
 
-    async def process(self, event: HunterEvent) -> None:
+    async def handle_event(self, event: UniversalBaseEvent) -> None:
         pass

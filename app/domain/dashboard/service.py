@@ -37,15 +37,17 @@ from app.config import get_settings
 from app.domain.conversations.models import AIMetadata, Conversation, Message, MessageDirection
 from app.domain.customers.models import Customer, CustomerStatus
 from app.domain.dashboard.models import (
-    AuditLog,
     BackgroundJob,
     JobStatus,
     PipelineEvent,
+)
+from app.domain.security.models import (
+    AuditLog,
     User,
     UserRole,
-    role_can,
     DEFAULT_WORKSPACE_ID,
 )
+from app.domain.security.engines.authorization import role_can
 from app.domain.dashboard.schemas import (
     ActivityEvent,
     AnalyticsData,

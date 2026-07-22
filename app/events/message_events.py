@@ -21,7 +21,7 @@ from app.events.model.categories import EventCategory
 
 class RawWebhookEvent(UniversalBaseEvent):
     """Fired when a raw webhook payload is received from Meta."""
-    category: EventCategory = Field(default=EventCategory.SYSTEM)
+    category: EventCategory = Field(default=EventCategory.PLATFORM)
     event_name: str = Field(default="RawWebhookEvent")
     source_subsystem: str = Field(default="webhook")
     
@@ -30,7 +30,7 @@ class RawWebhookEvent(UniversalBaseEvent):
 
 class MessageReceived(UniversalBaseEvent):
     """Fired when a WhatsApp text message arrives at the webhook."""
-    category: EventCategory = Field(default=EventCategory.MESSAGE)
+    category: EventCategory = Field(default=EventCategory.CONVERSATION)
     event_name: str = Field(default="MessageReceived")
     source_subsystem: str = Field(default="webhook")
     
@@ -43,7 +43,7 @@ class MessageReceived(UniversalBaseEvent):
 
 class MessageStored(UniversalBaseEvent):
     """Fired after the incoming message is persisted to the database."""
-    category: EventCategory = Field(default=EventCategory.MESSAGE)
+    category: EventCategory = Field(default=EventCategory.CONVERSATION)
     event_name: str = Field(default="MessageStored")
     source_subsystem: str = Field(default="pipeline_receive")
     
@@ -53,7 +53,7 @@ class MessageStored(UniversalBaseEvent):
 
 class AIRequested(UniversalBaseEvent):
     """Fired immediately before the OpenAI API call is made."""
-    category: EventCategory = Field(default=EventCategory.AI)
+    category: EventCategory = Field(default=EventCategory.AI_DECISION)
     event_name: str = Field(default="AIRequested")
     source_subsystem: str = Field(default="pipeline_ai")
     
@@ -63,7 +63,7 @@ class AIRequested(UniversalBaseEvent):
 
 class AIResponded(UniversalBaseEvent):
     """Fired after the OpenAI API returns a response."""
-    category: EventCategory = Field(default=EventCategory.AI)
+    category: EventCategory = Field(default=EventCategory.AI_DECISION)
     event_name: str = Field(default="AIResponded")
     source_subsystem: str = Field(default="pipeline_ai")
     
@@ -76,7 +76,7 @@ class AIResponded(UniversalBaseEvent):
 
 class MessageReadyToSendEvent(UniversalBaseEvent):
     """Fired when a message is ready to be sent to WhatsApp."""
-    category: EventCategory = Field(default=EventCategory.MESSAGE)
+    category: EventCategory = Field(default=EventCategory.CONVERSATION)
     event_name: str = Field(default="MessageReadyToSendEvent")
     source_subsystem: str = Field(default="pipeline_respond")
 
@@ -87,7 +87,7 @@ class MessageReadyToSendEvent(UniversalBaseEvent):
 
 class ReplySent(UniversalBaseEvent):
     """Fired after the WhatsApp reply has been successfully delivered."""
-    category: EventCategory = Field(default=EventCategory.MESSAGE)
+    category: EventCategory = Field(default=EventCategory.CONVERSATION)
     event_name: str = Field(default="ReplySent")
     source_subsystem: str = Field(default="pipeline_respond")
     
@@ -98,7 +98,7 @@ class ReplySent(UniversalBaseEvent):
 
 class ErrorOccurred(UniversalBaseEvent):
     """Fired when a pipeline stage encounters an unhandled error."""
-    category: EventCategory = Field(default=EventCategory.SYSTEM)
+    category: EventCategory = Field(default=EventCategory.PLATFORM)
     event_name: str = Field(default="ErrorOccurred")
     source_subsystem: str = Field(default="pipeline")
     

@@ -36,7 +36,7 @@ from app.domain.friction.schemas import (
     TopFrictionSource,
     WorkflowLatencyResponse,
 )
-from app.domain.dashboard.models import DEFAULT_WORKSPACE_ID
+from app.domain.security.models import DEFAULT_WORKSPACE_ID
 
 router = APIRouter(prefix="/friction", tags=["Business Friction Engine"])
 

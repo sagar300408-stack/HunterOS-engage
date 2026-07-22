@@ -45,7 +45,7 @@ from app.domain.scheduling.state_machine import (
     transition,
 )
 from app.domain.scheduling.validators import validate_create_event, get_missing_fields
-from app.domain.dashboard.models import DEFAULT_WORKSPACE_ID
+from app.domain.security.models import DEFAULT_WORKSPACE_ID
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

@@ -122,9 +122,11 @@ async def create_tables() -> None:
         CustomerMemoryEvent,
     )
     from app.domain.intent.models import IntentHistory  # noqa: F401
-    from app.domain.dashboard.models import (  # noqa: F401
+    from app.domain.security.models import (  # noqa: F401
         User,
         AuditLog,
+    )
+    from app.domain.dashboard.models import (  # noqa: F401
         PipelineEvent,
         BackgroundJob,
     )

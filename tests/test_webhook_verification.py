@@ -86,7 +86,7 @@ class TestWebhookPost:
     def test_valid_payload_returns_200(self, client, whatsapp_text_payload):
         """A valid WhatsApp payload must always return 200."""
         with (
-            patch("app.api.v1.webhook.receive", return_value=None),
+            patch("app.api.v1.webhook.receive_webhook", return_value=None),
         ):
             response = client.post(
                 "/api/v1/webhook",

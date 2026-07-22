@@ -34,6 +34,9 @@ class MockCRMConnector(BaseConnector):
     async def sync_events(self, credentials: Dict[str, Any], last_sync: Any) -> list:
         return []
 
+    async def parse_webhook(self, payload: Dict[str, Any], headers: Dict[str, str]) -> list:
+        return []
+
 
 class MockEmailConnector(BaseConnector):
     @property
@@ -62,6 +65,9 @@ class MockEmailConnector(BaseConnector):
     async def sync_events(self, credentials: Dict[str, Any], last_sync: Any) -> list:
         return []
 
+    async def parse_webhook(self, payload: Dict[str, Any], headers: Dict[str, str]) -> list:
+        return []
+
 
 class MockSlackConnector(BaseConnector):
     @property
@@ -88,4 +94,7 @@ class MockSlackConnector(BaseConnector):
         return {"status": "success", "channel_id": "mock_chan_789"}
 
     async def sync_events(self, credentials: Dict[str, Any], last_sync: Any) -> list:
+        return []
+
+    async def parse_webhook(self, payload: Dict[str, Any], headers: Dict[str, str]) -> list:
         return []

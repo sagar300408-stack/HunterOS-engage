@@ -1,8 +1,8 @@
 import logging
 from app.events.bus.interfaces import EventConsumer
 from app.events.bus.event_bus import EventBus
-from app.events.model.event import UniversalBaseEvent
-from app.integrations.postgres.database import SessionLocal
+from app.events.model.base_event import UniversalBaseEvent
+from app.integrations.postgres.database import get_session
 from app.domain.intelligence.engines.pipeline import OperationalIntelligencePipeline
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class IntelligenceEventConsumer(EventConsumer):
 
         logger.debug(f"IntelligenceEventConsumer handling event: {event.metadata.event_type}")
 
-        async with SessionLocal() as session:
+        async with get_session() as session:
             try:
                 pipeline = OperationalIntelligencePipeline(session)
                 await pipeline.run(event.workspace_id)

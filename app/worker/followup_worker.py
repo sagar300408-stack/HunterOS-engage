@@ -19,8 +19,12 @@ from app.integrations.postgres.database import get_session
 from app.domain.followup.models import FollowUpQueue, FollowUpExecution
 from app.domain.followup.state_machine import transition, can_retry
 from app.domain.followup.channel_router import send_message
-from app.domain.followup.sales_memory import record_follow_up_sent
-from app.domain.followup.crm_sync import sync_followup_sent
+from app.events.model.base_event import UniversalBaseEvent
+from app.events.model.categories import EventCategory
+from app.events.model.actor_types import ActorType
+from app.events.bus.event_bus import EventBus
+from app.events.store.service import EventStoreService
+from app.events.store.repository import EventStoreRepository
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -114,16 +118,24 @@ async def _execute_followup(followup_id):
         if send_res.success:
             fu.status = transition(fu.status, "sent")
             
-            # Record milestone & CRM
-            await record_follow_up_sent(
-                session, fu.customer_id, 
-                reason=fu.reason, 
-                strategy=fu.strategy or "friendly_reminder",
-                workspace_id=fu.workspace_id
+            # Publish event
+            event = UniversalBaseEvent(
+                workspace_id=fu.workspace_id,
+                category=EventCategory.FOLLOWUP,
+                event_name="followup.executed",
+                correlation_id=str(fu.id),
+                metadata={
+                    "customer_id": str(fu.customer_id),
+                    "channel": fu.channel,
+                    "provider_message_id": send_res.provider_message_id,
+                    "reason": fu.reason,
+                    "strategy": fu.strategy or "friendly_reminder"
+                },
+                actor_type=ActorType.SYSTEM,
+                source_subsystem="followup_worker"
             )
-            await sync_followup_sent(
-                session, fu.id, fu.customer_id, fu.channel, send_res.provider_message_id, fu.workspace_id
-            )
+            local_bus = EventBus(EventStoreService(EventStoreRepository()))
+            await local_bus.publish(session, event)
         else:
             if can_retry(fu.retry_count, fu.max_retries):
                 fu.status = transition(fu.status, "executing")

@@ -84,4 +84,29 @@ celery_app.conf.beat_schedule = {
         "schedule": 604800.0, # Every 7 days in seconds
         "args": ("ALL_WORKSPACES",)
     },
+    "poll-due-followups": {
+        "task": "app.worker.poll_due_followups",
+        "schedule": 15.0, # Every 15 seconds
+    },
 }
+
+@celery_app.task
+def poll_due_followups():
+    """
+    Background task triggered by Celery Beat to process follow-ups.
+    """
+    import asyncio
+    from app.worker.followup_worker import process_due_followups
+    
+    # We loop here synchronously for a bit to drain the queue 
+    # instead of just doing one per 15s.
+    count = 0
+    while True:
+        processed = asyncio.run(process_due_followups())
+        if not processed:
+            break
+        count += 1
+        if count >= 50:  # Prevent infinite lockup of the worker
+            break
+            
+    return {"status": "success", "processed_count": count}

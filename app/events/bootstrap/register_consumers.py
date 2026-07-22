@@ -75,3 +75,7 @@ def bootstrap_event_consumers(registry: ConsumerRegistry):
     registry.register(ResponseConsumer())
     registry.register(WhatsAppSendConsumer())
 
+    # 9. Register FollowUp Consumers
+    from app.domain.followup.consumers.followup_consumer import FollowUpExecutedConsumer
+    registry.register(FollowUpExecutedConsumer())
+

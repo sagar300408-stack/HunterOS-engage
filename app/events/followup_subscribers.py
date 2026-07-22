@@ -17,7 +17,7 @@ from app.integrations.postgres.database import get_session
 from app.domain.followup.service import schedule_followup
 from app.domain.followup.health_engine import upsert_health_score
 from app.domain.followup.sales_memory import record_customer_replied
-from app.domain.dashboard.models import DEFAULT_WORKSPACE_ID
+from app.domain.security.models import DEFAULT_WORKSPACE_ID
 from app.utils.logger import get_logger
 from app.domain.conversations.models import Conversation
 from app.domain.customers.models import Customer

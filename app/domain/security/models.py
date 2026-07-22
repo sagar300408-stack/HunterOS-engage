@@ -65,7 +65,7 @@ class User(Base):
         nullable=False,
         default=UserRole.reader,
     )
-    is_active    = Column(String(10), nullable=False, default="true")
+    is_active    = Column(Boolean, nullable=False, default=True)
     mfa_enabled  = Column(Boolean, nullable=False, default=False)
     mfa_secret   = Column(String(255), nullable=True)
     created_at   = Column(

@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.customer_success.models import ExecutiveReview
-from app.domain.roi.engines.calculator import ROICalculator
+from app.domain.impact.engines.roi import ROICalculator
 
 logger = logging.getLogger("hunteros.cs")
 

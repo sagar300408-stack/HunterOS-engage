@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from app.domain.conversations.models import Base
-from app.domain.dashboard.models import DEFAULT_WORKSPACE_ID
+from app.domain.security.models import DEFAULT_WORKSPACE_ID
 
 class FollowUpQueue(Base):
     __tablename__ = "followup_queue"
