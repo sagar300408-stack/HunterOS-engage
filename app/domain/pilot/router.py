@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 
-from app.api.deps import RequirePermissions, get_current_user
+from app.api.v1.auth_deps import RequirePermissions, get_current_user
 from app.integrations.postgres.database import get_db
 from app.domain.pilot.models import PilotDeployment, PilotFeedback, PilotPhase, FeedbackSeverity
 from app.domain.pilot.engines.onboarding import PilotOnboardingEngine

@@ -5,7 +5,7 @@ from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from app.integrations.postgres.database import get_db
 from app.domain.observability.models import Alert, Incident
-from app.api.deps import get_current_user, RequirePermissions
+from app.api.v1.auth_deps import get_current_user, RequirePermissions
 
 router = APIRouter(tags=["Observability"])
 

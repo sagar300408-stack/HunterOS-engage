@@ -238,8 +238,9 @@ def create_app() -> FastAPI:
     from app.api.v1.system import router as system_router
     app.include_router(system_router, prefix="/api/v1")
     
-    from app.domain.security.router import router as security_router
-    app.include_router(security_router, prefix="/api/v1")
+    # NOTE: app/domain/security/router.py is UNREGISTERED (auth stabilization).
+    # It used OAuth2PasswordRequestForm (form-encoded) and a stale signing key.
+    # File is preserved for reference; scheduled for deletion after grep confirms zero importers.
     
     from app.domain.observability.router import router as observability_router
     app.include_router(observability_router)

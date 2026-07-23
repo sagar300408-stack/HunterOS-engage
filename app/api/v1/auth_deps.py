@@ -70,3 +70,32 @@ def require_permission(permission: str):
             )
         return user
     return _check
+
+
+class RequirePermissions:
+    """
+    Class-based dependency for enforcing RBAC on specific endpoints.
+    Drop-in replacement for the RequirePermissions that was in app/api/deps.py.
+
+    Usage:
+        @router.get("/", dependencies=[Depends(RequirePermissions("view_all"))])
+        async def my_endpoint(...):
+            ...
+
+    Or as a parameter that also returns the authenticated user:
+        @router.get("/")
+        async def my_endpoint(user: User = Depends(RequirePermissions("view_all"))):
+            ...
+    """
+
+    def __init__(self, *required_permissions: str):
+        self.required_permissions = required_permissions
+
+    async def __call__(self, user: User = Depends(get_current_user)) -> User:
+        for perm in self.required_permissions:
+            if not role_can(user.role, perm):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Not enough permissions. Required: {perm}",
+                )
+        return user

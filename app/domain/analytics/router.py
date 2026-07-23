@@ -50,7 +50,7 @@ async def get_customer_analytics(
 from app.integrations.postgres.database import get_db
 from app.domain.analytics.engines.product_usage import ProductUsageEngine
 from app.domain.analytics.engines.customer_health import CustomerHealthEngine
-from app.api.deps import RequirePermissions
+from app.api.v1.auth_deps import RequirePermissions
 
 @router.get("/usage/{workspace_id}", dependencies=[Depends(RequirePermissions("view_all"))])
 async def get_usage_metrics(workspace_id: UUID, db: AsyncSession = Depends(get_db)):

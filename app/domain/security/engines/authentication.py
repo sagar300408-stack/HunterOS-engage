@@ -1,3 +1,21 @@
+# =============================================================================
+# DEPRECATED — Authentication Stabilization Refactor (2026-07-23)
+# =============================================================================
+# This module is ORPHANED. It is not used by any live route.
+#
+# The live authentication system uses:
+#   - JWT library   : python-jose  (app/domain/dashboard/service.py)
+#   - Signing key   : settings.dashboard_secret_key  (app/config.py)
+#   - Auth helpers  : authenticate_user(), create_access_token(), get_user_from_token()
+#
+# This module uses:
+#   - JWT library   : PyJWT  (different API surface)
+#   - Signing key   : core.config.SECRET_KEY  (a DIFFERENT key — tokens are incompatible)
+#
+# DO NOT add new imports from this file.
+# Scheduled for deletion in the next maintenance sprint.
+# =============================================================================
+
 from datetime import datetime, timedelta
 from typing import Optional
 import jwt

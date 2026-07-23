@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.api.deps import RequirePermissions
+from app.api.v1.auth_deps import RequirePermissions
 from app.integrations.postgres.database import get_db
 from app.domain.integration.models import IntegrationConnection, SyncJob
 from app.domain.integration.engines.gateway import IntegrationGateway

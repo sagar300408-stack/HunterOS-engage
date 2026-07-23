@@ -1,0 +1,1210 @@
+[
+  {
+    "path": "/api/v1/webhook",
+    "method": "GET",
+    "status": 403,
+    "exception": null,
+    "name": "verify_webhook",
+    "module": "app.api.v1.webhook"
+  },
+  {
+    "path": "/api/v1/webhook",
+    "method": "POST",
+    "status": 200,
+    "exception": null,
+    "name": "receive_webhook",
+    "module": "app.api.v1.webhook"
+  },
+  {
+    "path": "/api/v1/auth/login",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "login",
+    "module": "app.api.v1.auth"
+  },
+  {
+    "path": "/api/v1/auth/me",
+    "method": "GET",
+    "status": null,
+    "exception": "1 validation error for UserSchema\ncreated_at\n  Input should be a valid datetime [type=datetime_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.10/v/datetime_type",
+    "name": "get_me",
+    "module": "app.api.v1.auth"
+  },
+  {
+    "path": "/api/v1/dashboard/overview",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "get_overview",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/conversations",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_conversations",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/conversations/{conversation_id}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'messages'",
+    "name": "get_conversation_detail",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/customers",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_customers",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/customers/{customer_id}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'memory'",
+    "name": "get_customer_profile",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/customers/{customer_id}",
+    "method": "PUT",
+    "status": 204,
+    "exception": null,
+    "name": "update_customer",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/analytics",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object is not iterable",
+    "name": "get_analytics",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/system-health",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "get_system_health",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/activity",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_activity",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/leads",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_leads",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/leads/{customer_id}/stage",
+    "method": "PUT",
+    "status": 422,
+    "exception": null,
+    "name": "update_lead_stage",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/queue",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_queue",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/audit-log",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_audit_log",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/dashboard/search",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "search",
+    "module": "app.api.v1.dashboard"
+  },
+  {
+    "path": "/api/v1/scheduling/events",
+    "method": "GET",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "list_events",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "create_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}",
+    "method": "GET",
+    "status": null,
+    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_event_detail'",
+    "name": "get_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}",
+    "method": "PUT",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "update_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}/confirm",
+    "method": "POST",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "confirm_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}/start",
+    "method": "POST",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "start_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}/complete",
+    "method": "POST",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "complete_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}/cancel",
+    "method": "POST",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "cancel_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}/reschedule",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "reschedule_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}/assign",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "assign_event",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/events/{event_id}/audit-log",
+    "method": "GET",
+    "status": null,
+    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_event_audit_log'",
+    "name": "get_event_audit_log",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/candidates",
+    "method": "GET",
+    "status": null,
+    "exception": "module 'app.domain.scheduling.service' has no attribute 'list_candidates'",
+    "name": "list_candidates",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/candidates/{candidate_id}",
+    "method": "GET",
+    "status": null,
+    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_candidate_detail'",
+    "name": "get_candidate",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/candidates/{candidate_id}/promote",
+    "method": "POST",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "promote_candidate",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/candidates/{candidate_id}/abandon",
+    "method": "POST",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "abandon_candidate",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/schedule/today",
+    "method": "GET",
+    "status": null,
+    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_today_schedule'",
+    "name": "get_today_schedule",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/schedule/upcoming",
+    "method": "GET",
+    "status": null,
+    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_upcoming_schedule'",
+    "name": "get_upcoming_schedule",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/schedule/overview",
+    "method": "GET",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "get_schedule_overview",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/customers/{customer_id}/events",
+    "method": "GET",
+    "status": null,
+    "exception": "'User' object is not subscriptable",
+    "name": "get_customer_events",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/customers/{customer_id}/availability",
+    "method": "GET",
+    "status": null,
+    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_availability_preferences'",
+    "name": "get_customer_availability",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/scheduling/customers/{customer_id}/availability",
+    "method": "PUT",
+    "status": null,
+    "exception": "module 'app.domain.scheduling.service' has no attribute 'update_availability_preferences'",
+    "name": "update_customer_availability",
+    "module": "app.api.v1.scheduling"
+  },
+  {
+    "path": "/api/v1/followups/overview",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object is not iterable",
+    "name": "get_overview",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object is not iterable",
+    "name": "get_queue",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue/{followup_id}",
+    "method": "GET",
+    "status": null,
+    "exception": "cannot unpack non-iterable coroutine object",
+    "name": "get_followup_detail",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue/{followup_id}/pause",
+    "method": "POST",
+    "status": 204,
+    "exception": null,
+    "name": "pause_followup",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue/{followup_id}/resume",
+    "method": "POST",
+    "status": 204,
+    "exception": null,
+    "name": "resume_followup",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue/{followup_id}/cancel",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "cancel_followup",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue/{followup_id}/send-now",
+    "method": "POST",
+    "status": 204,
+    "exception": null,
+    "name": "send_followup_now",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue/{followup_id}/message",
+    "method": "PUT",
+    "status": 422,
+    "exception": null,
+    "name": "update_followup_message",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue/{followup_id}/reschedule",
+    "method": "PUT",
+    "status": 422,
+    "exception": null,
+    "name": "reschedule_followup",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/queue/{followup_id}/assign",
+    "method": "PUT",
+    "status": 422,
+    "exception": null,
+    "name": "assign_followup",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/customer/{customer_id}/health",
+    "method": "GET",
+    "status": null,
+    "exception": "2 validation errors for LeadHealthSummary\nband\n  Input should be a valid string [type=string_type, input_value=<AsyncMock name='mock.sca...and' id='2148737698128'>, input_type=AsyncMock]\n    For further information visit https://errors.pydantic.dev/2.10/v/string_type\nrecommendation\n  Input should be a valid string [type=string_type, input_value=<AsyncMock name='mock.sca...ion' id='2148737787824'>, input_type=AsyncMock]\n    For further information visit https://errors.pydantic.dev/2.10/v/string_type",
+    "name": "get_customer_health",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/followups/customer/{customer_id}/timeline",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_customer_timeline",
+    "module": "app.api.v1.followup"
+  },
+  {
+    "path": "/api/v1/livestream/workspace/{workspace_id}/activity",
+    "method": "GET",
+    "status": null,
+    "exception": "'NoneType' object has no attribute 'execute'",
+    "name": "get_recent_activity",
+    "module": "app.domain.livestream.router"
+  },
+  {
+    "path": "/api/v1/livestream/workspace/{workspace_id}/analytics",
+    "method": "GET",
+    "status": null,
+    "exception": "'NoneType' object has no attribute 'execute'",
+    "name": "get_analytics_summary",
+    "module": "app.domain.livestream.router"
+  },
+  {
+    "path": "/api/v1/kpis/workspace/{workspace_id}/refresh",
+    "method": "POST",
+    "status": 200,
+    "exception": null,
+    "name": "refresh_workspace_kpis",
+    "module": "app.domain.kpi.router"
+  },
+  {
+    "path": "/api/v1/kpis/workspace/{workspace_id}/latest",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_latest_workspace_kpis",
+    "module": "app.domain.kpi.router"
+  },
+  {
+    "path": "/api/v1/kpis/workspace/{workspace_id}/trends/{kpi_name}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_kpi_trends",
+    "module": "app.domain.kpi.router"
+  },
+  {
+    "path": "/api/v1/health/workspace/{workspace_id}/refresh",
+    "method": "POST",
+    "status": 200,
+    "exception": null,
+    "name": "rebuild_health",
+    "module": "app.domain.health.router"
+  },
+  {
+    "path": "/api/v1/health/workspace/{workspace_id}/latest",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_latest_health",
+    "module": "app.domain.health.router"
+  },
+  {
+    "path": "/api/v1/health/workspace/{workspace_id}/trends/{health_name}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_health_trends",
+    "module": "app.domain.health.router"
+  },
+  {
+    "path": "/api/v1/insight/workspace/{workspace_id}/latest",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_latest_insights",
+    "module": "app.domain.insight.router"
+  },
+  {
+    "path": "/api/v1/insight/workspace/{workspace_id}/category/{category}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_insights_by_category",
+    "module": "app.domain.insight.router"
+  },
+  {
+    "path": "/api/v1/insight/workspace/{workspace_id}/history",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_historical_insights",
+    "module": "app.domain.insight.router"
+  },
+  {
+    "path": "/api/v1/recommendation/workspace/{workspace_id}/latest",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_latest_recommendations",
+    "module": "app.domain.recommendation.router"
+  },
+  {
+    "path": "/api/v1/recommendation/workspace/{workspace_id}/category/{category}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_recommendations_by_category",
+    "module": "app.domain.recommendation.router"
+  },
+  {
+    "path": "/api/v1/recommendation/workspace/{workspace_id}/priority/{priority}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_recommendations_by_priority",
+    "module": "app.domain.recommendation.router"
+  },
+  {
+    "path": "/api/v1/recommendation/{recommendation_id}/status",
+    "method": "PUT",
+    "status": 422,
+    "exception": null,
+    "name": "update_recommendation_status",
+    "module": "app.domain.recommendation.router"
+  },
+  {
+    "path": "/api/v1/briefing/workspace/{workspace_id}/generate",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "generate_briefing",
+    "module": "app.domain.briefing.router"
+  },
+  {
+    "path": "/api/v1/briefing/workspace/{workspace_id}/template/{template_name}/latest",
+    "method": "GET",
+    "status": null,
+    "exception": "1 validation errors:\n  {'type': 'model_attributes_type', 'loc': ('response',), 'msg': 'Input should be a valid dictionary or object to extract fields from', 'input': <coroutine object AsyncMockMixin._execute_mock_call at 0x000001F44AB64B40>}\n",
+    "name": "get_latest_briefing",
+    "module": "app.domain.briefing.router"
+  },
+  {
+    "path": "/api/v1/briefing/workspace/{workspace_id}/template/{template_name}/history",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_briefing_history",
+    "module": "app.domain.briefing.router"
+  },
+  {
+    "path": "/api/v1/briefing/workspace/{workspace_id}/period/{period}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "get_briefings_by_period",
+    "module": "app.domain.briefing.router"
+  },
+  {
+    "path": "/api/v1/api/v1/integrations",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_integrations",
+    "module": "app.domain.integration.router"
+  },
+  {
+    "path": "/api/v1/api/v1/integrations/{integration_id}/webhook",
+    "method": "POST",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'status'",
+    "name": "webhook_receiver",
+    "module": "app.domain.integration.router"
+  },
+  {
+    "path": "/api/v1/api/v1/integrations/{integration_id}/sync",
+    "method": "POST",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'id'",
+    "name": "trigger_manual_sync",
+    "module": "app.domain.integration.router"
+  },
+  {
+    "path": "/api/v1/api/v1/integrations/{integration_id}/jobs",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_sync_jobs",
+    "module": "app.domain.integration.router"
+  },
+  {
+    "path": "/api/v1/action/workspace/{workspace_id}/submit",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "submit_action",
+    "module": "app.domain.action.router"
+  },
+  {
+    "path": "/api/v1/action/{action_id}",
+    "method": "GET",
+    "status": null,
+    "exception": "1 validation errors:\n  {'type': 'model_attributes_type', 'loc': ('response',), 'msg': 'Input should be a valid dictionary or object to extract fields from', 'input': <coroutine object AsyncMockMixin._execute_mock_call at 0x000001F44A9B1640>}\n",
+    "name": "get_action_status",
+    "module": "app.domain.action.router"
+  },
+  {
+    "path": "/api/v1/action/{action_id}/cancel",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "cancel_action",
+    "module": "app.domain.action.router"
+  },
+  {
+    "path": "/api/v1/action/{action_id}/retry",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "retry_action",
+    "module": "app.domain.action.router"
+  },
+  {
+    "path": "/api/v1/approval/{approval_id}/decision",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "process_approval_decision",
+    "module": "app.domain.approval.router"
+  },
+  {
+    "path": "/api/v1/operations/workspace/{workspace_id}/submit",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "submit_operational_request",
+    "module": "app.domain.operations.router"
+  },
+  {
+    "path": "/api/v1/marketplace/connectors",
+    "method": "GET",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "browse_connectors",
+    "module": "app.domain.marketplace.router"
+  },
+  {
+    "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "install_connector",
+    "module": "app.domain.marketplace.router"
+  },
+  {
+    "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations/{installation_id}/configure",
+    "method": "PATCH",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "configure_connector",
+    "module": "app.domain.marketplace.router"
+  },
+  {
+    "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations/{installation_id}/enable",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "enable_connector",
+    "module": "app.domain.marketplace.router"
+  },
+  {
+    "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations/{installation_id}/disable",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "disable_connector",
+    "module": "app.domain.marketplace.router"
+  },
+  {
+    "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations/{installation_id}/upgrade",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "upgrade_connector",
+    "module": "app.domain.marketplace.router"
+  },
+  {
+    "path": "/api/v1/autonomous/opportunities",
+    "method": "GET",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "list_opportunities",
+    "module": "app.domain.autonomous.router"
+  },
+  {
+    "path": "/api/v1/autonomous/plans",
+    "method": "GET",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "list_plans",
+    "module": "app.domain.autonomous.router"
+  },
+  {
+    "path": "/api/v1/autonomous/plans/{plan_id}/execute",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "execute_plan",
+    "module": "app.domain.autonomous.router"
+  },
+  {
+    "path": "/api/v1/autonomous/plans/{plan_id}/cancel",
+    "method": "POST",
+    "status": null,
+    "exception": "'State' object has no attribute 'event_bus'",
+    "name": "cancel_plan",
+    "module": "app.domain.autonomous.router"
+  },
+  {
+    "path": "/api/v1/intelligence/summary/{workspace_id}",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'first'",
+    "name": "get_intelligence_summary",
+    "module": "app.domain.intelligence.router"
+  },
+  {
+    "path": "/api/v1/intelligence/analyze/{workspace_id}",
+    "method": "POST",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'first'",
+    "name": "trigger_analysis",
+    "module": "app.domain.intelligence.router"
+  },
+  {
+    "path": "/api/v1/collaboration/tasks",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "list_tasks",
+    "module": "app.domain.collaboration.router"
+  },
+  {
+    "path": "/api/v1/collaboration/decision-history",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "list_decision_history",
+    "module": "app.domain.collaboration.router"
+  },
+  {
+    "path": "/api/v1/collaboration/autonomy-policies",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "list_autonomy_policies",
+    "module": "app.domain.collaboration.router"
+  },
+  {
+    "path": "/api/v1/collaboration/learning-rules",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "list_learning_rules",
+    "module": "app.domain.collaboration.router"
+  },
+  {
+    "path": "/api/v1/collaboration/simulate-policy",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "simulate_policy",
+    "module": "app.domain.collaboration.router"
+  },
+  {
+    "path": "/api/v1/collaboration/feedback",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "submit_feedback",
+    "module": "app.domain.collaboration.router"
+  },
+  {
+    "path": "/api/v1/collaboration/approve",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "process_approval",
+    "module": "app.domain.collaboration.router"
+  },
+  {
+    "path": "/api/v1/collaboration/trust-metrics",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_trust_metrics",
+    "module": "app.domain.collaboration.router"
+  },
+  {
+    "path": "/api/v1/impact/summary",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_impact_summary",
+    "module": "app.domain.impact.router"
+  },
+  {
+    "path": "/api/v1/impact/reports",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "list_reports",
+    "module": "app.domain.impact.router"
+  },
+  {
+    "path": "/api/v1/impact/reports/generate",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "generate_report",
+    "module": "app.domain.impact.router"
+  },
+  {
+    "path": "/api/v1/context/organization",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_organization",
+    "module": "app.domain.context.router"
+  },
+  {
+    "path": "/api/v1/context/customers",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_customers",
+    "module": "app.domain.context.router"
+  },
+  {
+    "path": "/api/v1/context/ontology",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_ontology",
+    "module": "app.domain.context.router"
+  },
+  {
+    "path": "/api/v1/context/quality-dashboard",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_quality_dashboard",
+    "module": "app.domain.context.router"
+  },
+  {
+    "path": "/api/v1/context/sync",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "sync_providers",
+    "module": "app.domain.context.router"
+  },
+  {
+    "path": "/api/v1/onboarding/dashboard",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_dashboard",
+    "module": "app.domain.onboarding.router"
+  },
+  {
+    "path": "/api/v1/onboarding/go-live",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "evaluate_go_live",
+    "module": "app.domain.onboarding.router"
+  },
+  {
+    "path": "/api/v1/ui/dashboard/{role}",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_dashboard",
+    "module": "app.domain.ui.router"
+  },
+  {
+    "path": "/api/v1/ui/command-center/intent",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "process_command",
+    "module": "app.domain.ui.router"
+  },
+  {
+    "path": "/api/v1/ui/layout",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_layout",
+    "module": "app.domain.ui.router"
+  },
+  {
+    "path": "/api/v1/ui/preferences",
+    "method": "GET",
+    "status": 422,
+    "exception": null,
+    "name": "get_preferences",
+    "module": "app.domain.ui.router"
+  },
+  {
+    "path": "/api/v1/dev/simulate-whatsapp",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "simulate_whatsapp",
+    "module": "app.api.v1.dev"
+  },
+  {
+    "path": "/api/v1/health/",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "health_check",
+    "module": "app.api.v1.health"
+  },
+  {
+    "path": "/api/v1/health/live",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "liveness_probe",
+    "module": "app.api.v1.health"
+  },
+  {
+    "path": "/api/v1/health/ready",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "readiness_probe",
+    "module": "app.api.v1.health"
+  },
+  {
+    "path": "/api/v1/health/dependencies",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "check_dependencies",
+    "module": "app.api.v1.health"
+  },
+  {
+    "path": "/api/v1/system/info",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "system_info",
+    "module": "app.api.v1.system"
+  },
+  {
+    "path": "/api/v1/system/version",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "system_version",
+    "module": "app.api.v1.system"
+  },
+  {
+    "path": "/api/v1/system/changelog",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "system_changelog",
+    "module": "app.api.v1.system"
+  },
+  {
+    "path": "/metrics",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "get_metrics",
+    "module": "app.domain.observability.router"
+  },
+  {
+    "path": "/api/v1/alerts",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_alerts",
+    "module": "app.domain.observability.router"
+  },
+  {
+    "path": "/api/v1/incidents",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_incidents",
+    "module": "app.domain.observability.router"
+  },
+  {
+    "path": "/api/v1/performance/benchmarks",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_benchmarks",
+    "module": "app.domain.reliability.router"
+  },
+  {
+    "path": "/api/v1/reliability/status",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "reliability_status",
+    "module": "app.domain.reliability.router"
+  },
+  {
+    "path": "/api/v1/reliability/failover",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "trigger_manual_failover",
+    "module": "app.domain.reliability.router"
+  },
+  {
+    "path": "/api/v1/deployments",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_deployments",
+    "module": "app.domain.reliability.router"
+  },
+  {
+    "path": "/api/v1/reliability/dlq",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_dlq",
+    "module": "app.domain.reliability.router"
+  },
+  {
+    "path": "/api/v1/reliability/dlq/{event_id}/replay",
+    "method": "POST",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'lifecycle_state'",
+    "name": "replay_dlq_event",
+    "module": "app.domain.reliability.router"
+  },
+  {
+    "path": "/api/v1/pilots",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "initiate_pilot",
+    "module": "app.domain.pilot.router"
+  },
+  {
+    "path": "/api/v1/pilots",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_pilots",
+    "module": "app.domain.pilot.router"
+  },
+  {
+    "path": "/api/v1/pilots/{pilot_id}/feedback",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "submit_feedback",
+    "module": "app.domain.pilot.router"
+  },
+  {
+    "path": "/api/v1/pilots/{pilot_id}/roi",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'first'",
+    "name": "get_executive_roi_report",
+    "module": "app.domain.pilot.router"
+  },
+  {
+    "path": "/api/v1/customers",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_customers",
+    "module": "app.domain.customer_success.router"
+  },
+  {
+    "path": "/api/v1/customers/{workspace_id}/stage",
+    "method": "PUT",
+    "status": 422,
+    "exception": null,
+    "name": "advance_stage",
+    "module": "app.domain.customer_success.router"
+  },
+  {
+    "path": "/api/v1/customers/{workspace_id}/executive-review",
+    "method": "POST",
+    "status": null,
+    "exception": "type object 'ROICalculator' has no attribute 'calculate_impact'",
+    "name": "generate_ebr",
+    "module": "app.domain.customer_success.router"
+  },
+  {
+    "path": "/api/v1/support/tickets",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "create_ticket",
+    "module": "app.domain.customer_success.router"
+  },
+  {
+    "path": "/api/v1/support/tickets",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_tickets",
+    "module": "app.domain.customer_success.router"
+  },
+  {
+    "path": "/api/v1/commercial/licenses",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "provision_license",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/licenses/{workspace_id}/entitlements",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'status'",
+    "name": "get_entitlements",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/licenses/{workspace_id}/upgrade",
+    "method": "PUT",
+    "status": 422,
+    "exception": null,
+    "name": "upgrade_license",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/subscriptions",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "create_subscription",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/billing/invoices",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object has no attribute 'all'",
+    "name": "list_invoices",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/sales/leads",
+    "method": "POST",
+    "status": 422,
+    "exception": null,
+    "name": "create_lead",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/sales/leads/{lead_id}/stage",
+    "method": "PUT",
+    "status": 422,
+    "exception": null,
+    "name": "advance_lead_stage",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/sales/pipeline",
+    "method": "GET",
+    "status": null,
+    "exception": "'coroutine' object is not iterable",
+    "name": "get_pipeline_summary",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/dashboard",
+    "method": "GET",
+    "status": null,
+    "exception": "cannot unpack non-iterable coroutine object",
+    "name": "get_commercial_dashboard",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/api/v1/commercial/launch-readiness",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "get_launch_readiness",
+    "module": "app.domain.commercial.router"
+  },
+  {
+    "path": "/health",
+    "method": "GET",
+    "status": 200,
+    "exception": null,
+    "name": "health_check",
+    "module": "app.main"
+  }
+]

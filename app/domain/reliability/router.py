@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.integrations.postgres.database import get_db
-from app.api.deps import get_current_user, RequirePermissions
+from app.api.v1.auth_deps import get_current_user, RequirePermissions
 from app.domain.reliability.models import PerformanceBenchmark, ReliabilityEvent, DeploymentRecord
 from app.events.store.models import EventRecord
 from app.events.model.lifecycle import EventLifecycleState

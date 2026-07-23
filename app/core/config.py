@@ -1,3 +1,14 @@
+# =============================================================================
+# DEPRECATED — Authentication Stabilization Refactor (2026-07-23)
+# =============================================================================
+# This is a LEGACY Settings class that duplicates app/config.py.
+# It was used exclusively by app/api/deps.py (now deleted).
+#
+# The live configuration is in app/config.py → Settings → get_settings().
+# Once confirmed no other code imports from app.core.config, this file
+# is safe to delete.
+# =============================================================================
+
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AnyHttpUrl, validator
