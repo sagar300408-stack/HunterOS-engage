@@ -22,8 +22,17 @@ from app.integrations.postgres.database import get_db, get_db_session
 from app.api.v1.auth_deps import get_current_user
 from app.domain.security.models import User, UserRole
 
+from unittest.mock import AsyncMock, MagicMock
+
 def mock_get_db():
     session = AsyncMock(spec=AsyncSession)
+    
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.all.return_value = []
+    mock_result.scalar_one_or_none.return_value = None
+    mock_result.scalar_one.return_value = 0
+    session.execute.return_value = mock_result
+    
     yield session
 
 test_user = User(
@@ -50,65 +59,65 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 
-client = TestClient(application)
 results = []
 test_id = str(uuid.uuid4())
 
 print("Starting endpoint execution audit...")
-for route in application.routes:
-    if not isinstance(route, APIRoute):
-        continue
-    
-    path = route.path
-    methods = route.methods
-    
-    # Replace path parameters
-    for param in ["workspace_id", "conversation_id", "customer_id", "event_id", "action_id", "approval_id", "plan_id", "pilot_id", "lead_id", "recommendation_id", "candidate_id", "followup_id", "installation_id", "integration_id"]:
-        path = path.replace(f"{{{param}}}", test_id)
+with TestClient(application) as client:
+    for route in application.routes:
+        if not isinstance(route, APIRoute):
+            continue
         
-    path = path.replace("{template_name}", "standard")
-    path = path.replace("{period}", "monthly")
-    path = path.replace("{category}", "general")
-    path = path.replace("{kpi_name}", "revenue")
-    path = path.replace("{health_name}", "system")
-    path = path.replace("{priority}", "high")
-    path = path.replace("{role}", "admin")
+        path = route.path
+        methods = route.methods
+        
+        # Replace path parameters
+        for param in ["workspace_id", "conversation_id", "customer_id", "event_id", "action_id", "approval_id", "plan_id", "pilot_id", "lead_id", "recommendation_id", "candidate_id", "followup_id", "installation_id", "integration_id"]:
+            path = path.replace(f"{{{param}}}", test_id)
+            
+        path = path.replace("{template_name}", "standard")
+        path = path.replace("{period}", "monthly")
+        path = path.replace("{category}", "general")
+        path = path.replace("{kpi_name}", "revenue")
+        path = path.replace("{health_name}", "system")
+        path = path.replace("{priority}", "high")
+        path = path.replace("{role}", "admin")
 
-    for method in methods:
-        if method == "OPTIONS": continue
-        
-        status_code = None
-        response_text = ""
-        exception = None
-        
-        try:
-            if method == "GET":
-                res = client.get(path + "?q=test&limit=10&page=1&page_size=10")
-            elif method == "POST":
-                if "/webhook" in path:
-                    res = client.post(path, json={"object": "whatsapp_business_account"})
-                else:
-                    res = client.post(path, json={})
-            elif method == "PUT":
-                res = client.put(path, json={})
-            elif method == "DELETE":
-                res = client.delete(path)
-            elif method == "PATCH":
-                res = client.patch(path, json={})
+        for method in methods:
+            if method == "OPTIONS": continue
             
-            status_code = res.status_code
-            response_text = res.text
-        except Exception as e:
-            exception = str(e)
+            status_code = None
+            response_text = ""
+            exception = None
             
-        results.append({
-            "path": route.path,
-            "method": method,
-            "status": status_code,
-            "exception": exception,
-            "name": route.name,
-            "module": route.endpoint.__module__
-        })
+            try:
+                if method == "GET":
+                    res = client.get(path + "?q=test&limit=10&page=1&page_size=10")
+                elif method == "POST":
+                    if "/webhook" in path:
+                        res = client.post(path, json={"object": "whatsapp_business_account"})
+                    else:
+                        res = client.post(path, json={})
+                elif method == "PUT":
+                    res = client.put(path, json={})
+                elif method == "DELETE":
+                    res = client.delete(path)
+                elif method == "PATCH":
+                    res = client.patch(path, json={})
+                
+                status_code = res.status_code
+                response_text = res.text
+            except Exception as e:
+                exception = str(e)
+                
+            results.append({
+                "path": route.path,
+                "method": method,
+                "status": status_code,
+                "exception": exception,
+                "name": route.name,
+                "module": route.endpoint.__module__
+            })
 
 output_path = "scratch/audit_results.json"
 with open(output_path, "w") as f:

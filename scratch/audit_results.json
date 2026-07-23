@@ -43,15 +43,15 @@
     "path": "/api/v1/dashboard/conversations",
     "method": "GET",
     "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "exception": "'<' not supported between instances of 'int' and 'AsyncMock'",
     "name": "get_conversations",
     "module": "app.api.v1.dashboard"
   },
   {
     "path": "/api/v1/dashboard/conversations/{conversation_id}",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'messages'",
+    "status": 404,
+    "exception": null,
     "name": "get_conversation_detail",
     "module": "app.api.v1.dashboard"
   },
@@ -59,15 +59,15 @@
     "path": "/api/v1/dashboard/customers",
     "method": "GET",
     "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "exception": "'<' not supported between instances of 'int' and 'AsyncMock'",
     "name": "get_customers",
     "module": "app.api.v1.dashboard"
   },
   {
     "path": "/api/v1/dashboard/customers/{customer_id}",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'memory'",
+    "status": 404,
+    "exception": null,
     "name": "get_customer_profile",
     "module": "app.api.v1.dashboard"
   },
@@ -82,8 +82,8 @@
   {
     "path": "/api/v1/dashboard/analytics",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object is not iterable",
+    "status": 200,
+    "exception": null,
     "name": "get_analytics",
     "module": "app.api.v1.dashboard"
   },
@@ -98,16 +98,16 @@
   {
     "path": "/api/v1/dashboard/activity",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_activity",
     "module": "app.api.v1.dashboard"
   },
   {
     "path": "/api/v1/dashboard/leads",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_leads",
     "module": "app.api.v1.dashboard"
   },
@@ -122,32 +122,32 @@
   {
     "path": "/api/v1/dashboard/queue",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_queue",
     "module": "app.api.v1.dashboard"
   },
   {
     "path": "/api/v1/dashboard/audit-log",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_audit_log",
     "module": "app.api.v1.dashboard"
   },
   {
     "path": "/api/v1/dashboard/search",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "search",
     "module": "app.api.v1.dashboard"
   },
   {
     "path": "/api/v1/scheduling/events",
     "method": "GET",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 200,
+    "exception": null,
     "name": "list_events",
     "module": "app.api.v1.scheduling"
   },
@@ -162,48 +162,48 @@
   {
     "path": "/api/v1/scheduling/events/{event_id}",
     "method": "GET",
-    "status": null,
-    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_event_detail'",
+    "status": 404,
+    "exception": null,
     "name": "get_event",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/events/{event_id}",
     "method": "PUT",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 404,
+    "exception": null,
     "name": "update_event",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/events/{event_id}/confirm",
     "method": "POST",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 404,
+    "exception": null,
     "name": "confirm_event",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/events/{event_id}/start",
     "method": "POST",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 404,
+    "exception": null,
     "name": "start_event",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/events/{event_id}/complete",
     "method": "POST",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 404,
+    "exception": null,
     "name": "complete_event",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/events/{event_id}/cancel",
     "method": "POST",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 404,
+    "exception": null,
     "name": "cancel_event",
     "module": "app.api.v1.scheduling"
   },
@@ -226,72 +226,72 @@
   {
     "path": "/api/v1/scheduling/events/{event_id}/audit-log",
     "method": "GET",
-    "status": null,
-    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_event_audit_log'",
+    "status": 200,
+    "exception": null,
     "name": "get_event_audit_log",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/candidates",
     "method": "GET",
-    "status": null,
-    "exception": "module 'app.domain.scheduling.service' has no attribute 'list_candidates'",
+    "status": 200,
+    "exception": null,
     "name": "list_candidates",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/candidates/{candidate_id}",
     "method": "GET",
-    "status": null,
-    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_candidate_detail'",
+    "status": 404,
+    "exception": null,
     "name": "get_candidate",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/candidates/{candidate_id}/promote",
     "method": "POST",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 404,
+    "exception": null,
     "name": "promote_candidate",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/candidates/{candidate_id}/abandon",
     "method": "POST",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 404,
+    "exception": null,
     "name": "abandon_candidate",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/schedule/today",
     "method": "GET",
-    "status": null,
-    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_today_schedule'",
+    "status": 200,
+    "exception": null,
     "name": "get_today_schedule",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/schedule/upcoming",
     "method": "GET",
-    "status": null,
-    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_upcoming_schedule'",
+    "status": 200,
+    "exception": null,
     "name": "get_upcoming_schedule",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/schedule/overview",
     "method": "GET",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 200,
+    "exception": null,
     "name": "get_schedule_overview",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/scheduling/customers/{customer_id}/events",
     "method": "GET",
-    "status": null,
-    "exception": "'User' object is not subscriptable",
+    "status": 200,
+    "exception": null,
     "name": "get_customer_events",
     "module": "app.api.v1.scheduling"
   },
@@ -299,7 +299,7 @@
     "path": "/api/v1/scheduling/customers/{customer_id}/availability",
     "method": "GET",
     "status": null,
-    "exception": "module 'app.domain.scheduling.service' has no attribute 'get_availability_preferences'",
+    "exception": "3 validation errors:\n  {'type': 'uuid_type', 'loc': ('response', 'id'), 'msg': 'UUID input should be a string, bytes or UUID object', 'input': None}\n  {'type': 'string_type', 'loc': ('response', 'timezone'), 'msg': 'Input should be a valid string', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 'updated_at'), 'msg': 'Input should be a valid datetime', 'input': None}\n",
     "name": "get_customer_availability",
     "module": "app.api.v1.scheduling"
   },
@@ -307,15 +307,15 @@
     "path": "/api/v1/scheduling/customers/{customer_id}/availability",
     "method": "PUT",
     "status": null,
-    "exception": "module 'app.domain.scheduling.service' has no attribute 'update_availability_preferences'",
+    "exception": "2 validation errors:\n  {'type': 'uuid_type', 'loc': ('response', 'id'), 'msg': 'UUID input should be a string, bytes or UUID object', 'input': None}\n  {'type': 'string_type', 'loc': ('response', 'timezone'), 'msg': 'Input should be a valid string', 'input': None}\n",
     "name": "update_customer_availability",
     "module": "app.api.v1.scheduling"
   },
   {
     "path": "/api/v1/followups/overview",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object is not iterable",
+    "status": 200,
+    "exception": null,
     "name": "get_overview",
     "module": "app.api.v1.followup"
   },
@@ -323,7 +323,7 @@
     "path": "/api/v1/followups/queue",
     "method": "GET",
     "status": null,
-    "exception": "'coroutine' object is not iterable",
+    "exception": "'<' not supported between instances of 'int' and 'AsyncMock'",
     "name": "get_queue",
     "module": "app.api.v1.followup"
   },
@@ -331,7 +331,7 @@
     "path": "/api/v1/followups/queue/{followup_id}",
     "method": "GET",
     "status": null,
-    "exception": "cannot unpack non-iterable coroutine object",
+    "exception": "not enough values to unpack (expected 2, got 0)",
     "name": "get_followup_detail",
     "module": "app.api.v1.followup"
   },
@@ -395,15 +395,15 @@
     "path": "/api/v1/followups/customer/{customer_id}/health",
     "method": "GET",
     "status": null,
-    "exception": "2 validation errors for LeadHealthSummary\nband\n  Input should be a valid string [type=string_type, input_value=<AsyncMock name='mock.sca...and' id='2148737698128'>, input_type=AsyncMock]\n    For further information visit https://errors.pydantic.dev/2.10/v/string_type\nrecommendation\n  Input should be a valid string [type=string_type, input_value=<AsyncMock name='mock.sca...ion' id='2148737787824'>, input_type=AsyncMock]\n    For further information visit https://errors.pydantic.dev/2.10/v/string_type",
+    "exception": "2 validation errors for LeadHealthSummary\nband\n  Input should be a valid string [type=string_type, input_value=<AsyncMock name='mock.sca...and' id='2082077260592'>, input_type=AsyncMock]\n    For further information visit https://errors.pydantic.dev/2.10/v/string_type\nrecommendation\n  Input should be a valid string [type=string_type, input_value=<AsyncMock name='mock.sca...ion' id='2082076683600'>, input_type=AsyncMock]\n    For further information visit https://errors.pydantic.dev/2.10/v/string_type",
     "name": "get_customer_health",
     "module": "app.api.v1.followup"
   },
   {
     "path": "/api/v1/followups/customer/{customer_id}/timeline",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_customer_timeline",
     "module": "app.api.v1.followup"
   },
@@ -426,96 +426,96 @@
   {
     "path": "/api/v1/kpis/workspace/{workspace_id}/refresh",
     "method": "POST",
-    "status": 200,
-    "exception": null,
+    "status": null,
+    "exception": "6 validation errors:\n  {'type': 'uuid_type', 'loc': ('response', 0, 'id'), 'msg': 'UUID input should be a string, bytes or UUID object', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 0, 'calculated_at'), 'msg': 'Input should be a valid datetime', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 0, 'last_updated'), 'msg': 'Input should be a valid datetime', 'input': None}\n  {'type': 'uuid_type', 'loc': ('response', 1, 'id'), 'msg': 'UUID input should be a string, bytes or UUID object', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 1, 'calculated_at'), 'msg': 'Input should be a valid datetime', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 1, 'last_updated'), 'msg': 'Input should be a valid datetime', 'input': None}\n",
     "name": "refresh_workspace_kpis",
     "module": "app.domain.kpi.router"
   },
   {
     "path": "/api/v1/kpis/workspace/{workspace_id}/latest",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_latest_workspace_kpis",
     "module": "app.domain.kpi.router"
   },
   {
     "path": "/api/v1/kpis/workspace/{workspace_id}/trends/{kpi_name}",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_kpi_trends",
     "module": "app.domain.kpi.router"
   },
   {
     "path": "/api/v1/health/workspace/{workspace_id}/refresh",
     "method": "POST",
-    "status": 200,
-    "exception": null,
+    "status": null,
+    "exception": "6 validation errors:\n  {'type': 'uuid_type', 'loc': ('response', 0, 'id'), 'msg': 'UUID input should be a string, bytes or UUID object', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 0, 'calculated_at'), 'msg': 'Input should be a valid datetime', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 0, 'last_updated'), 'msg': 'Input should be a valid datetime', 'input': None}\n  {'type': 'uuid_type', 'loc': ('response', 1, 'id'), 'msg': 'UUID input should be a string, bytes or UUID object', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 1, 'calculated_at'), 'msg': 'Input should be a valid datetime', 'input': None}\n  {'type': 'datetime_type', 'loc': ('response', 1, 'last_updated'), 'msg': 'Input should be a valid datetime', 'input': None}\n",
     "name": "rebuild_health",
     "module": "app.domain.health.router"
   },
   {
     "path": "/api/v1/health/workspace/{workspace_id}/latest",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_latest_health",
     "module": "app.domain.health.router"
   },
   {
     "path": "/api/v1/health/workspace/{workspace_id}/trends/{health_name}",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_health_trends",
     "module": "app.domain.health.router"
   },
   {
     "path": "/api/v1/insight/workspace/{workspace_id}/latest",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_latest_insights",
     "module": "app.domain.insight.router"
   },
   {
     "path": "/api/v1/insight/workspace/{workspace_id}/category/{category}",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_insights_by_category",
     "module": "app.domain.insight.router"
   },
   {
     "path": "/api/v1/insight/workspace/{workspace_id}/history",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_historical_insights",
     "module": "app.domain.insight.router"
   },
   {
     "path": "/api/v1/recommendation/workspace/{workspace_id}/latest",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_latest_recommendations",
     "module": "app.domain.recommendation.router"
   },
   {
     "path": "/api/v1/recommendation/workspace/{workspace_id}/category/{category}",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_recommendations_by_category",
     "module": "app.domain.recommendation.router"
   },
   {
     "path": "/api/v1/recommendation/workspace/{workspace_id}/priority/{priority}",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_recommendations_by_priority",
     "module": "app.domain.recommendation.router"
   },
@@ -538,184 +538,184 @@
   {
     "path": "/api/v1/briefing/workspace/{workspace_id}/template/{template_name}/latest",
     "method": "GET",
-    "status": null,
-    "exception": "1 validation errors:\n  {'type': 'model_attributes_type', 'loc': ('response',), 'msg': 'Input should be a valid dictionary or object to extract fields from', 'input': <coroutine object AsyncMockMixin._execute_mock_call at 0x000001F44AB64B40>}\n",
+    "status": 404,
+    "exception": null,
     "name": "get_latest_briefing",
     "module": "app.domain.briefing.router"
   },
   {
     "path": "/api/v1/briefing/workspace/{workspace_id}/template/{template_name}/history",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_briefing_history",
     "module": "app.domain.briefing.router"
   },
   {
     "path": "/api/v1/briefing/workspace/{workspace_id}/period/{period}",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "get_briefings_by_period",
     "module": "app.domain.briefing.router"
   },
   {
-    "path": "/api/v1/api/v1/integrations",
+    "path": "/api/v1/integrations",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_integrations",
     "module": "app.domain.integration.router"
   },
   {
-    "path": "/api/v1/api/v1/integrations/{integration_id}/webhook",
+    "path": "/api/v1/integrations/{integration_id}/webhook",
     "method": "POST",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'status'",
+    "status": 404,
+    "exception": null,
     "name": "webhook_receiver",
     "module": "app.domain.integration.router"
   },
   {
-    "path": "/api/v1/api/v1/integrations/{integration_id}/sync",
+    "path": "/api/v1/integrations/{integration_id}/sync",
     "method": "POST",
     "status": null,
-    "exception": "'coroutine' object has no attribute 'id'",
+    "exception": "Integration not found",
     "name": "trigger_manual_sync",
     "module": "app.domain.integration.router"
   },
   {
-    "path": "/api/v1/api/v1/integrations/{integration_id}/jobs",
+    "path": "/api/v1/integrations/{integration_id}/jobs",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_sync_jobs",
     "module": "app.domain.integration.router"
   },
   {
     "path": "/api/v1/action/workspace/{workspace_id}/submit",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "submit_action",
     "module": "app.domain.action.router"
   },
   {
     "path": "/api/v1/action/{action_id}",
     "method": "GET",
-    "status": null,
-    "exception": "1 validation errors:\n  {'type': 'model_attributes_type', 'loc': ('response',), 'msg': 'Input should be a valid dictionary or object to extract fields from', 'input': <coroutine object AsyncMockMixin._execute_mock_call at 0x000001F44A9B1640>}\n",
+    "status": 404,
+    "exception": null,
     "name": "get_action_status",
     "module": "app.domain.action.router"
   },
   {
     "path": "/api/v1/action/{action_id}/cancel",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 501,
+    "exception": null,
     "name": "cancel_action",
     "module": "app.domain.action.router"
   },
   {
     "path": "/api/v1/action/{action_id}/retry",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 501,
+    "exception": null,
     "name": "retry_action",
     "module": "app.domain.action.router"
   },
   {
     "path": "/api/v1/approval/{approval_id}/decision",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "process_approval_decision",
     "module": "app.domain.approval.router"
   },
   {
     "path": "/api/v1/operations/workspace/{workspace_id}/submit",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "submit_operational_request",
     "module": "app.domain.operations.router"
   },
   {
     "path": "/api/v1/marketplace/connectors",
     "method": "GET",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 200,
+    "exception": null,
     "name": "browse_connectors",
     "module": "app.domain.marketplace.router"
   },
   {
     "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "install_connector",
     "module": "app.domain.marketplace.router"
   },
   {
     "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations/{installation_id}/configure",
     "method": "PATCH",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "configure_connector",
     "module": "app.domain.marketplace.router"
   },
   {
     "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations/{installation_id}/enable",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 400,
+    "exception": null,
     "name": "enable_connector",
     "module": "app.domain.marketplace.router"
   },
   {
     "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations/{installation_id}/disable",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 400,
+    "exception": null,
     "name": "disable_connector",
     "module": "app.domain.marketplace.router"
   },
   {
     "path": "/api/v1/marketplace/workspaces/{workspace_id}/installations/{installation_id}/upgrade",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "upgrade_connector",
     "module": "app.domain.marketplace.router"
   },
   {
     "path": "/api/v1/autonomous/opportunities",
     "method": "GET",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "list_opportunities",
     "module": "app.domain.autonomous.router"
   },
   {
     "path": "/api/v1/autonomous/plans",
     "method": "GET",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "list_plans",
     "module": "app.domain.autonomous.router"
   },
   {
     "path": "/api/v1/autonomous/plans/{plan_id}/execute",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 400,
+    "exception": null,
     "name": "execute_plan",
     "module": "app.domain.autonomous.router"
   },
   {
     "path": "/api/v1/autonomous/plans/{plan_id}/cancel",
     "method": "POST",
-    "status": null,
-    "exception": "'State' object has no attribute 'event_bus'",
+    "status": 422,
+    "exception": null,
     "name": "cancel_plan",
     "module": "app.domain.autonomous.router"
   },
@@ -723,7 +723,7 @@
     "path": "/api/v1/intelligence/summary/{workspace_id}",
     "method": "GET",
     "status": null,
-    "exception": "'coroutine' object has no attribute 'first'",
+    "exception": "2 validation errors for IntelligenceSummaryResponse\nhealth.workspace_id\n  UUID input should be a string, bytes or UUID object [type=uuid_type, input_value=<MagicMock name='mock.exe..._id' id='2082078122032'>, input_type=MagicMock]\n    For further information visit https://errors.pydantic.dev/2.10/v/uuid_type\nhealth.trend\n  Input should be a valid string [type=string_type, input_value=<MagicMock name='mock.exe...end' id='2082075351024'>, input_type=MagicMock]\n    For further information visit https://errors.pydantic.dev/2.10/v/string_type",
     "name": "get_intelligence_summary",
     "module": "app.domain.intelligence.router"
   },
@@ -731,7 +731,7 @@
     "path": "/api/v1/intelligence/analyze/{workspace_id}",
     "method": "POST",
     "status": null,
-    "exception": "'coroutine' object has no attribute 'first'",
+    "exception": "'<' not supported between instances of 'MagicMock' and 'int'",
     "name": "trigger_analysis",
     "module": "app.domain.intelligence.router"
   },
@@ -986,32 +986,32 @@
   {
     "path": "/api/v1/alerts",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_alerts",
     "module": "app.domain.observability.router"
   },
   {
     "path": "/api/v1/incidents",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_incidents",
     "module": "app.domain.observability.router"
   },
   {
     "path": "/api/v1/performance/benchmarks",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_benchmarks",
     "module": "app.domain.reliability.router"
   },
   {
     "path": "/api/v1/reliability/status",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "reliability_status",
     "module": "app.domain.reliability.router"
   },
@@ -1026,24 +1026,24 @@
   {
     "path": "/api/v1/deployments",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_deployments",
     "module": "app.domain.reliability.router"
   },
   {
     "path": "/api/v1/reliability/dlq",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_dlq",
     "module": "app.domain.reliability.router"
   },
   {
     "path": "/api/v1/reliability/dlq/{event_id}/replay",
     "method": "POST",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'lifecycle_state'",
+    "status": 404,
+    "exception": null,
     "name": "replay_dlq_event",
     "module": "app.domain.reliability.router"
   },
@@ -1058,8 +1058,8 @@
   {
     "path": "/api/v1/pilots",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_pilots",
     "module": "app.domain.pilot.router"
   },
@@ -1075,15 +1075,15 @@
     "path": "/api/v1/pilots/{pilot_id}/roi",
     "method": "GET",
     "status": null,
-    "exception": "'coroutine' object has no attribute 'first'",
+    "exception": "Pilot not found",
     "name": "get_executive_roi_report",
     "module": "app.domain.pilot.router"
   },
   {
     "path": "/api/v1/customers",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_customers",
     "module": "app.domain.customer_success.router"
   },
@@ -1114,8 +1114,8 @@
   {
     "path": "/api/v1/support/tickets",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_tickets",
     "module": "app.domain.customer_success.router"
   },
@@ -1130,8 +1130,8 @@
   {
     "path": "/api/v1/commercial/licenses/{workspace_id}/entitlements",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'status'",
+    "status": 200,
+    "exception": null,
     "name": "get_entitlements",
     "module": "app.domain.commercial.router"
   },
@@ -1154,8 +1154,8 @@
   {
     "path": "/api/v1/commercial/billing/invoices",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object has no attribute 'all'",
+    "status": 200,
+    "exception": null,
     "name": "list_invoices",
     "module": "app.domain.commercial.router"
   },
@@ -1178,8 +1178,8 @@
   {
     "path": "/api/v1/commercial/sales/pipeline",
     "method": "GET",
-    "status": null,
-    "exception": "'coroutine' object is not iterable",
+    "status": 200,
+    "exception": null,
     "name": "get_pipeline_summary",
     "module": "app.domain.commercial.router"
   },
@@ -1187,7 +1187,7 @@
     "path": "/api/v1/commercial/dashboard",
     "method": "GET",
     "status": null,
-    "exception": "cannot unpack non-iterable coroutine object",
+    "exception": "not enough values to unpack (expected 2, got 0)",
     "name": "get_commercial_dashboard",
     "module": "app.domain.commercial.router"
   },

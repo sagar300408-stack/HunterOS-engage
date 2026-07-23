@@ -1102,3 +1102,119 @@ async def process_intent_for_scheduling(
     )
 
     return candidate
+
+
+async def get_event_detail(
+    session: AsyncSession,
+    event_id: UUID,
+    workspace_id: UUID,
+) -> Optional[ScheduledEvent]:
+    return await get_event(session, event_id, workspace_id)
+
+
+async def get_event_audit_log(
+    session: AsyncSession,
+    event_id: UUID,
+    workspace_id: UUID,
+) -> list[EventAuditLog]:
+    q = (
+        select(EventAuditLog)
+        .where(
+            EventAuditLog.event_id == event_id,
+            EventAuditLog.workspace_id == workspace_id,
+        )
+        .order_by(EventAuditLog.created_at.desc())
+    )
+    result = await session.execute(q)
+    return list(result.scalars().all())
+
+
+async def list_candidates(
+    session: AsyncSession,
+    workspace_id: UUID,
+) -> list[SchedulingCandidate]:
+    q = (
+        select(SchedulingCandidate)
+        .where(
+            SchedulingCandidate.workspace_id == workspace_id,
+            SchedulingCandidate.status.in_(["pending_info", "ready"]),
+        )
+        .order_by(desc(SchedulingCandidate.created_at))
+    )
+    result = await session.execute(q)
+    return list(result.scalars().all())
+
+
+async def get_candidate_detail(
+    session: AsyncSession,
+    candidate_id: UUID,
+    workspace_id: UUID,
+) -> Optional[SchedulingCandidate]:
+    q = (
+        select(SchedulingCandidate)
+        .where(
+            SchedulingCandidate.id == candidate_id,
+            SchedulingCandidate.workspace_id == workspace_id,
+        )
+    )
+    result = await session.execute(q)
+    return result.scalar_one_or_none()
+
+
+async def get_today_schedule(
+    session: AsyncSession,
+    workspace_id: UUID,
+) -> list[ScheduledEvent]:
+    now = _now()
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + timedelta(days=1)
+    
+    q = (
+        select(ScheduledEvent)
+        .where(
+            ScheduledEvent.workspace_id == workspace_id,
+            ScheduledEvent.scheduled_for >= start_of_day,
+            ScheduledEvent.scheduled_for < end_of_day,
+        )
+        .order_by(ScheduledEvent.scheduled_for.asc())
+    )
+    result = await session.execute(q)
+    return list(result.scalars().all())
+
+
+async def get_upcoming_schedule(
+    session: AsyncSession,
+    workspace_id: UUID,
+    days: int,
+) -> list[ScheduledEvent]:
+    now = _now()
+    end_time = now + timedelta(days=days)
+    
+    q = (
+        select(ScheduledEvent)
+        .where(
+            ScheduledEvent.workspace_id == workspace_id,
+            ScheduledEvent.scheduled_for >= now,
+            ScheduledEvent.scheduled_for < end_time,
+        )
+        .order_by(ScheduledEvent.scheduled_for.asc())
+    )
+    result = await session.execute(q)
+    return list(result.scalars().all())
+
+
+async def get_availability_preferences(
+    session: AsyncSession,
+    customer_id: UUID,
+    workspace_id: UUID,
+) -> CustomerAvailabilityPreferences:
+    return await get_or_create_availability_prefs(session, customer_id, workspace_id)
+
+
+async def update_availability_preferences(
+    session: AsyncSession,
+    customer_id: UUID,
+    workspace_id: UUID,
+    req: AvailabilityPreferencesRequest,
+) -> CustomerAvailabilityPreferences:
+    return await update_availability_prefs(session, customer_id, req, workspace_id)

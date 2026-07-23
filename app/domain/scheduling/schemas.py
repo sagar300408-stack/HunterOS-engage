@@ -74,7 +74,7 @@ class CreateEventRequest(BaseModel):
     priority:           str                     = Field("medium", pattern="^(high|medium|low)$")
     scheduled_for:      Optional[datetime]      = None
     duration_minutes:   Optional[int]           = Field(None, ge=0, le=1440)
-    assignment_strategy: str                    = Field("manual", description="manual | round_robin | ai | territory | skill_based")
+    assignment_strategy: str                    = Field("manual", pattern="^(manual|round_robin|ai|territory|skill_based)$")
     metadata:           Optional[dict[str, Any]] = None
     workspace_id:       Optional[UUID]          = None
 
@@ -109,7 +109,7 @@ class TransitionEventRequest(BaseModel):
 
     Applies a state machine transition. The service validates the transition.
     """
-    new_status: str    = Field(..., description="confirmed | in_progress | completed | cancelled | rescheduled")
+    new_status: str    = Field(..., pattern="^(confirmed|in_progress|completed|cancelled|rescheduled)$")
     note:       Optional[str] = Field(None, description="Optional reason / note logged to audit trail")
 
 
@@ -128,7 +128,7 @@ class RescheduleEventRequest(BaseModel):
 class AssignEventRequest(BaseModel):
     """Request body for POST /scheduling/events/{id}/assign."""
     assigned_to:         UUID
-    assignment_strategy: str = Field("manual", description="manual | round_robin | ai")
+    assignment_strategy: str = Field("manual", pattern="^(manual|round_robin|ai|territory|skill_based)$")
     note:                Optional[str] = None
 
 
@@ -277,9 +277,9 @@ class PromoteCandidateResponse(BaseModel):
 
 class AvailabilityPreferencesRequest(BaseModel):
     """Request body for PUT /scheduling/customers/{id}/availability."""
-    preferred_time_of_day:  Optional[str]       = Field(None, description="morning | afternoon | evening | any")
+    preferred_time_of_day:  Optional[str]       = Field(None, pattern="^(morning|afternoon|evening|any)$")
     unavailable_days:       Optional[list[str]] = Field(None, description='e.g. ["Sunday", "Saturday"]')
-    preferred_meeting_mode: Optional[str]       = Field(None, description="in_person | online | phone | any")
+    preferred_meeting_mode: Optional[str]       = Field(None, pattern="^(in_person|online|phone|any)$")
     timezone:               Optional[str]       = Field(None, description='e.g. "Asia/Kolkata"')
     notes:                  Optional[str]       = None
 

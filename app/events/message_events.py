@@ -17,6 +17,7 @@ from pydantic import Field
 
 from app.events.model.base_event import UniversalBaseEvent
 from app.events.model.categories import EventCategory
+from app.events.model.actor_types import ActorType
 
 
 class RawWebhookEvent(UniversalBaseEvent):
@@ -24,6 +25,9 @@ class RawWebhookEvent(UniversalBaseEvent):
     category: EventCategory = Field(default=EventCategory.PLATFORM)
     event_name: str = Field(default="RawWebhookEvent")
     source_subsystem: str = Field(default="webhook")
+    
+    workspace_id: Optional[UUID] = None
+    actor_type: Optional[ActorType] = None
     
     payload: Dict[str, Any] = Field(default_factory=dict)
     

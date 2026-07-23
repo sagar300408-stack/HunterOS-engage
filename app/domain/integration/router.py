@@ -12,7 +12,7 @@ from app.domain.integration.models import IntegrationConnection, SyncJob
 from app.domain.integration.engines.gateway import IntegrationGateway
 from app.domain.integration.engines.sync import SynchronizationEngine
 
-router = APIRouter(prefix="/api/v1/integrations", tags=["Integration Platform"])
+router = APIRouter(prefix="/integrations", tags=["Integrations"])
 
 @router.get("", dependencies=[Depends(RequirePermissions("view_all"))])
 async def list_integrations(db: AsyncSession = Depends(get_db)):
