@@ -1184,10 +1184,52 @@ async def get_today_schedule(
     session: AsyncSession,
     workspace_id: UUID,
 ) -> list[ScheduledEvent]:
+    """
+    Return all events whose scheduled_for falls within today's UTC calendar day.
+
+    Diagnostic logging is included to expose any mismatch between the
+    schedule overview count and this query's results.
+    """
     now = _now()
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = start_of_day + timedelta(days=1)
-    
+
+    logger.info(
+        "get_today_schedule_params",
+        utc_now=now.isoformat(),
+        start_of_day=start_of_day.isoformat(),
+        end_of_day=end_of_day.isoformat(),
+        workspace_id=str(workspace_id),
+    )
+
+    # ── Diagnostic: count ALL pending events for this workspace ──────────────
+    total_pending_q = select(func.count(ScheduledEvent.id)).where(
+        ScheduledEvent.workspace_id == workspace_id,
+        ScheduledEvent.status == "pending",
+    )
+    total_pending = (await session.execute(total_pending_q)).scalar_one()
+
+    # Diagnostic: how many have scheduled_for IS NULL?
+    null_sched_q = select(func.count(ScheduledEvent.id)).where(
+        ScheduledEvent.workspace_id == workspace_id,
+        ScheduledEvent.status == "pending",
+        ScheduledEvent.scheduled_for.is_(None),
+    )
+    null_sched_count = (await session.execute(null_sched_q)).scalar_one()
+
+    logger.info(
+        "get_today_schedule_diagnostics",
+        total_pending_in_workspace=total_pending,
+        pending_with_null_scheduled_for=null_sched_count,
+        pending_with_scheduled_for=total_pending - null_sched_count,
+        note=(
+            "If pending_with_null_scheduled_for == total_pending, "
+            "events were created without a scheduled_for value and "
+            "will never appear in the today view."
+        ),
+    )
+
+    # ── Main query: events scheduled within today's UTC window ───────────────
     q = (
         select(ScheduledEvent)
         .where(
@@ -1198,7 +1240,17 @@ async def get_today_schedule(
         .order_by(ScheduledEvent.scheduled_for.asc())
     )
     result = await session.execute(q)
-    return list(result.scalars().all())
+    events = list(result.scalars().all())
+
+    logger.info(
+        "get_today_schedule_result",
+        events_returned=len(events),
+        workspace_id=str(workspace_id),
+    )
+
+    return events
+
+
 
 
 async def get_upcoming_schedule(

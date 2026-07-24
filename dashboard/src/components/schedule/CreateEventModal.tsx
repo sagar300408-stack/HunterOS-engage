@@ -51,7 +51,20 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const [eventType,     setEventType]     = useState<EventType>('meeting')
   const [title,         setTitle]         = useState('')
   const [description,   setDescription]   = useState('')
-  const [scheduledFor,  setScheduledFor]  = useState('')
+  const [scheduledFor,  setScheduledFor]  = useState(() => {
+    // Pre-fill with the current local time so new events default to "now"
+    // and appear in the Today schedule view immediately after creation.
+    // The user can clear or change this before submitting.
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return (
+      now.getFullYear() + '-' +
+      pad(now.getMonth() + 1) + '-' +
+      pad(now.getDate()) + 'T' +
+      pad(now.getHours()) + ':' +
+      pad(now.getMinutes())
+    )
+  })
   const [durationMin,   setDurationMin]   = useState<number | ''>('')
   const [priority,      setPriority]      = useState<'high' | 'medium' | 'low'>('medium')
   const [customerId,    setCustomerId]     = useState(defaultCustomerId ?? '')
