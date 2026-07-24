@@ -10,11 +10,11 @@ Naming conventions:
   - *Detail   — full object with nested relations
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, AwareDatetime
 
 
 # ── Shared sub-models ──────────────────────────────────────────────────────────
@@ -72,7 +72,14 @@ class CreateEventRequest(BaseModel):
     conversation_id:    Optional[UUID]          = None
     assigned_to:        Optional[UUID]          = None
     priority:           str                     = Field("medium", pattern="^(high|medium|low)$")
-    scheduled_for:      Optional[datetime]      = None
+    scheduled_for:      Optional[AwareDatetime]      = None
+
+    @field_validator("scheduled_for", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is not None:
+            return v.astimezone(timezone.utc)
+        return v
     duration_minutes:   Optional[int]           = Field(None, ge=0, le=1440)
     assignment_strategy: str                    = Field("manual", pattern="^(manual|round_robin|ai|territory|skill_based)$")
     metadata:           Optional[dict[str, Any]] = None
@@ -98,7 +105,14 @@ class UpdateEventRequest(BaseModel):
     description:      Optional[str]            = None
     assigned_to:      Optional[UUID]           = None
     priority:         Optional[str]            = Field(None, pattern="^(high|medium|low)$")
-    scheduled_for:    Optional[datetime]       = None
+    scheduled_for:    Optional[AwareDatetime]       = None
+
+    @field_validator("scheduled_for", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is not None:
+            return v.astimezone(timezone.utc)
+        return v
     duration_minutes: Optional[int]            = Field(None, ge=0, le=1440)
     metadata:         Optional[dict[str, Any]] = None
 
@@ -120,7 +134,12 @@ class RescheduleEventRequest(BaseModel):
     Marks the original event as 'rescheduled' (terminal) and creates a new
     ScheduledEvent with the updated time, copying all other fields.
     """
-    new_scheduled_for:    datetime
+    new_scheduled_for:    AwareDatetime
+
+    @field_validator("new_scheduled_for", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: datetime) -> datetime:
+        return v.astimezone(timezone.utc)
     new_duration_minutes: Optional[int] = None
     reason:               Optional[str] = None
 
@@ -135,7 +154,12 @@ class AssignEventRequest(BaseModel):
 class ConflictCheckRequest(BaseModel):
     """Request body for POST /scheduling/events/check-conflicts."""
     assigned_to:      UUID
-    scheduled_for:    datetime
+    scheduled_for:    AwareDatetime
+
+    @field_validator("scheduled_for", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: datetime) -> datetime:
+        return v.astimezone(timezone.utc)
     duration_minutes: int  = Field(60, ge=1, le=1440)
     exclude_event_id: Optional[UUID] = None
     workspace_id:     Optional[UUID] = None

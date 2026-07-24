@@ -65,6 +65,25 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const handleMetaChange = (key: string, val: string) =>
     setMetaValues(prev => ({ ...prev, [key]: val }))
 
+  const getLocalIsoString = (datetimeLocalValue: string) => {
+    if (!datetimeLocalValue) return undefined;
+    const d = new Date(datetimeLocalValue);
+    const tzOffset = -d.getTimezoneOffset();
+    const diff = tzOffset >= 0 ? '+' : '-';
+    const pad = (n: number) => `${Math.floor(Math.abs(n))}`.padStart(2, '0');
+    const offset = diff + pad(tzOffset / 60) + ':' + pad(tzOffset % 60);
+    
+    // Format YYYY-MM-DDTHH:mm:ss
+    const localIso = d.getFullYear() +
+      '-' + pad(d.getMonth() + 1) +
+      '-' + pad(d.getDate()) +
+      'T' + pad(d.getHours()) +
+      ':' + pad(d.getMinutes()) +
+      ':' + pad(d.getSeconds());
+
+    return localIso + offset;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -77,7 +96,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         event_type:       eventType,
         title:            title.trim() || `${eventType.replace('_', ' ')} Event`,
         description:      description || undefined,
-        scheduled_for:    scheduledFor || undefined,
+        scheduled_for:    getLocalIsoString(scheduledFor),
         duration_minutes: durationMin !== '' ? Number(durationMin) : undefined,
         priority,
         metadata:         Object.keys(metadata).length ? metadata : undefined,

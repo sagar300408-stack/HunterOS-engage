@@ -53,7 +53,7 @@ async def list_events(
     }
 
 
-@router.post("/events", response_model=schemas.EventResponse)
+@router.post("/events", response_model=schemas.EventResponse, status_code=201)
 async def create_event(
     req: schemas.CreateEventRequest,
     user: User = Depends(require_permission("write_schedule")),

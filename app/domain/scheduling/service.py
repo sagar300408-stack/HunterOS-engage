@@ -188,6 +188,11 @@ async def create_event(
         payload={"event_type": event.event_type, "title": event.title},
     ))
 
+    # Eager-load audit_log while the async session is still live.
+    # Without this, Pydantic touches event.audit_log during response
+    # serialization (outside the greenlet), triggering MissingGreenlet.
+    await session.refresh(event, attribute_names=["audit_log"])
+
     return event
 
 
@@ -348,6 +353,9 @@ async def update_event(
         changes=list(after.keys()),
     )
 
+    # Eager-load audit_log to prevent MissingGreenlet during serialization.
+    await session.refresh(event, attribute_names=["audit_log"])
+
     return event
 
 
@@ -408,6 +416,9 @@ async def transition_event(
         customer_id=event.customer_id,
         assigned_to_user_id=event.assigned_to,
     ))
+
+    # Eager-load audit_log to prevent MissingGreenlet during serialization.
+    await session.refresh(event, attribute_names=["audit_log"])
 
     return event
 
@@ -471,6 +482,9 @@ async def assign_event(
         customer_id=event.customer_id,
         assigned_to_user_id=new_uid,
     ))
+
+    # Eager-load audit_log to prevent MissingGreenlet during serialization.
+    await session.refresh(event, attribute_names=["audit_log"])
 
     return event
 
@@ -576,6 +590,11 @@ async def reschedule_event(
             "new_scheduled_for": req.new_scheduled_for.isoformat(),
         },
     ))
+
+    # Eager-load audit_log on both events to prevent MissingGreenlet
+    # during response serialization of the new event.
+    await session.refresh(original, attribute_names=["audit_log"])
+    await session.refresh(new_event, attribute_names=["audit_log"])
 
     return original, new_event
 
