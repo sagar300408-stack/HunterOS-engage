@@ -151,18 +151,19 @@ async def schedule_followup(
         workspace_id=workspace_id,
     )
 
+    logger.info(f"[TRACE] Generating AI message (LLM called) for customer_id: {customer_id}")
     msg = await generate_message(ctx)
 
     # 5. Quality Check
+    logger.info(f"[TRACE] Quality Checker executed for drafted message")
     q_res = check(msg.content)
-    if not q_res.passed:
+    
+    is_paused = not q_res.passed
+    if is_paused:
         logger.warning("followup_quality_check_failed", customer_id=str(customer_id), issues=q_res.issues)
-        # Optionally regenerate or flag for human review. For now, flag.
-        human_paused = True
-    else:
-        human_paused = False
 
     # 6. Queue
+    logger.info(f"[TRACE] FollowUpQueue record inserted (status: {'human_paused' if is_paused else 'scheduled'})")
     queue_item = FollowUpQueue(
         workspace_id=workspace_id,
         customer_id=customer_id,

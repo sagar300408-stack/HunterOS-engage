@@ -132,8 +132,10 @@ async def on_event_completed(notification: NotificationEvent) -> None:
         return
 
     try:
+        logger.info(f"[TRACE] on_event_completed() executed for customer_id: {notification.customer_id}")
         async with get_session() as session:
             # The event is complete; see if we need a follow-up right away
+            logger.info("[TRACE] schedule_followup(customer_id) invoked")
             await schedule_followup(
                 session, 
                 customer_id=notification.customer_id, 

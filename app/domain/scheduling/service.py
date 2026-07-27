@@ -409,6 +409,7 @@ async def transition_event(
         to_status=req.new_status,
     )
 
+    logger.info(f"[TRACE] notification_bus.emit('event_{req.new_status}') called for event: {event_id}")
     await notification_bus.emit(NotificationEvent(
         event_type=f"event_{req.new_status}",
         scheduled_event_id=event.id,

@@ -17,6 +17,9 @@ def select_strategy(
     workspace_id: UUID,
 ) -> StrategyDecision:
     """Selects the best messaging strategy."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("[TRACE] Strategy Engine: select_strategy() executed")
     
     if has_proposal and follow_up_attempt == 1:
         return StrategyDecision(

@@ -25,6 +25,9 @@ def evaluate(
     """
     Evaluates whether a lead needs a follow-up.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"[TRACE] Decision Engine: evaluate() executed for customer_id: {customer_id}")
     now = datetime.now(tz=timezone.utc)
     factors = {
         "buying_stage": buying_stage,
@@ -34,6 +37,7 @@ def evaluate(
 
     if has_confirmed_meeting and next_meeting_at and next_meeting_at > now:
         # Don't follow up if they have an upcoming meeting, unless it's a reminder
+        logger.info(f"[TRACE] Decision Engine returned: abort, reason: Upcoming meeting scheduled")
         return FollowUpDecision(
             should_follow_up=False,
             reason="Upcoming meeting scheduled",
@@ -46,6 +50,7 @@ def evaluate(
         )
 
     if followup_attempt_count >= max_attempts:
+        logger.info(f"[TRACE] Decision Engine returned: abort, reason: Max follow-up attempts reached")
         return FollowUpDecision(
             should_follow_up=False,
             reason="Max follow-up attempts reached",
@@ -67,7 +72,6 @@ def evaluate(
     scheduled_for = now
     if last_outgoing_at:
         # Add delay from last contact
-        from datetime import timedelta
         scheduled_for = last_outgoing_at.replace(tzinfo=timezone.utc) + timedelta(hours=delay_hours)
     
     if scheduled_for < now:
@@ -75,6 +79,7 @@ def evaluate(
 
     factors["delay_hours_applied"] = delay_hours
 
+    logger.info(f"[TRACE] Decision Engine returned: schedule, reason: Follow-up due based on cadence, scheduled_for: {scheduled_for}")
     return FollowUpDecision(
         should_follow_up=True,
         reason="Follow-up due based on cadence",
