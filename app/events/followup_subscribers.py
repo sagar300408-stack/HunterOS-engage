@@ -1,9 +1,16 @@
 """
-Follow-up event subscribers as EventConsumer implementations.
+Follow-up event subscribers.
 
-Bridges the main conversation pipeline to the Follow-up Engine.
-When a message arrives or is sent, we evaluate the lead for follow-up
-and recalculate their health score.
+Two kinds of subscriptions live here:
+
+1. EventConsumer implementations (on the main EventBus)
+   - FollowUpMessageStoredConsumer  → MessageStored
+   - FollowUpReplySentConsumer      → ReplySent
+
+2. NotificationBus handler
+   - on_event_completed             → "event_completed"
+     Called by the Scheduling Service after a ScheduledEvent is completed.
+     Evaluates the customer and schedules a follow-up if required.
 """
 
 from typing import List, Type
@@ -23,6 +30,7 @@ from app.domain.conversations.models import Conversation
 from app.domain.customers.models import Customer
 from app.domain.followup.models import FollowUpQueue
 from app.domain.followup.state_machine import transition
+from app.domain.scheduling.notification_bus import NotificationEvent, notification_bus
 from sqlalchemy import select
 
 logger = get_logger(__name__)
@@ -111,3 +119,32 @@ def register_subscribers():
         FollowUpMessageStoredConsumer(),
         FollowUpReplySentConsumer()
     ]
+
+
+# ── NotificationBus ────────────────────────────────────────────────────────────
+
+async def on_event_completed(notification: NotificationEvent) -> None:
+    """
+    Triggered when the Scheduling Service emits an event_completed notification.
+    Re-evaluates the customer to determine if a follow-up should be scheduled.
+    """
+    if not notification.customer_id:
+        return
+
+    try:
+        async with get_session() as session:
+            # The event is complete; see if we need a follow-up right away
+            await schedule_followup(
+                session, 
+                customer_id=notification.customer_id, 
+                workspace_id=notification.workspace_id
+            )
+            await session.commit()
+    except Exception as exc:
+        logger.error("followup_on_event_completed_error", error=str(exc), exc_info=True)
+
+
+def register_notification_bus_subscribers() -> None:
+    """Register handlers directly on the Scheduling Engine's NotificationBus."""
+    notification_bus.subscribe("event_completed", on_event_completed)
+

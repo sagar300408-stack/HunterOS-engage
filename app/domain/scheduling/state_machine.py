@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 VALID_TRANSITIONS: dict[str, set[str]] = {
     "pending":     {"confirmed", "cancelled"},
-    "confirmed":   {"in_progress", "rescheduled", "cancelled"},
+    "confirmed":   {"in_progress", "completed", "rescheduled", "cancelled"},
     "in_progress": {"completed", "cancelled"},
     "rescheduled": {"cancelled"},      # rescheduled is effectively terminal; new event takes over
     "completed":   set(),               # terminal

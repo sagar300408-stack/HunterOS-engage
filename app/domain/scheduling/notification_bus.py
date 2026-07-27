@@ -1,26 +1,29 @@
 """
-HunterOS Engage — Notification Bus (Phase 5 Hook)
+HunterOS Engage — Notification Bus
 
-Architecture-only in Phase 5 — the bus emits log entries only.
+The Scheduling Engine calls bus.emit() after every state change.
 
-Phase 6 will implement real dispatchers:
+Subscribers register via notification_bus.subscribe(event_type, handler)
+and are called asynchronously on each emit().
+
+Phase 6 will add real dispatchers:
   WhatsAppNotificationDispatcher
   EmailNotificationDispatcher
   SMSNotificationDispatcher
   CRMNotificationDispatcher
-
-The Scheduling Engine calls bus.emit() after every state change.
-Phase 6 replaces the no-op bus with a real one — zero changes to the
-scheduling service are required.
 """
 
+import asyncio
+from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Awaitable, Callable, Dict, List, Optional
 from uuid import UUID
 
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+NotificationHandler = Callable[["NotificationEvent"], Awaitable[None]]
 
 
 # ── Notification event ─────────────────────────────────────────────────────────
@@ -47,18 +50,32 @@ class NotificationEvent:
 
 class NotificationBus:
     """
-    Phase 5: No-op notification bus.
+    Notification bus with subscriber support.
 
-    Logs every notification intent but dispatches nothing.
-    Phase 6 will subclass or replace this with real implementations.
+    Handlers register via subscribe(event_type, handler).
+    emit() logs the event and calls all registered handlers for that event_type.
     """
+
+    def __init__(self) -> None:
+        self._subscribers: Dict[str, List[NotificationHandler]] = defaultdict(list)
+
+    def subscribe(self, event_type: str, handler: NotificationHandler) -> None:
+        """
+        Register an async handler for a specific event_type.
+
+        Example:
+            notification_bus.subscribe("event_completed", my_handler)
+        """
+        self._subscribers[event_type].append(handler)
+        logger.info("notification_bus_subscribed", event_type=event_type, handler=handler.__qualname__)
 
     async def emit(self, notification: NotificationEvent) -> None:
         """
         Emit a notification event.
 
-        Phase 5: Logs only.
-        Phase 6: Dispatches to WhatsApp, email, SMS, CRM based on workspace config.
+        Logs the event and calls every subscriber registered for this event_type.
+        Subscriber errors are caught and logged so one failing handler
+        cannot block the others.
         """
         logger.info(
             "notification_bus_emit",
@@ -66,11 +83,23 @@ class NotificationBus:
             scheduled_event_id=str(notification.scheduled_event_id),
             workspace_id=str(notification.workspace_id),
             customer_id=str(notification.customer_id) if notification.customer_id else None,
-            note="Phase 5: no-op — Phase 6 will dispatch",
         )
+
+        handlers = self._subscribers.get(notification.event_type, [])
+        for handler in handlers:
+            try:
+                await handler(notification)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "notification_bus_handler_error",
+                    event_type=notification.event_type,
+                    handler=handler.__qualname__,
+                    error=str(exc),
+                    exc_info=True,
+                )
 
 
 # ── Singleton ──────────────────────────────────────────────────────────────────
 
-# Global bus instance — replace with a configured implementation in Phase 6
+# Global bus instance shared by the scheduling service and all subscribers.
 notification_bus = NotificationBus()

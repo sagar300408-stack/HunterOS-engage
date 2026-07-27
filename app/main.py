@@ -67,9 +67,13 @@ async def lifespan(app: FastAPI):
     bootstrap_event_consumers(registry)
     
     # Register Follow-up subscribers manually until properly moved to bootstrap
-    from app.events.followup_subscribers import register_subscribers as register_followup_subscribers
+    from app.events.followup_subscribers import (
+        register_subscribers as register_followup_subscribers,
+        register_notification_bus_subscribers
+    )
     for consumer in register_followup_subscribers():
         registry.register(consumer)
+    register_notification_bus_subscribers()
         
     store_service = EventStoreService(EventStoreRepository())
     event_bus = EventBus(store_service)
