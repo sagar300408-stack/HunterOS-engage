@@ -1,38 +1,59 @@
-from abc import ABC, abstractmethod
 from typing import Optional
-from app.config import get_settings
-from app.integrations.whatsapp.client import send_text_message as real_send_text_message
 
-class WhatsAppProvider(ABC):
-    @abstractmethod
-    async def send_text_message(self, to: str, body: str) -> Optional[str]:
-        pass
+from app.utils.logger import get_logger
+from app.integrations.whatsapp.client import WhatsAppClient
+from app.integrations.whatsapp.schemas import (
+    OutgoingTemplateMessage,
+    WhatsAppTemplate,
+    WhatsAppLanguage,
+    MessageResponse
+)
 
-class MetaWhatsAppProvider(WhatsAppProvider):
-    async def send_text_message(self, to: str, body: str) -> Optional[str]:
-        return await real_send_text_message(to, body)
+logger = get_logger(__name__)
 
-class SimulatedWhatsAppProvider(WhatsAppProvider):
-    async def send_text_message(self, to: str, body: str) -> Optional[str]:
-        from app.developer_tools.service import simulation_state
-        from app.utils.logger import get_logger
-        import uuid
+class WhatsAppProvider:
+    """High-level provider for WhatsApp functionality."""
+
+    def __init__(self, client: WhatsAppClient):
+        self._client = client
+
+    async def verify_connection(self) -> bool:
+        """
+        Verify that the WhatsApp Cloud API integration is configured properly
+        and the API is accessible.
+        """
+        try:
+            info = await self._client.verify_connection()
+            logger.info(
+                "whatsapp_connection_verified", 
+                phone_number=info.display_phone_number,
+                verified_name=info.verified_name
+            )
+            return True
+        except Exception as e:
+            logger.error("whatsapp_connection_failed", error=str(e))
+            return False
+
+    async def send_test_message(self, recipient: str) -> MessageResponse:
+        """
+        Sends the default Meta 'hello_world' template message to the recipient.
         
-        logger = get_logger(__name__)
+        Args:
+            recipient: The phone number to send the message to (with country code).
+        """
+        # Meta API expects the recipient number without the '+' prefix.
+        clean_recipient = recipient.replace("+", "").strip()
         
-        # Check simulation status
-        if simulation_state.whatsapp_status == "offline":
-            logger.error("whatsapp_send_failed", detail="WhatsApp API is offline (Simulated)")
-            return None
-            
-        dummy_id = f"wamid.{uuid.uuid4()}"
-        logger.info("whatsapp_message_sent_mock", to=to, wa_message_id=dummy_id, body_preview=body[:50])
-        return dummy_id
-
-def get_whatsapp_provider() -> WhatsAppProvider:
-    settings = get_settings()
-    if settings.enable_developer_tools:
-        from app.developer_tools.service import simulation_state
-        if settings.whatsapp_access_token.startswith("dummy") or settings.whatsapp_access_token == "change-me" or simulation_state.mock_whatsapp:
-            return SimulatedWhatsAppProvider()
-    return MetaWhatsAppProvider()
+        payload = OutgoingTemplateMessage(
+            to=clean_recipient,
+            template=WhatsAppTemplate(
+                name="hello_world",
+                language=WhatsAppLanguage(code="en_US")
+            )
+        )
+        
+        logger.info("whatsapp_sending_test_message", recipient=clean_recipient)
+        response = await self._client.send_template(payload)
+        logger.info("whatsapp_test_message_sent", response=response.model_dump())
+        
+        return response
