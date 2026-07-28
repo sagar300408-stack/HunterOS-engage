@@ -9,11 +9,14 @@ from app.events.bus.interfaces import EventConsumer, ExecutionPolicy
 from app.events.model.base_event import UniversalBaseEvent
 from app.events.message_events import MessageReadyToSendEvent, ReplySent, ErrorOccurred
 from app.integrations.postgres.database import get_session
-from app.integrations.whatsapp.provider import get_whatsapp_provider
+from app.integrations.whatsapp.provider import WhatsAppProvider
 
 logger = logging.getLogger(__name__)
 
 class WhatsAppSendConsumer(EventConsumer):
+    def __init__(self, whatsapp_provider: WhatsAppProvider):
+        self.whatsapp_provider = whatsapp_provider
+
     def get_execution_policy(self) -> ExecutionPolicy:
         return ExecutionPolicy.BACKGROUND
 
@@ -26,7 +29,7 @@ class WhatsAppSendConsumer(EventConsumer):
 
         try:
             # ── Send via WhatsApp ─────────────────────────────────────────────────────
-            wa_message_id = await get_whatsapp_provider().send_text_message(
+            wa_message_id = await self.whatsapp_provider.send_text_message(
                 to=event.to_phone, 
                 body=event.content
             )

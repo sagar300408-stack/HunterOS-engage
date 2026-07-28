@@ -19,7 +19,6 @@ from app.domain.conversations.schemas import (
     SaveMessageDTO,
 )
 
-from app.integrations.whatsapp.provider import get_whatsapp_provider
 from app.utils.logger import get_logger
 from app.utils.clock import SystemClock
 

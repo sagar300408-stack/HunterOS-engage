@@ -69,11 +69,20 @@ def bootstrap_event_consumers(registry: ConsumerRegistry):
     from app.domain.conversations.consumers.ai_consumer import AIProcessingConsumer
     from app.domain.conversations.consumers.response_consumer import ResponseConsumer
     from app.domain.integration.consumers.whatsapp_send_consumer import WhatsAppSendConsumer
+    
+    from app.integrations.whatsapp.config import get_whatsapp_config
+    from app.integrations.whatsapp.client import WhatsAppClient
+    from app.integrations.whatsapp.provider import WhatsAppProvider
 
     registry.register(WebhookReceiveConsumer())
     registry.register(AIProcessingConsumer())
     registry.register(ResponseConsumer())
-    registry.register(WhatsAppSendConsumer())
+    
+    # Antigravity explicit dependency injection convention
+    wa_config = get_whatsapp_config()
+    wa_client = WhatsAppClient(config=wa_config)
+    wa_provider = WhatsAppProvider(client=wa_client)
+    registry.register(WhatsAppSendConsumer(whatsapp_provider=wa_provider))
 
     # 9. Register FollowUp Consumers
     from app.domain.followup.consumers.followup_consumer import FollowUpExecutedConsumer
