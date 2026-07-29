@@ -34,7 +34,12 @@ def verify_hub_challenge(
     settings = get_settings()
 
     if mode == "subscribe" and token == settings.whatsapp_verify_token:
-        logger.info("webhook_verified", mode=mode)
+        logger.info( "webhook_verify_debug",
+        mode=mode,
+        received_token=token,
+        configured_token=settings.whatsapp_verify_token,
+        challenge=challenge,
+        )
         return challenge
 
     logger.warning(
