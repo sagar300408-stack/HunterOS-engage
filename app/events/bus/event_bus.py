@@ -40,16 +40,9 @@ class EventBus(EventPublisher):
             }
         )
         
-        # 2. Queue for distribution (Stage 5 of Architecture)
-        from app.events.tasks import dispatch_event
-        # Queueing happens immediately. If the DB transaction rolls back, 
-        # the Celery task will fail to find the event and can be discarded/ignored.
-        # Alternatively, we could enqueue on commit, but Celery tasks usually handle 
-        # missing DB records via retries until the transaction commits.
-        dispatch_event.apply_async(
-            args=[str(event.event_id)],
-            queue="event_dispatch"
-        )
+        # 2. Distribution is now handled exclusively by the Outbox Dispatcher
+        # The event remains in PERSISTED state until the independent dispatcher 
+        # polls it and publishes it to the message broker.
 
     def _validate_event(self, event: UniversalBaseEvent) -> None:
         """
