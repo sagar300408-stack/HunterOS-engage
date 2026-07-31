@@ -66,6 +66,10 @@ async def lifespan(app: FastAPI):
     registry = ConsumerRegistry()
     bootstrap_event_consumers(registry)
     
+    # Initialize Context Resolution Layer
+    from app.bootstrap.context import bootstrap_context
+    context_resolver = bootstrap_context()
+    
     # Register Follow-up subscribers manually until properly moved to bootstrap
     from app.events.followup_subscribers import (
         register_subscribers as register_followup_subscribers,
@@ -81,6 +85,7 @@ async def lifespan(app: FastAPI):
     
     app.state.event_bus = event_bus
     app.state.consumer_registry = registry
+    app.state.context_resolver = context_resolver
     
     # ── Startup Validation (Architecture Guard) ──────────────────────────────
     from app.events.categories.conversation_events import CustomerRepliedEvent

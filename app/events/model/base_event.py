@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.events.model.actor_types import ActorType
 from app.events.model.categories import EventCategory
+from app.events.model.integration_types import IntegrationType
 
 
 class UniversalBaseEvent(BaseModel):
@@ -22,6 +23,7 @@ class UniversalBaseEvent(BaseModel):
     causation_id: Optional[UUID] = None
 
     # Context Layer
+    integration: Optional[IntegrationType] = None
     workspace_id: UUID
     customer_id: Optional[UUID] = None
     lead_id: Optional[UUID] = None

@@ -80,8 +80,21 @@ async def receive_webhook(
             )
             return {"status": "ignored", "reason": "not_whatsapp_business_account"}
 
+        # Resolve Application Context
+        context_resolver = request.app.state.context_resolver
+        from app.events.model.integration_types import IntegrationType
+        resolved_context = await context_resolver.resolve(session, IntegrationType.WHATSAPP, payload)
+
         # Create the event
-        event = RawWebhookEvent(payload=payload)
+        event = RawWebhookEvent(
+            integration=resolved_context.integration,
+            workspace_id=resolved_context.workspace_id,
+            actor_type=resolved_context.actor_type,
+            customer_id=resolved_context.customer_id,
+            lead_id=resolved_context.lead_id,
+            conversation_id=resolved_context.conversation_id,
+            payload=payload
+        )
         
         # Publish to the EventBus (which persists it synchronously in the DB transaction and queues a Celery task)
         event_bus = request.app.state.event_bus

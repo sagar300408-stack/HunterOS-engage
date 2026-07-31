@@ -26,11 +26,8 @@ class RawWebhookEvent(UniversalBaseEvent):
     event_name: str = Field(default="RawWebhookEvent")
     source_subsystem: str = Field(default="webhook")
     
-    workspace_id: Optional[UUID] = None
-    actor_type: Optional[ActorType] = None
-    
     payload: Dict[str, Any] = Field(default_factory=dict)
-    
+
 
 class MessageReceived(UniversalBaseEvent):
     """Fired when a WhatsApp text message arrives at the webhook."""
