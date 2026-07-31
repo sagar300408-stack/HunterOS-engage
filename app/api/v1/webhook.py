@@ -54,6 +54,7 @@ async def receive_webhook(
     request: Request,
     session: AsyncSession = Depends(get_db),
 ) -> dict:
+    print("🔥 POST webhook reached")
     """
     POST /api/v1/webhook — receive incoming WhatsApp messages.
     
