@@ -85,22 +85,47 @@ async def list_dlq(session: AsyncSession = Depends(get_db)):
 async def replay_dlq_event(event_id: str, session: AsyncSession = Depends(get_db)):
     """
     Requeues a DEAD_LETTER event for processing.
+
+    Lifecycle path:
+        DEAD_LETTER → REPLAYED → PERSISTED
+        (Outbox Dispatcher picks it up on next poll and transitions to QUEUED → PROCESSING)
     """
-    stmt = select(EventRecord).where(EventRecord.event_id == event_id)
+    from uuid import UUID
+    from app.events.lifecycle.manager import LifecycleManager
+
+    try:
+        uid = UUID(event_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid event_id format")
+
+    stmt = select(EventRecord).where(EventRecord.event_id == uid)
     result = await session.execute(stmt)
     record = result.scalar_one_or_none()
-    
+
     if not record:
         raise HTTPException(status_code=404, detail="Event not found")
-        
-    if record.lifecycle_state != EventLifecycleState.DEAD_LETTER.value:
-        raise HTTPException(status_code=400, detail="Event is not in DEAD_LETTER state")
-        
-    # Reset state to QUEUED and dispatch
-    record.lifecycle_state = EventLifecycleState.REPLAYED.value
+
+    if record.lifecycle_state not in (
+        EventLifecycleState.DEAD_LETTER.value,
+        EventLifecycleState.COMPLETED.value,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Event is in '{record.lifecycle_state}' state; only DEAD_LETTER or COMPLETED events can be replayed",
+        )
+
+    # DEAD_LETTER / COMPLETED → REPLAYED (state machine enforced)
+    await LifecycleManager._transition(session, uid, EventLifecycleState.REPLAYED)
+    # REPLAYED → PERSISTED so the Outbox Dispatcher picks it up on the next poll
+    # (Replayed events re-enter the pipeline from the beginning)
+    record.lifecycle_state = EventLifecycleState.PERSISTED.value
+    record.retry_count = 0
+    record.error_detail = None
+    record.next_retry_at = None
     await session.commit()
-    
-    from app.events.tasks import dispatch_event_to_consumers
-    dispatch_event_to_consumers.delay(event_id)
-    
-    return {"status": "ok", "message": f"Event {event_id} queued for replay"}
+
+    return {
+        "status": "ok",
+        "message": f"Event {event_id} reset to PERSISTED — Outbox Dispatcher will re-queue it on the next poll",
+    }
+

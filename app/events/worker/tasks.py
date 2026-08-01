@@ -94,39 +94,52 @@ async def _dispatch_async(event_id: UUID, max_retries: int) -> None:
                         has_errors = True
                         error_messages.append(f"{background_consumers[i].__class__.__name__}: {str(result)}")
 
-            # 5. Lifecycle Transition
+            # 5. Lifecycle Transition — direct from PROCESSING, no FAILED intermediate
             if has_errors:
                 error_detail = "; ".join(error_messages)
-                # First move to FAILED
-                record = await LifecycleManager.fail(session, event_id, error_detail=error_detail)
-                
-                # Check retries
                 if record.retry_count < max_retries:
-                    # Exponential backoff: 2^retry_count * 10 seconds (e.g. 10s, 20s, 40s)
+                    # Exponential backoff: 2^retry_count * 10 s (10s, 20s, 40s …)
                     delay_seconds = (2 ** record.retry_count) * 10
                     next_retry = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
-                    await LifecycleManager.retry(session, event_id, next_retry_at=next_retry, error_detail=error_detail)
+                    await LifecycleManager.retry(
+                        session, event_id,
+                        next_retry_at=next_retry,
+                        error_detail=error_detail,
+                    )
                 else:
-                    await LifecycleManager.dead_letter(session, event_id, error_detail="Max retries exceeded: " + error_detail)
-                
+                    await LifecycleManager.dead_letter(
+                        session, event_id,
+                        error_detail=f"Max retries exceeded: {error_detail}",
+                    )
                 await session.commit()
             else:
                 await LifecycleManager.complete(session, event_id)
                 await session.commit()
-                
+
         except Exception as e:
-            # Catch-all for unexpected orchestration errors
+            # Catch-all for unexpected orchestration errors (e.g. DB down mid-flight)
             logger.error(f"Unexpected error orchestrating event {event_id}: {e}", exc_info=True)
-            record = await LifecycleManager.fail(session, event_id, error_detail=str(e))
-            
-            if record.retry_count < max_retries:
-                delay_seconds = (2 ** record.retry_count) * 10
-                next_retry = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
-                await LifecycleManager.retry(session, event_id, next_retry_at=next_retry, error_detail=str(e))
-            else:
-                await LifecycleManager.dead_letter(session, event_id, error_detail="Max retries exceeded: " + str(e))
-                
-            await session.commit()
+            try:
+                record = await session.get(EventRecord, event_id)
+                if record and record.retry_count < max_retries:
+                    delay_seconds = (2 ** record.retry_count) * 10
+                    next_retry = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+                    await LifecycleManager.retry(
+                        session, event_id,
+                        next_retry_at=next_retry,
+                        error_detail=str(e),
+                    )
+                else:
+                    await LifecycleManager.dead_letter(
+                        session, event_id,
+                        error_detail=f"Max retries exceeded: {e}",
+                    )
+                await session.commit()
+            except Exception as inner_e:
+                logger.error(
+                    f"Failed to persist error state for event {event_id}: {inner_e}",
+                    exc_info=True,
+                )
 
 from app.celery_app import celery_app
 

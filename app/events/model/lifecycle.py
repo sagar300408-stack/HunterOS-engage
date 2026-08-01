@@ -6,13 +6,18 @@ persisted until it is fully consumed or dead-lettered.
 
 Lifecycle transitions:
   PERSISTED → QUEUED → PROCESSING → COMPLETED
-                                  → FAILED (retry)
-                                  → DEAD_LETTER (max retries exceeded)
-  Any state → REPLAYED (when manually replayed via the reliability API)
+                                   → RETRYING  (transient failure, under retry limit)
+                                   → DEAD_LETTER (max retries exceeded)
+  Any COMPLETED / DEAD_LETTER → REPLAYED (manual replay via reliability API)
+  REPLAYED → QUEUED
 
 Architectural Rule:
   Stage 4 (Persistence) always precedes Stage 5 (Distribution).
   The lifecycle state is the machine-readable proof of this guarantee.
+
+  FAILED is intentionally absent. Failures are never a stable resting state:
+    - Recoverable failures transition PROCESSING → RETRYING.
+    - Terminal failures transition PROCESSING → DEAD_LETTER.
 """
 
 from enum import Enum
@@ -30,9 +35,9 @@ class EventLifecycleState(str, Enum):
                  The event will be delivered to consumers.
     PROCESSING:  A Celery worker has picked up the dispatch task and is
                  routing the event to its registered consumers.
-    COMPLETED:   All consumers executed (successes and isolated failures logged).
-    FAILED:      One or more consumers failed and the dispatch task is
-                 awaiting retry. retry_count and next_retry_at are set.
+    COMPLETED:   All consumers executed successfully.
+    RETRYING:    One or more consumers failed; retry_count and next_retry_at
+                 are set. The dispatcher will re-queue when next_retry_at elapses.
     DEAD_LETTER: Max retries exceeded. Human intervention required.
                  Available for replay via the reliability API.
     REPLAYED:    Event was manually re-dispatched via the reliability API.
@@ -44,25 +49,21 @@ class EventLifecycleState(str, Enum):
     QUEUED = "QUEUED"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
     RETRYING = "RETRYING"
     DEAD_LETTER = "DEAD_LETTER"
     REPLAYED = "REPLAYED"
 
 
-# Valid forward transitions — used to enforce state machine correctness
+# Valid forward transitions — used to enforce state machine correctness.
+# FAILED is absent by design: failures route directly to RETRYING or DEAD_LETTER.
 VALID_TRANSITIONS: dict[EventLifecycleState, set[EventLifecycleState]] = {
     EventLifecycleState.NEW:          {EventLifecycleState.PERSISTED},
     EventLifecycleState.PERSISTED:    {EventLifecycleState.QUEUED},
     EventLifecycleState.QUEUED:       {EventLifecycleState.PROCESSING},
     EventLifecycleState.PROCESSING:   {
         EventLifecycleState.COMPLETED,
-        EventLifecycleState.FAILED,
-        EventLifecycleState.RETRYING,     # Stale recovery
-    },
-    EventLifecycleState.FAILED:       {
-        EventLifecycleState.RETRYING,     # Under max retries
-        EventLifecycleState.DEAD_LETTER,  # Max retries exceeded
+        EventLifecycleState.RETRYING,    # transient failure — will be re-queued
+        EventLifecycleState.DEAD_LETTER, # terminal failure — max retries exceeded
     },
     EventLifecycleState.RETRYING:     {EventLifecycleState.QUEUED},
     EventLifecycleState.DEAD_LETTER:  {EventLifecycleState.REPLAYED},

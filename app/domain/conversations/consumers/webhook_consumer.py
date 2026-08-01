@@ -44,7 +44,6 @@ class WebhookReceiveConsumer(EventConsumer):
                     # We need to trigger the next stage (AI processing)
                     # By publishing MessageReceived, the AIProcessingConsumer will pick it up.
                     from app.celery_app import celery_app
-                    from app.events.tasks import _registry
                     
                     # We can instantiate a local EventBus just for publishing, but it's cleaner to 
                     # do it through a shared instance.
