@@ -82,10 +82,12 @@ class OutboxPoller:
             if not event_ids:
                 return
             
-            logger.debug(f"Poller found {len(event_ids)} events to dispatch.")
+            logger.debug(f"Poller found {len(event_ids)} events to dispatch. Broker: {self.celery_app.conf.broker_url}")
             
             for event_id in event_ids:
                 try:
+                    logger.debug(f"Attempting to dispatch event {event_id} to Celery...")
+                    
                     # 1. Enqueue to Broker
                     # We use send_task to decouple from the actual task module
                     self.celery_app.send_task(
@@ -93,12 +95,19 @@ class OutboxPoller:
                         args=[str(event_id)],
                         queue="event_dispatch"
                     )
+                    logger.debug(f"Successfully sent event {event_id} to Celery broker.")
                     
                     # 2. Transition State
+                    logger.debug(f"Transitioning event {event_id} to QUEUED...")
                     await LifecycleManager.queue(session, event_id)
+                    logger.debug(f"Event {event_id} transitioned to QUEUED.")
                     
                 except Exception as e:
-                    logger.error(f"Failed to dispatch event {event_id}: {e}")
+                    logger.error(
+                        f"Failed to dispatch event {event_id}. "
+                        f"Broker: {self.celery_app.conf.broker_url} | Error: {e}",
+                        exc_info=True
+                    )
                     # If dispatch fails (e.g. Redis is down), we don't commit this row's change to QUEUED
                     # The transaction will rollback at the end of the block or we can just ignore and retry later
                     # Actually, if we raise, the whole batch rolls back.
@@ -107,4 +116,6 @@ class OutboxPoller:
                     raise
             
             # Commit the batch
+            logger.debug(f"Committing batch of {len(event_ids)} events...")
             await session.commit()
+            logger.debug("Batch committed successfully.")
