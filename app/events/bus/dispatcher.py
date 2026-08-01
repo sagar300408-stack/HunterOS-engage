@@ -41,69 +41,81 @@ class OutboxDispatcher:
         Fetches a batch of PERSISTED events using row-level locking,
         publishes them, and marks them QUEUED.
         Returns the number of events processed.
+
+        IMPORTANT: The entire query + dispatch + state-update loop must run
+        inside an explicit BEGIN/COMMIT block. PostgreSQL only holds
+        FOR UPDATE SKIP LOCKED row-locks for the duration of the transaction.
+        Without session.begin(), the lock is acquired and immediately released,
+        making the result set appear empty on subsequent reads.
         """
         async with get_session() as session:
-            # 1. Fetch batch with FOR UPDATE SKIP LOCKED
-            # This ensures multiple dispatcher instances won't process the same events.
-            logger.info("STEP 1: Querying persisted events")
-            stmt = select(EventRecord).where(
-                EventRecord.lifecycle_state == EventLifecycleState.PERSISTED.value
-            ).with_for_update(skip_locked=True).limit(self.batch_size)
-            
-            result = await session.execute(stmt)
-            records = result.scalars().all()
-            
-            if not records:
-                return 0
-                
-            logger.info("STEP 2: Retrieved %d events", len(records))
-            published_count = 0
-            
-            for record in records:
-                try:
-                    logger.info("STEP 3: Publishing event %s", record.event_id)
-                    # 2. Publish to Broker
-                    print(f"\n[DEBUG] dispatch_event: {dispatch_event}")
-                    print(f"[DEBUG] dispatch_event.app: {dispatch_event.app}")
-                    print(f"[DEBUG] dispatch_event.app.conf.broker_url: {dispatch_event.app.conf.broker_url}")
-                    
-                    dispatch_event.apply_async(
-                        args=[str(record.event_id)],
-                        queue="event_dispatch"
-                    )
-                    
-                    logger.info("STEP 4: apply_async succeeded")
-                    
-                    # 3. Transition to QUEUED
-                    logger.info("STEP 5: Updating lifecycle to QUEUED")
-                    record.lifecycle_state = EventLifecycleState.QUEUED.value
-                    published_count += 1
-                    
-                except OperationalError:
-                    logger.exception("Dispatcher exception: outbox_dispatcher_broker_outage")
-                    # Broker is down. Stop processing this batch. 
-                    # Rollback the transaction to release locks and leave events in PERSISTED state.
-                    await session.rollback()
-                    return published_count
-                except Exception:
-                    logger.exception("Dispatcher exception: outbox_dispatcher_unexpected_error")
-                    # Unrelated programming/serialization error.
-                    # We still rollback the whole batch because this might be an application bug
-                    # or memory issue. We don't want to partially commit safely without more robust DLQ handling here.
-                    # Wait, if one event is poisoned, we shouldn't block the queue.
-                    # But apply_async shouldn't raise serialization errors since we only pass the string UUID!
-                    await session.rollback()
-                    return published_count
+            async with session.begin():
+                # STEP 1 — Query
+                logger.info("STEP 1: Querying persisted events")
+                stmt = (
+                    select(EventRecord)
+                    .where(EventRecord.lifecycle_state == EventLifecycleState.PERSISTED.value)
+                    .with_for_update(skip_locked=True)
+                    .limit(self.batch_size)
+                )
 
-            # 4. Commit successfully published events
-            logger.info("STEP 6: Committing transaction")
-            await session.commit()
-            logger.info("STEP 7: Commit successful")
-            
-            if published_count > 0:
-                logger.info("outbox_batch_dispatched", count=published_count)
-                
-            return published_count
+                result = await session.execute(stmt)
+                records = result.scalars().all()
+
+                logger.info("Retrieved %d persisted events", len(records))
+
+                if not records:
+                    # session.begin() rolls back cleanly here — no rows, no locks held.
+                    return 0
+
+                logger.info("STEP 2: Retrieved %d events to dispatch", len(records))
+                published_count = 0
+
+                for record in records:
+                    try:
+                        logger.info("STEP 3: Publishing event %s", record.event_id)
+
+                        print(f"\n[DEBUG] dispatch_event: {dispatch_event}")
+                        print(f"[DEBUG] dispatch_event.app: {dispatch_event.app}")
+                        print(f"[DEBUG] dispatch_event.app.conf.broker_url: {dispatch_event.app.conf.broker_url}")
+
+                        dispatch_event.apply_async(
+                            args=[str(record.event_id)],
+                            queue="event_dispatch"
+                        )
+                        logger.info("STEP 4: apply_async succeeded for event %s", record.event_id)
+
+                        # Transition to QUEUED — still inside the same transaction
+                        logger.info("STEP 5: Updating lifecycle to QUEUED for event %s", record.event_id)
+                        record.lifecycle_state = EventLifecycleState.QUEUED.value
+                        published_count += 1
+
+                    except OperationalError:
+                        # Broker is down — roll back the entire batch so no row is
+                        # left stranded in a partially-updated state. The events
+                        # remain PERSISTED and will be picked up on the next poll.
+                        logger.exception(
+                            "Dispatcher exception: outbox_dispatcher_broker_outage — "
+                            "rolling back batch, events remain PERSISTED"
+                        )
+                        raise  # session.begin() context manager will rollback
+
+                    except Exception:
+                        logger.exception(
+                            "Dispatcher exception: outbox_dispatcher_unexpected_error — "
+                            "rolling back batch"
+                        )
+                        raise  # session.begin() context manager will rollback
+
+                # STEP 6/7 — session.begin() commits here when the block exits normally
+                logger.info("STEP 6: Committing transaction (%d events)", published_count)
+
+        logger.info("STEP 7: Commit successful — %d events transitioned to QUEUED", published_count)
+
+        if published_count > 0:
+            logger.info("outbox_batch_dispatched count=%d", published_count)
+
+        return published_count
 
     async def start(self):
         """Starts the continuous polling loop."""
