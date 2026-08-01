@@ -21,8 +21,6 @@ from app.domain.conversations.schemas import MessageDirectionEnum, SaveMessageDT
 from app.domain.customers import service as customer_service
 from app.domain.memory import service as memory_service
 from app.domain.memory.models import MemoryEventType
-from app.events.dispatcher import dispatcher
-from app.events.message_events import MessageReceived, MessageStored
 from app.utils.helpers import extract_message_data
 from app.utils.logger import get_logger
 
