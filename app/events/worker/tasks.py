@@ -3,7 +3,6 @@ import logging
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
 
-from celery import shared_task
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.postgres.database import get_session
@@ -129,7 +128,9 @@ async def _dispatch_async(event_id: UUID, max_retries: int) -> None:
                 
             await session.commit()
 
-@shared_task(
+from app.celery_app import celery_app
+
+@celery_app.task(
     name="app.events.worker.tasks.dispatch_event",
     queue="event_dispatch",
     acks_late=True,

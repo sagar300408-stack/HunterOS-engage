@@ -2,7 +2,6 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 
-from celery import shared_task
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,7 +61,9 @@ async def _recover_stale_events_async(timeout_minutes: int, max_retries: int) ->
             
     return recovered_count
 
-@shared_task(name="app.events.worker.maintenance.recover_stale_events")
+from app.celery_app import celery_app
+
+@celery_app.task(name="app.events.worker.maintenance.recover_stale_events")
 def recover_stale_events(timeout_minutes: int = 30, max_retries: int = 5):
     """
     Periodic maintenance task to find 'zombie' events stuck in the PROCESSING state
