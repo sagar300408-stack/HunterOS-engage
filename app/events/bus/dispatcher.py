@@ -17,7 +17,7 @@ from app.domain.followup.models import FollowUpQueue, FollowUpExecution, LeadHea
 
 from app.events.store.models import EventRecord
 from app.events.model.lifecycle import EventLifecycleState
-from app.events.tasks import dispatch_event
+from app.events.worker.tasks import dispatch_event
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -45,6 +45,7 @@ class OutboxDispatcher:
         async with get_session() as session:
             # 1. Fetch batch with FOR UPDATE SKIP LOCKED
             # This ensures multiple dispatcher instances won't process the same events.
+            logger.info("STEP 1: Querying persisted events")
             stmt = select(EventRecord).where(
                 EventRecord.lifecycle_state == EventLifecycleState.PERSISTED.value
             ).with_for_update(skip_locked=True).limit(self.batch_size)
@@ -55,37 +56,37 @@ class OutboxDispatcher:
             if not records:
                 return 0
                 
+            logger.info("STEP 2: Retrieved %d events", len(records))
             published_count = 0
             
             for record in records:
                 try:
+                    logger.info("STEP 3: Publishing event %s", record.event_id)
                     # 2. Publish to Broker
+                    print(f"\n[DEBUG] dispatch_event: {dispatch_event}")
+                    print(f"[DEBUG] dispatch_event.app: {dispatch_event.app}")
+                    print(f"[DEBUG] dispatch_event.app.conf.broker_url: {dispatch_event.app.conf.broker_url}")
+                    
                     dispatch_event.apply_async(
                         args=[str(record.event_id)],
                         queue="event_dispatch"
                     )
                     
+                    logger.info("STEP 4: apply_async succeeded")
+                    
                     # 3. Transition to QUEUED
+                    logger.info("STEP 5: Updating lifecycle to QUEUED")
                     record.lifecycle_state = EventLifecycleState.QUEUED.value
                     published_count += 1
                     
-                except OperationalError as exc:
-                    logger.warning(
-                        "outbox_dispatcher_broker_outage",
-                        error=str(exc),
-                        event_id=str(record.event_id)
-                    )
+                except OperationalError:
+                    logger.exception("Dispatcher exception: outbox_dispatcher_broker_outage")
                     # Broker is down. Stop processing this batch. 
                     # Rollback the transaction to release locks and leave events in PERSISTED state.
                     await session.rollback()
                     return published_count
-                except Exception as exc:
-                    logger.error(
-                        "outbox_dispatcher_unexpected_error",
-                        error=str(exc),
-                        event_id=str(record.event_id),
-                        exc_info=True
-                    )
+                except Exception:
+                    logger.exception("Dispatcher exception: outbox_dispatcher_unexpected_error")
                     # Unrelated programming/serialization error.
                     # We still rollback the whole batch because this might be an application bug
                     # or memory issue. We don't want to partially commit safely without more robust DLQ handling here.
@@ -95,7 +96,9 @@ class OutboxDispatcher:
                     return published_count
 
             # 4. Commit successfully published events
+            logger.info("STEP 6: Committing transaction")
             await session.commit()
+            logger.info("STEP 7: Commit successful")
             
             if published_count > 0:
                 logger.info("outbox_batch_dispatched", count=published_count)
