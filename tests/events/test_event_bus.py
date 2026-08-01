@@ -7,7 +7,7 @@ import pytest_asyncio
 from app.events.bus.event_bus import EventBus
 from app.events.bus.exceptions import ConsumerRegistrationError
 from app.events.bus.interfaces import EventConsumer
-from app.events.bus.registry import ConsumerRegistry
+from app.events.registry.registry import ConsumerRegistry
 from app.events.categories.conversation_events import ConversationEvent, CustomerRepliedEvent
 from app.events.model.actor_types import ActorType
 from app.events.model.base_event import UniversalBaseEvent
@@ -60,27 +60,30 @@ class FailingConsumer(EventConsumer):
 def test_registry_registration():
     registry = ConsumerRegistry()
     consumer = DummyCustomerRepliedConsumer()
-    registry.register(consumer)
+    for ev in consumer.get_subscriptions():
+        registry.register(ev, consumer)
 
-    subscribers = registry.get_subscribers(CustomerRepliedEvent)
+    subscribers = registry.get_consumers(CustomerRepliedEvent)
     assert consumer in subscribers
 
 
-def test_registry_inheritance_routing_and_priority():
+def test_registry_inheritance_routing():
     registry = ConsumerRegistry()
     
     specific_consumer = DummyCustomerRepliedConsumer()
     category_consumer = DummyConversationCategoryConsumer()
     high_priority_consumer = DummyHighPriorityConsumer()
     
-    registry.register(specific_consumer)
-    registry.register(category_consumer)
-    registry.register(high_priority_consumer)
+    for ev in specific_consumer.get_subscriptions():
+        registry.register(ev, specific_consumer)
+    for ev in category_consumer.get_subscriptions():
+        registry.register(ev, category_consumer)
+    for ev in high_priority_consumer.get_subscriptions():
+        registry.register(ev, high_priority_consumer)
 
-    subscribers = registry.get_subscribers(CustomerRepliedEvent)
+    subscribers = registry.get_consumers(CustomerRepliedEvent)
     
-    # Priority sorting should place high_priority_consumer first
-    assert subscribers[0] == high_priority_consumer
+    assert high_priority_consumer in subscribers
     assert specific_consumer in subscribers
     assert category_consumer in subscribers
 

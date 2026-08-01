@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI):
     # ── Startup Validation (Architecture Guard) ──────────────────────────────
     from app.events.categories.conversation_events import CustomerRepliedEvent
     
-    if not registry.get_subscribers(CustomerRepliedEvent):
+    if not registry.get_consumers(CustomerRepliedEvent):
         raise RuntimeError("Architecture Violation: No consumers registered for CustomerRepliedEvent (Critical Path broken)")
         
     logger.info("Startup validation passed: Critical event consumers are registered")
