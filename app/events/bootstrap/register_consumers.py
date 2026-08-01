@@ -13,7 +13,11 @@ def bootstrap_event_consumers(registry: ConsumerRegistry):
     Central bootstrap location for registering all operational and projection consumers 
     with the HunterOS Consumer Registry.
     """
-    
+    def _register(consumer):
+        # Dynamically register based on the consumer's subscriptions
+        for event_class in consumer.get_subscriptions():
+            registry.register(event_class, consumer)
+            
     # 1. Register Projection Framework (Priority 50)
     projection_manager = ProjectionManager()
     
@@ -32,37 +36,37 @@ def bootstrap_event_consumers(registry: ConsumerRegistry):
     projection_manager.register_projection(livestream_projection)
     
     # Register the single projection manager consumer
-    registry.register(projection_manager)
+    _register(projection_manager)
 
     # 2. Register Operational Intelligence Engine Consumer (Priority -10)
     from app.domain.intelligence.consumer import IntelligenceEventConsumer
     intelligence_consumer = IntelligenceEventConsumer()
-    registry.register(intelligence_consumer)
+    _register(intelligence_consumer)
     
     # 3. Register Collaboration Engine Consumer (Priority 10)
     from app.domain.collaboration.consumer import CollaborationEventConsumer
     collaboration_consumer = CollaborationEventConsumer()
-    registry.register(collaboration_consumer)
+    _register(collaboration_consumer)
 
     # 4. Register Impact Engine Consumer (Priority 20)
     from app.domain.impact.consumer import ImpactEventConsumer
     impact_consumer = ImpactEventConsumer()
-    registry.register(impact_consumer)
+    _register(impact_consumer)
 
     # 5. Register Context Engine Consumer (Priority -20)
     from app.domain.context.consumer import ContextEventConsumer
     context_consumer = ContextEventConsumer()
-    registry.register(context_consumer)
+    _register(context_consumer)
 
     # 6. Register Onboarding Event Consumer (Priority 100)
     from app.domain.onboarding.consumer import OnboardingEventConsumer
     onboarding_consumer = OnboardingEventConsumer()
-    registry.register(onboarding_consumer)
+    _register(onboarding_consumer)
 
     # 7. Register UI Event Consumer (Priority 1000)
     from app.domain.ui.consumer import UIEventConsumer
     ui_consumer = UIEventConsumer()
-    registry.register(ui_consumer)
+    _register(ui_consumer)
 
     # 8. Register Pipeline Consumers
     from app.domain.conversations.consumers.webhook_consumer import WebhookReceiveConsumer
@@ -74,17 +78,17 @@ def bootstrap_event_consumers(registry: ConsumerRegistry):
     from app.integrations.whatsapp.client import WhatsAppClient
     from app.integrations.whatsapp.provider import WhatsAppProvider
 
-    registry.register(WebhookReceiveConsumer())
-    registry.register(AIProcessingConsumer())
-    registry.register(ResponseConsumer())
+    _register(WebhookReceiveConsumer())
+    _register(AIProcessingConsumer())
+    _register(ResponseConsumer())
     
     # Antigravity explicit dependency injection convention
     wa_config = get_whatsapp_config()
     wa_client = WhatsAppClient(config=wa_config)
     wa_provider = WhatsAppProvider(client=wa_client)
-    registry.register(WhatsAppSendConsumer(whatsapp_provider=wa_provider))
+    _register(WhatsAppSendConsumer(whatsapp_provider=wa_provider))
 
     # 9. Register FollowUp Consumers
     from app.domain.followup.consumers.followup_consumer import FollowUpExecutedConsumer
-    registry.register(FollowUpExecutedConsumer())
+    _register(FollowUpExecutedConsumer())
 

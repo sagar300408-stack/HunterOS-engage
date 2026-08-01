@@ -65,6 +65,14 @@ class Settings(BaseSettings):
         alias="ENABLE_DEVELOPER_TOOLS"
     )
 
+    # ── Phase 1.3: Asynchronous Processing Pipeline ──────────────────────────
+    dispatcher_poll_interval: float = Field(default=1.0, alias="DISPATCHER_POLL_INTERVAL")
+    dispatcher_batch_size: int = Field(default=100, alias="DISPATCHER_BATCH_SIZE")
+    dispatcher_worker_id: str = Field(default="dispatcher-1", alias="DISPATCHER_WORKER_ID")
+    dispatcher_shutdown_timeout: float = Field(default=10.0, alias="DISPATCHER_SHUTDOWN_TIMEOUT")
+    celery_broker_url: str = Field(default="redis://localhost:6379/1", alias="CELERY_BROKER_URL")
+    celery_result_backend: str = Field(default="redis://localhost:6379/2", alias="CELERY_RESULT_BACKEND")
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"

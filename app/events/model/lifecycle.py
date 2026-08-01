@@ -45,6 +45,7 @@ class EventLifecycleState(str, Enum):
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    RETRYING = "RETRYING"
     DEAD_LETTER = "DEAD_LETTER"
     REPLAYED = "REPLAYED"
 
@@ -57,11 +58,13 @@ VALID_TRANSITIONS: dict[EventLifecycleState, set[EventLifecycleState]] = {
     EventLifecycleState.PROCESSING:   {
         EventLifecycleState.COMPLETED,
         EventLifecycleState.FAILED,
+        EventLifecycleState.RETRYING,     # Stale recovery
     },
     EventLifecycleState.FAILED:       {
-        EventLifecycleState.QUEUED,       # retry
-        EventLifecycleState.DEAD_LETTER,  # max retries exceeded
+        EventLifecycleState.RETRYING,     # Under max retries
+        EventLifecycleState.DEAD_LETTER,  # Max retries exceeded
     },
+    EventLifecycleState.RETRYING:     {EventLifecycleState.QUEUED},
     EventLifecycleState.DEAD_LETTER:  {EventLifecycleState.REPLAYED},
     EventLifecycleState.COMPLETED:    {EventLifecycleState.REPLAYED},
     EventLifecycleState.REPLAYED:     {EventLifecycleState.QUEUED},
