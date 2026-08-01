@@ -47,9 +47,8 @@ def init_worker(**kwargs):
     # Register followup subscribers manually
     from app.events.followup_subscribers import register_subscribers
     for consumer in register_subscribers():
-        # register_subscribers likely returns instantiated classes, we need to adapt it
-        # or leave it if it works with the old registry.
-        pass
+        for event_class in consumer.get_subscriptions():
+            registry.register(event_class, consumer)
 
     logger.info("Declarative ConsumerRegistry successfully initialized.")
 

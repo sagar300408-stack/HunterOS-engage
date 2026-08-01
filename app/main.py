@@ -25,7 +25,7 @@ from app.api.v1.followup import router as followup_router
 from app.config import get_settings
 
 from app.events.bootstrap.register_consumers import bootstrap_event_consumers
-from app.events.bus.registry import ConsumerRegistry
+from app.events.registry.registry import registry
 from app.events.bus.event_bus import EventBus
 from app.events.store.repository import EventStoreRepository
 from app.events.store.service import EventStoreService
@@ -63,7 +63,6 @@ async def lifespan(app: FastAPI):
         await seed_default_admin()
 
     # Initialize Event Bus and Dependencies
-    registry = ConsumerRegistry()
     bootstrap_event_consumers(registry)
     
     # Initialize Context Resolution Layer
@@ -76,7 +75,8 @@ async def lifespan(app: FastAPI):
         register_notification_bus_subscribers
     )
     for consumer in register_followup_subscribers():
-        registry.register(consumer)
+        for event_class in consumer.get_subscriptions():
+            registry.register(event_class, consumer)
     register_notification_bus_subscribers()
         
     store_service = EventStoreService(EventStoreRepository())
