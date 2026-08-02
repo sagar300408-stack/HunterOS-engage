@@ -14,9 +14,11 @@ Returns (Conversation, message_data, Customer) on success, None if skipped.
 
 from typing import Optional
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.conversations import service as message_service
+from app.domain.conversations.models import Message
 from app.domain.conversations.schemas import MessageDirectionEnum, SaveMessageDTO
 from app.domain.customers import service as customer_service
 from app.domain.memory import service as memory_service
@@ -103,8 +105,26 @@ async def receive(
         customer_id=customer.id,
     )
 
-    # Emit conversation_started event on fresh conversations
-    if not conversation.messages:
+    # Emit conversation_started event on fresh conversations.
+    #
+    # WHY NOT conversation.messages:
+    #   Conversation.messages is a SQLAlchemy relationship with lazy="select"
+    #   (the default). Accessing it in an async context triggers
+    #   "greenlet_spawn has not been called" (MissingGreenlet) because SQLAlchemy
+    #   Async cannot issue implicit I/O outside an awaitable greenlet.
+    #
+    # THE FIX:
+    #   Issue a minimal explicit async query — SELECT id LIMIT 1 — which:
+    #     • uses await so SQLAlchemy Async can schedule the I/O correctly
+    #     • touches only one index row (ix_messages_conversation_id)
+    #     • never traverses the ORM relationship attribute
+    #     • is semantically identical: None means "no messages yet"
+    existing_message_id = await session.scalar(
+        select(Message.id)
+        .where(Message.conversation_id == conversation.id)
+        .limit(1)
+    )
+    if existing_message_id is None:
         await memory_service.append_memory_event(
             session,
             customer.id,

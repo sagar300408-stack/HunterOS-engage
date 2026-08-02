@@ -7,7 +7,10 @@ from app.api.v1.auth_deps import get_current_user, RequirePermissions
 from app.domain.reliability.models import PerformanceBenchmark, ReliabilityEvent, DeploymentRecord
 from app.events.store.models import EventRecord
 from app.events.model.lifecycle import EventLifecycleState
+from app.events.lifecycle.manager import LifecycleManager
+from app.utils.logger import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(tags=["Reliability & Performance"])
 
 @router.get("/performance/benchmarks", dependencies=[Depends(RequirePermissions("view_all"))])
@@ -84,14 +87,18 @@ async def list_dlq(session: AsyncSession = Depends(get_db)):
 @router.post("/reliability/dlq/{event_id}/replay", summary="Replay a DLQ Event")
 async def replay_dlq_event(event_id: str, session: AsyncSession = Depends(get_db)):
     """
-    Requeues a DEAD_LETTER event for processing.
+    Requeues a DEAD_LETTER or COMPLETED event for re-processing.
 
     Lifecycle path:
-        DEAD_LETTER → REPLAYED → PERSISTED
-        (Outbox Dispatcher picks it up on next poll and transitions to QUEUED → PROCESSING)
+        DEAD_LETTER | COMPLETED → REPLAYED → PERSISTED
+        (Outbox Dispatcher picks it up on next poll: PERSISTED → QUEUED → PROCESSING)
+
+    The REPLAYED → PERSISTED step is an intentional bypass of the state machine:
+    REPLAYED is a momentary audit marker. The dispatcher re-enters the normal
+    lifecycle from PERSISTED so queued_at and processing_started_at are
+    freshly stamped on the new dispatch cycle.
     """
     from uuid import UUID
-    from app.events.lifecycle.manager import LifecycleManager
 
     try:
         uid = UUID(event_id)
@@ -111,21 +118,36 @@ async def replay_dlq_event(event_id: str, session: AsyncSession = Depends(get_db
     ):
         raise HTTPException(
             status_code=400,
-            detail=f"Event is in '{record.lifecycle_state}' state; only DEAD_LETTER or COMPLETED events can be replayed",
+            detail=(
+                f"Event is in '{record.lifecycle_state}' state; "
+                "only DEAD_LETTER or COMPLETED events can be replayed"
+            ),
         )
 
-    # DEAD_LETTER / COMPLETED → REPLAYED (state machine enforced)
-    await LifecycleManager._transition(session, uid, EventLifecycleState.REPLAYED)
-    # REPLAYED → PERSISTED so the Outbox Dispatcher picks it up on the next poll
-    # (Replayed events re-enter the pipeline from the beginning)
+    # Step 1 — DEAD_LETTER | COMPLETED → REPLAYED (via manager: validated + logged)
+    await LifecycleManager.replay(session, uid)
+
+    # Step 2 — REPLAYED → PERSISTED (intentional direct reset).
+    # REPLAYED is an audit marker only; the event must re-enter the outbox as
+    # PERSISTED so the dispatcher stamps a fresh queued_at on pickup.
+    # retry_count and error_detail are cleared so the event gets a clean slate.
     record.lifecycle_state = EventLifecycleState.PERSISTED.value
     record.retry_count = 0
     record.error_detail = None
     record.next_retry_at = None
+
+    logger.info(
+        "event_replay_reset_to_persisted",
+        event_id=event_id,
+        event_name=record.event_name,
+    )
+
     await session.commit()
 
     return {
         "status": "ok",
-        "message": f"Event {event_id} reset to PERSISTED — Outbox Dispatcher will re-queue it on the next poll",
+        "message": (
+            f"Event {event_id} reset to PERSISTED — "
+            "Outbox Dispatcher will re-queue it on the next poll"
+        ),
     }
-

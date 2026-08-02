@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
 
@@ -11,8 +10,9 @@ from app.events.model.base_event import UniversalBaseEvent
 from app.events.lifecycle.manager import LifecycleManager, InvalidLifecycleTransitionError
 from app.events.registry.registry import registry
 from app.events.bus.interfaces import ExecutionPolicy
+from app.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def _dispatch_async(event_id: UUID, max_retries: int) -> None:
     async with get_session() as session:
@@ -21,10 +21,18 @@ async def _dispatch_async(event_id: UUID, max_retries: int) -> None:
             record = await LifecycleManager.processing(session, event_id)
             await session.commit()
         except InvalidLifecycleTransitionError as e:
-            logger.warning(f"Skipping dispatch for {event_id}: {e}")
+            logger.warning(
+                "event_dispatch_skipped_invalid_transition",
+                event_id=str(event_id),
+                reason=str(e),
+            )
             return
         except ValueError as e:
-            logger.error(str(e))
+            logger.error(
+                "event_dispatch_record_not_found",
+                event_id=str(event_id),
+                reason=str(e),
+            )
             return
             
         try:
@@ -98,15 +106,33 @@ async def _dispatch_async(event_id: UUID, max_retries: int) -> None:
             if has_errors:
                 error_detail = "; ".join(error_messages)
                 if record.retry_count < max_retries:
-                    # Exponential backoff: 2^retry_count * 10 s (10s, 20s, 40s …)
+                    # Exponential backoff: 2^n * 10 s  → 10s, 20s, 40s, 80s …
+                    # retry_count is the CURRENT count (before increment); the
+                    # manager will increment it inside _transition().
                     delay_seconds = (2 ** record.retry_count) * 10
                     next_retry = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+                    logger.warning(
+                        "event_consumer_failure_retrying",
+                        event_id=str(event_id),
+                        event_name=record.event_name,
+                        retry_count=record.retry_count,
+                        delay_seconds=delay_seconds,
+                        next_retry_at=next_retry.isoformat(),
+                        error_detail=error_detail,
+                    )
                     await LifecycleManager.retry(
                         session, event_id,
                         next_retry_at=next_retry,
                         error_detail=error_detail,
                     )
                 else:
+                    logger.error(
+                        "event_consumer_failure_dead_lettered",
+                        event_id=str(event_id),
+                        event_name=record.event_name,
+                        retry_count=record.retry_count,
+                        error_detail=error_detail,
+                    )
                     await LifecycleManager.dead_letter(
                         session, event_id,
                         error_detail=f"Max retries exceeded: {error_detail}",
@@ -117,19 +143,37 @@ async def _dispatch_async(event_id: UUID, max_retries: int) -> None:
                 await session.commit()
 
         except Exception as e:
-            # Catch-all for unexpected orchestration errors (e.g. DB down mid-flight)
-            logger.error(f"Unexpected error orchestrating event {event_id}: {e}", exc_info=True)
+            # Catch-all for unexpected orchestration errors (e.g. DB unavailable
+            # mid-flight, event class not found, malformed payload, etc.).
+            logger.error(
+                "event_dispatch_orchestration_error",
+                event_id=str(event_id),
+                error=str(e),
+                exc_info=True,
+            )
             try:
                 record = await session.get(EventRecord, event_id)
                 if record and record.retry_count < max_retries:
                     delay_seconds = (2 ** record.retry_count) * 10
                     next_retry = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+                    logger.warning(
+                        "event_orchestration_failure_retrying",
+                        event_id=str(event_id),
+                        retry_count=record.retry_count,
+                        delay_seconds=delay_seconds,
+                        next_retry_at=next_retry.isoformat(),
+                    )
                     await LifecycleManager.retry(
                         session, event_id,
                         next_retry_at=next_retry,
                         error_detail=str(e),
                     )
                 else:
+                    logger.error(
+                        "event_orchestration_failure_dead_lettered",
+                        event_id=str(event_id),
+                        retry_count=record.retry_count if record else None,
+                    )
                     await LifecycleManager.dead_letter(
                         session, event_id,
                         error_detail=f"Max retries exceeded: {e}",
@@ -137,7 +181,9 @@ async def _dispatch_async(event_id: UUID, max_retries: int) -> None:
                 await session.commit()
             except Exception as inner_e:
                 logger.error(
-                    f"Failed to persist error state for event {event_id}: {inner_e}",
+                    "event_dispatch_state_persist_failed",
+                    event_id=str(event_id),
+                    error=str(inner_e),
                     exc_info=True,
                 )
 
