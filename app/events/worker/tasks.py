@@ -9,7 +9,8 @@ from app.events.store.models import EventRecord
 from app.events.model.base_event import UniversalBaseEvent
 from app.events.lifecycle.manager import LifecycleManager, InvalidLifecycleTransitionError
 from app.events.registry.registry import registry
-from app.events.bus.interfaces import ExecutionPolicy
+from app.events.worker.orchestrator import ConsumerOrchestrator
+from app.events.worker.planner import PlanBuilder
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -48,67 +49,35 @@ async def _dispatch_async(event_id: UUID, max_retries: int) -> None:
                     
             event = event_class(**event_dict)
             
-            # 3. Get consumers
+            # 3. Get consumers from registry
             consumer_types_or_instances = registry.get_consumers(event_class)
-            
-            ordered_consumers = []
-            parallel_consumers = []
-            background_consumers = []
-            
-            for item in consumer_types_or_instances:
-                # If it's a class (from @consume), instantiate it. If it's already an instance, use it.
-                consumer = item() if isinstance(item, type) else item
-                policy = consumer.get_execution_policy()
-                if policy in (ExecutionPolicy.ORDERED, ExecutionPolicy.CRITICAL):
-                    ordered_consumers.append(consumer)
-                elif policy == ExecutionPolicy.PARALLEL:
-                    parallel_consumers.append(consumer)
-                elif policy == ExecutionPolicy.BACKGROUND:
-                    background_consumers.append(consumer)
 
-            # Sort ordered by priority (highest first)
-            ordered_consumers.sort(key=lambda c: c.get_priority(), reverse=True)
-            
-            has_errors = False
-            error_messages = []
+            # Instantiate class-based consumers (@consume decorator registers types)
+            consumers = [
+                item() if isinstance(item, type) else item
+                for item in consumer_types_or_instances
+            ]
 
-            # 4. Execute Consumers
-            for consumer in ordered_consumers:
-                try:
-                    await consumer.handle_event(event)
-                except Exception as e:
-                    has_errors = True
-                    error_messages.append(f"{consumer.__class__.__name__}: {str(e)}")
-                    if consumer.get_execution_policy() == ExecutionPolicy.CRITICAL:
-                        break
+            # 4. Build execution plan via DAG / topological sort
+            plan = PlanBuilder.build(
+                event_name=record.event_name,
+                consumers=consumers,
+            )
 
-            if parallel_consumers and not has_errors:
-                results = await asyncio.gather(
-                    *[c.handle_event(event) for c in parallel_consumers],
-                    return_exceptions=True
-                )
-                for i, result in enumerate(results):
-                    if isinstance(result, Exception):
-                        has_errors = True
-                        error_messages.append(f"{parallel_consumers[i].__class__.__name__}: {str(result)}")
+            # 5. Execute all consumers stage-by-stage via the orchestration engine.
+            #    ConsumerOrchestrator handles bucketing by ExecutionPolicy,
+            #    topological stages, failure isolation, per-consumer timing,
+            #    and structured logs.
+            report = await ConsumerOrchestrator.run_plan(
+                event=event,
+                plan=plan,
+                event_id=event_id,
+            )
 
-            if background_consumers and not has_errors:
-                results = await asyncio.gather(
-                    *[c.handle_event(event) for c in background_consumers],
-                    return_exceptions=True
-                )
-                for i, result in enumerate(results):
-                    if isinstance(result, Exception):
-                        has_errors = True
-                        error_messages.append(f"{background_consumers[i].__class__.__name__}: {str(result)}")
-
-            # 5. Lifecycle Transition — direct from PROCESSING, no FAILED intermediate
-            if has_errors:
-                error_detail = "; ".join(error_messages)
+            # 5. Lifecycle Transition — driven by the execution report.
+            if report.has_errors:
+                error_detail = report.error_detail()
                 if record.retry_count < max_retries:
-                    # Exponential backoff: 2^n * 10 s  → 10s, 20s, 40s, 80s …
-                    # retry_count is the CURRENT count (before increment); the
-                    # manager will increment it inside _transition().
                     delay_seconds = (2 ** record.retry_count) * 10
                     next_retry = datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
                     logger.warning(

@@ -43,6 +43,29 @@ class EventConsumer(ABC):
         """
         return ExecutionPolicy.PARALLEL
 
+    def depends_on(self) -> List[Type["EventConsumer"]]:
+        """
+        Declares other consumer classes that must execute successfully before
+        this consumer is allowed to run.
+
+        The PlanBuilder uses this to construct a DAG and derive topologically-
+        sorted execution stages.  Consumers in earlier stages run first;
+        consumers in the same stage run concurrently (subject to their
+        ExecutionPolicy).
+
+        Rules:
+          • A dependency must also be registered for the same event class.
+          • Circular dependencies are detected at plan-build time and raise
+            PlanValidationFailed.
+          • Default is [] (no dependencies) — fully backward-compatible.
+
+        Example:
+            class AIConsumer(EventConsumer):
+                def depends_on(self):
+                    return [WebhookReceiveConsumer]
+        """
+        return []
+
     @abstractmethod
     def get_subscriptions(self) -> List[Type[UniversalBaseEvent]]:
         """

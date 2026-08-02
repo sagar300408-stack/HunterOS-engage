@@ -92,3 +92,53 @@ def bootstrap_event_consumers(registry: ConsumerRegistry):
     from app.domain.followup.consumers.followup_consumer import FollowUpExecutedConsumer
     _register(FollowUpExecutedConsumer())
 
+    # 10. Build DAG, Validate, and Log Execution Plans for all registered events
+    validate_and_log_startup_plans(registry)
+
+
+def validate_and_log_startup_plans(registry) -> dict:
+    """
+    Build, validate, and emit structured logs for all consumer execution plans
+    across every registered event class in the registry at application startup.
+    Ensures all dependencies, DAGs, and topological sort orders are valid before
+    the service accepts traffic.
+    """
+    from app.events.worker.planner import PlanBuilder
+    from app.utils.logger import get_logger
+
+    log = get_logger(__name__)
+    plans = {}
+
+    log.info(
+        "consumer_dag_startup_validation_starting",
+        registered_event_types=len(registry._subscriptions),
+    )
+
+    for event_class, raw_consumers in registry._subscriptions.items():
+        consumers = [
+            item() if isinstance(item, type) else item
+            for item in raw_consumers
+        ]
+        event_name = event_class.__name__
+        plan = PlanBuilder.build(event_name=event_name, consumers=consumers)
+        plans[event_name] = plan
+
+    log.info(
+        "consumer_dag_startup_validation_completed",
+        total_event_plans=len(plans),
+        total_consumers=sum(p.consumer_count for p in plans.values()),
+        plans={
+            name: {
+                "stage_count": p.stage_count,
+                "consumer_count": p.consumer_count,
+                "stages": [
+                    [c.__class__.__name__ for c in stage.consumers]
+                    for stage in p.stages
+                ],
+            }
+            for name, p in plans.items()
+        },
+    )
+
+    return plans
+
