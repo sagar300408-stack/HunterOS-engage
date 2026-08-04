@@ -119,6 +119,18 @@ class LifecycleManager:
             if error_detail:
                 record.error_detail = error_detail
 
+            # Record retry attempt in metadata_payload
+            meta = dict(record.metadata_payload or {})
+            retries = list(meta.get("retry_history", []))
+            retries.append({
+                "attempt": record.retry_count,
+                "timestamp": now.isoformat(),
+                "error_detail": error_detail,
+                "next_retry_at": next_retry_at.isoformat() if next_retry_at else None,
+            })
+            meta["retry_history"] = retries
+            record.metadata_payload = meta
+
         elif to_state == EventLifecycleState.DEAD_LETTER:
             # Terminal state — reuse completed_at as "finalized_at" so
             # observability queries can use a single column across outcomes.
@@ -130,16 +142,29 @@ class LifecycleManager:
             # Manual replay — clear stale error context so the event
             # re-enters the pipeline with a clean slate.
             record.error_detail = None
+            meta = dict(record.metadata_payload or {})
+            replays = list(meta.get("replay_history", []))
+            replays.append({
+                "replayed_at": now.isoformat(),
+                "from_state": from_state.value,
+            })
+            meta["replay_history"] = replays
+            record.metadata_payload = meta
 
         # ── Structured lifecycle log ───────────────────────────────────────────
         # Emitted after ALL mutations so the log reflects the final committed
         # state of the record. Fields are always present (None if not applicable)
         # to make log queries predictable and schema-stable.
+        trace_id = getattr(record, "trace_id", None) or str(record.event_id)
+        correlation_id = str(record.correlation_id) if record.correlation_id else None
+
         logger.info(
             "event_lifecycle_transition",
             event_id=str(event_id),
             event_name=record.event_name,
             workspace_id=str(record.workspace_id),
+            trace_id=trace_id,
+            correlation_id=correlation_id,
             from_state=from_state.value,
             to_state=to_state.value,
             retry_count=record.retry_count,
@@ -249,4 +274,6 @@ class LifecycleManager:
         triggers a replay. Clears error_detail so the event re-enters
         the pipeline with a clean slate.
         """
+        from app.events.observability.metrics import event_metrics
+        event_metrics.increment("replayed")
         return await cls._transition(session, event_id, EventLifecycleState.REPLAYED)

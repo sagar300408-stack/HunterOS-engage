@@ -14,9 +14,13 @@ def bootstrap_event_consumers(registry: ConsumerRegistry):
     with the HunterOS Consumer Registry.
     """
     def _register(consumer):
-        # Dynamically register based on the consumer's subscriptions
+        # Dynamically register based on the consumer's subscriptions (idempotently)
+        consumer_cls = consumer if isinstance(consumer, type) else consumer.__class__
         for event_class in consumer.get_subscriptions():
-            registry.register(event_class, consumer)
+            existing = registry.get_consumers(event_class)
+            existing_classes = {c if isinstance(c, type) else c.__class__ for c in existing}
+            if consumer_cls not in existing_classes:
+                registry.register(event_class, consumer)
             
     # 1. Register Projection Framework (Priority 50)
     projection_manager = ProjectionManager()
@@ -82,7 +86,7 @@ def bootstrap_event_consumers(registry: ConsumerRegistry):
     _register(AIProcessingConsumer())
     _register(ResponseConsumer())
     
-    # Antigravity explicit dependency injection convention
+    # Originyx explicit dependency injection convention
     wa_config = get_whatsapp_config()
     wa_client = WhatsAppClient(config=wa_config)
     wa_provider = WhatsAppProvider(client=wa_client)
@@ -140,5 +144,72 @@ def validate_and_log_startup_plans(registry) -> dict:
         },
     )
 
+    # ── Schema version registration & validation ──────────────────────────
+    # Scan every registered event class, extract the schema_version from its
+    # Pydantic field definition (supports both Pydantic v1 and v2), and
+    # register it with the schema_registry singleton so the registry knows
+    # the authoritative latest version for each event type.
+    # schema_registry.validate() then checks for missing upgrade paths,
+    # multiple terminal versions, etc.
+    _bootstrap_schema_registry(registry, log)
+
     return plans
 
+
+def _bootstrap_schema_registry(registry, log) -> None:
+    """
+    Register event schema versions from class definitions and run startup
+    validation on the schema registry.
+
+    This is called at the end of validate_and_log_startup_plans so both the
+    consumer DAG and the schema registry are fully verified before the service
+    starts accepting traffic.
+    """
+    from app.events.schema import schema_registry
+
+    log.info(
+        "schema_registry_bootstrap_starting",
+        event_types=len(registry._subscriptions),
+    )
+
+    for event_class in registry._subscriptions.keys():
+        event_name = event_class.__name__
+        version = _get_schema_version(event_class)
+        schema_registry.register_version(event_name, version)
+
+    log.info(
+        "schema_registry_bootstrap_completed",
+        registered_versions={
+            event_class.__name__: _get_schema_version(event_class)
+            for event_class in registry._subscriptions.keys()
+        },
+        schema_registry_state=schema_registry.describe(),
+    )
+
+    # Raises SchemaValidationFailed if any adapter graph is malformed
+    schema_registry.validate()
+
+
+def _get_schema_version(event_class) -> int:
+    """
+    Extract the schema_version default from a Pydantic event class.
+    Supports Pydantic v2 (model_fields) and Pydantic v1 (__fields__).
+    Falls back to 1 if the field is absent or its default is unresolvable.
+    """
+    # Pydantic v2
+    if hasattr(event_class, "model_fields"):
+        field = event_class.model_fields.get("schema_version")
+        if field is not None:
+            default = getattr(field, "default", None)
+            if isinstance(default, int):
+                return default
+
+    # Pydantic v1
+    if hasattr(event_class, "__fields__"):
+        field = event_class.__fields__.get("schema_version")
+        if field is not None:
+            default = getattr(field, "default", None)
+            if isinstance(default, int):
+                return default
+
+    return 1

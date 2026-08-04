@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 from app.api.v1.auth_deps import get_current_user
 from app.domain.security.models import User, UserRole
@@ -11,8 +11,11 @@ class TestDeveloperTools:
         
         with (
             patch("app.config.get_settings", return_value=mock_settings),
-            patch("app.integrations.postgres.database.create_tables"),
-            patch("app.integrations.postgres.database.dispose_engine"),
+            patch("app.main.get_settings", return_value=mock_settings),
+            patch("app.main.create_tables", new=AsyncMock()),
+            patch("app.main.dispose_engine", new=AsyncMock()),
+            patch("app.integrations.postgres.database.create_tables", new=AsyncMock()),
+            patch("app.integrations.postgres.database.dispose_engine", new=AsyncMock()),
         ):
             from app.main import create_app
             test_app = create_app()
@@ -28,8 +31,11 @@ class TestDeveloperTools:
         
         with (
             patch("app.config.get_settings", return_value=mock_settings),
-            patch("app.integrations.postgres.database.create_tables"),
-            patch("app.integrations.postgres.database.dispose_engine"),
+            patch("app.main.get_settings", return_value=mock_settings),
+            patch("app.main.create_tables", new=AsyncMock()),
+            patch("app.main.dispose_engine", new=AsyncMock()),
+            patch("app.integrations.postgres.database.create_tables", new=AsyncMock()),
+            patch("app.integrations.postgres.database.dispose_engine", new=AsyncMock()),
         ):
             from app.main import create_app
             test_app = create_app()
@@ -45,8 +51,11 @@ class TestDeveloperTools:
         
         with (
             patch("app.config.get_settings", return_value=mock_settings),
-            patch("app.integrations.postgres.database.create_tables"),
-            patch("app.integrations.postgres.database.dispose_engine"),
+            patch("app.main.get_settings", return_value=mock_settings),
+            patch("app.main.create_tables", new=AsyncMock()),
+            patch("app.main.dispose_engine", new=AsyncMock()),
+            patch("app.integrations.postgres.database.create_tables", new=AsyncMock()),
+            patch("app.integrations.postgres.database.dispose_engine", new=AsyncMock()),
         ):
             from app.main import create_app
             test_app = create_app()
@@ -62,8 +71,11 @@ class TestDeveloperTools:
         
         with (
             patch("app.config.get_settings", return_value=mock_settings),
-            patch("app.integrations.postgres.database.create_tables"),
-            patch("app.integrations.postgres.database.dispose_engine"),
+            patch("app.main.get_settings", return_value=mock_settings),
+            patch("app.main.create_tables", new=AsyncMock()),
+            patch("app.main.dispose_engine", new=AsyncMock()),
+            patch("app.integrations.postgres.database.create_tables", new=AsyncMock()),
+            patch("app.integrations.postgres.database.dispose_engine", new=AsyncMock()),
         ):
             from app.main import create_app
             test_app = create_app()

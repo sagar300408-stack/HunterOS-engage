@@ -4,7 +4,7 @@ Pytest configuration and shared fixtures for HunterOS Engage tests.
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 
 @pytest.fixture(scope="session")
@@ -30,19 +30,21 @@ def mock_settings():
 def client(mock_settings):
     """
     Return a FastAPI TestClient with settings and DB patched out.
-    Skips the lifespan (no DB connection required for unit tests).
+    Skips DB table creation and connection pool during unit tests.
     """
     with (
         patch("app.config.get_settings", return_value=mock_settings),
-        patch("app.integrations.postgres.database.create_tables"),
-        patch("app.integrations.postgres.database.dispose_engine"),
+        patch("app.main.get_settings", return_value=mock_settings),
+        patch("app.main.create_tables", new=AsyncMock()),
+        patch("app.main.dispose_engine", new=AsyncMock()),
+        patch("app.integrations.postgres.database.create_tables", new=AsyncMock()),
+        patch("app.integrations.postgres.database.dispose_engine", new=AsyncMock()),
     ):
         from app.main import create_app
         test_app = create_app()
 
-    # TestClient runs without triggering async lifespan by default
-    with TestClient(test_app, raise_server_exceptions=False) as c:
-        yield c
+        with TestClient(test_app, raise_server_exceptions=False) as c:
+            yield c
 
 
 @pytest.fixture

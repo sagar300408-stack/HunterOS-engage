@@ -75,8 +75,12 @@ async def lifespan(app: FastAPI):
         register_notification_bus_subscribers
     )
     for consumer in register_followup_subscribers():
+        consumer_cls = consumer if isinstance(consumer, type) else consumer.__class__
         for event_class in consumer.get_subscriptions():
-            registry.register(event_class, consumer)
+            existing = registry.get_consumers(event_class)
+            existing_classes = {c if isinstance(c, type) else c.__class__ for c in existing}
+            if consumer_cls not in existing_classes:
+                registry.register(event_class, consumer)
     register_notification_bus_subscribers()
         
     store_service = EventStoreService(EventStoreRepository())
@@ -87,13 +91,31 @@ async def lifespan(app: FastAPI):
     app.state.consumer_registry = registry
     app.state.context_resolver = context_resolver
     
-    # ── Startup Validation (Architecture Guard) ──────────────────────────────
+    # ── Startup Validation (Architecture, Idempotency & Partitioning Guards) ───────────────
+    from app.events.idempotency.validator import IdempotencyStartupValidator
+    IdempotencyStartupValidator.validate(engine=store_service.idempotency_engine)
+
+    from app.events.partitioning.validator import PartitionStartupValidator
+    PartitionStartupValidator.validate()
+
+    from app.events.priority.validator import PriorityStartupValidator
+    PriorityStartupValidator.validate()
+
+    from app.events.cluster.validator import ClusterStartupValidator
+    ClusterStartupValidator.validate()
+
+    from app.events.tracing.validator import TracingStartupValidator
+    TracingStartupValidator.validate()
+
+    from app.events.intelligence.validator import ExecutionIntelligenceStartupValidator
+    ExecutionIntelligenceStartupValidator.validate()
+
     from app.events.categories.conversation_events import CustomerRepliedEvent
     
     if not registry.get_consumers(CustomerRepliedEvent):
         raise RuntimeError("Architecture Violation: No consumers registered for CustomerRepliedEvent (Critical Path broken)")
         
-    logger.info("Startup validation passed: Critical event consumers are registered")
+    logger.info("Startup validation passed: Critical consumers, Idempotency Engine, Partitioning Engine, Priority Engine, Cluster Coordinator, Distributed Tracing, and Execution Intelligence are validated")
     
     logger.info("Event Bus initialized and subscribers registered")
 
@@ -255,6 +277,7 @@ def create_app() -> FastAPI:
     app.include_router(observability_router)
     
     from app.domain.reliability.router import router as reliability_router
+    app.include_router(reliability_router)
     app.include_router(reliability_router, prefix="/api/v1")
     
     from app.domain.pilot.router import router as pilot_router

@@ -1,27 +1,60 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from app.config import get_settings
+from app.events.cluster.coordinator import ClusterCoordinator
 from app.events.store.models import EventRecord
 from app.events.model.lifecycle import EventLifecycleState
 from app.events.lifecycle.manager import LifecycleManager
+from app.events.partitioning.scheduler import EnterprisePartitionScheduler
+from app.events.priority.aging import PriorityAgingEngine
+from app.events.priority.config import PriorityConfig
+from app.events.priority.context import SchedulingContext
+from app.events.priority.flow_control import FlowController
+from app.events.priority.health import QueueHealthMonitor
+from app.events.priority.scheduler import AbstractPriorityScheduler, DefaultPriorityScheduler
+from app.events.observability.metrics import event_metrics
 
 logger = logging.getLogger(__name__)
+
 
 class OutboxPoller:
     """
     Independent Outbox Dispatcher.
-    Polls the EventStore for PERSISTED or RETRYING events and dispatches them to Celery.
+    Polls the EventStore for PERSISTED or RETRYING events, applies:
+      1. ClusterCoordinator (deterministic consistent hash ring ownership filtering)
+      2. EnterprisePartitionScheduler (partition locks & fair allocation)
+      3. QueueHealthMonitor (real-time queue health & load state)
+      4. PriorityScheduler (interface-driven priority ordering & FIFO preservation)
+      5. FlowController (adaptive backpressure & overload protection)
+    and dispatches final planned events to Celery.
     """
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], celery_app):
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        celery_app,
+        coordinator: Optional[ClusterCoordinator] = None,
+        scheduler: Optional[EnterprisePartitionScheduler] = None,
+        priority_scheduler: Optional[AbstractPriorityScheduler] = None,
+        health_monitor: Optional[QueueHealthMonitor] = None,
+        flow_controller: Optional[FlowController] = None,
+        priority_config: Optional[PriorityConfig] = None,
+    ):
         self.settings = get_settings()
         self.session_factory = session_factory
         self.celery_app = celery_app
+        self.coordinator = coordinator
+        self.priority_config = priority_config or PriorityConfig.from_env()
+        self.scheduler = scheduler or EnterprisePartitionScheduler()
+        self.priority_scheduler = priority_scheduler or DefaultPriorityScheduler()
+        self.health_monitor = health_monitor or QueueHealthMonitor(self.priority_config)
+        self.flow_controller = flow_controller or FlowController(self.priority_config)
         self.poll_interval = self.settings.dispatcher_poll_interval
         self.batch_size = self.settings.dispatcher_batch_size
         self._stop_event = asyncio.Event()
@@ -50,15 +83,16 @@ class OutboxPoller:
         self._stop_event.set()
 
     async def poll_and_dispatch(self):
-        """Polls a batch of events and dispatches them to the broker."""
+        """
+        Polls candidate EventRecord rows with FOR UPDATE SKIP LOCKED,
+        applies Partition -> Priority -> Flow Control pipeline, and dispatches to Celery.
+        """
         async with self.session_factory() as session:
-            # We use FOR UPDATE SKIP LOCKED to ensure multiple dispatchers can run concurrently
-            # without row contention.
-            
             now = datetime.now(timezone.utc)
             
+            # 1. Select EventRecord entities directly (zero extra DB query needed)
             stmt = (
-                select(EventRecord.event_id)
+                select(EventRecord)
                 .where(
                     or_(
                         EventRecord.lifecycle_state == EventLifecycleState.PERSISTED.value,
@@ -72,50 +106,116 @@ class OutboxPoller:
                     )
                 )
                 .order_by(EventRecord.occurred_at.asc())
-                .limit(self.batch_size)
+                .limit(self.batch_size * 2)  # Pre-fetch candidate window
                 .with_for_update(skip_locked=True)
             )
             
             result = await session.execute(stmt)
-            event_ids = result.scalars().all()
+            candidate_records = list(result.scalars().all())
             
-            if not event_ids:
+            if not candidate_records:
                 return
+
+            # 2. Multi-Dispatcher Cluster Ownership Planning
+            if self.coordinator:
+                assignment_plan = self.coordinator.plan_local_assignments(candidate_records)
+                candidate_records = assignment_plan.assigned_events
+                event_metrics.set("dispatcher_assignments", assignment_plan.local_owned_count)
+                event_metrics.set("dispatcher_load", int(assignment_plan.local_ownership_ratio * 100))
+                if not candidate_records:
+                    logger.debug(
+                        f"All {assignment_plan.total_candidates} candidate events are owned by peer nodes in cluster."
+                    )
+                    return
             
-            logger.debug(f"Poller found {len(event_ids)} events to dispatch. Broker: {self.celery_app.conf.broker_url}")
+            # 3. Pure Execution Planning via Partition Scheduler
+            partition_plan = self.scheduler.plan_dispatch(
+                candidate_records, batch_size=self.batch_size * 2
+            )
             
-            for event_id in event_ids:
+            # 4. Compute Queue Health Snapshot
+            health_snapshot = self.health_monitor.compute_snapshot(candidate_records, now=now)
+
+            # 5. Build Immutable SchedulingContext
+            context = SchedulingContext(
+                candidate_records=candidate_records,
+                partition_plan=partition_plan,
+                queue_health=health_snapshot,
+                load_state=health_snapshot.system_load_state,
+                metrics_snapshot=event_metrics.get_snapshot(),
+                active_partitions={r.partition_key for r in candidate_records if r.partition_key},
+                retry_backlog_count=sum(1 for r in candidate_records if r.lifecycle_state == "RETRYING"),
+                config=self.priority_config,
+                current_time=now,
+                target_batch_size=self.batch_size,
+            )
+
+            # 6. Interface-Driven Priority Scheduler Planning
+            priority_plan = self.priority_scheduler.plan(context)
+
+            # 7. Adaptive Backpressure & Flow Control
+            flow_plan = self.flow_controller.apply_flow_control(
+                plan=priority_plan,
+                health=health_snapshot,
+                base_batch_size=self.batch_size,
+            )
+
+            # 7. Update Partition & Pipeline Telemetry Gauges
+            event_metrics.set("active_partitions", partition_plan.active_partition_count)
+            event_metrics.set("waiting_partitions", partition_plan.waiting_partition_count)
+            event_metrics.set("largest_partition", partition_plan.largest_partition_size)
+            event_metrics.increment("scheduler_cycles")
+            
+            if not flow_plan.dispatches_to_execute:
+                logger.debug("No eligible dispatches scheduled in this cycle.")
+                return
+
+            logger.debug(
+                f"Poller dispatching {len(flow_plan.dispatches_to_execute)} events "
+                f"({len(flow_plan.deferred_dispatches)} deferred, load_state={flow_plan.load_state.value}). "
+                f"Broker: {self.celery_app.conf.broker_url}"
+            )
+            
+            # 8. Dispatch Scheduled Events to Celery & Transition to QUEUED
+            for item in flow_plan.dispatches_to_execute:
                 try:
-                    logger.debug(f"Attempting to dispatch event {event_id} to Celery...")
+                    logger.debug(
+                        f"Dispatching event {item.event_id} (partition={item.partition_key}, "
+                        f"prio={item.base_priority.value}, eff={item.effective_weight}, "
+                        f"policy={item.ordering_policy.value})..."
+                    )
                     
-                    # 1. Enqueue to Broker
-                    # We use send_task to decouple from the actual task module
+                    # Enqueue to Broker
                     self.celery_app.send_task(
                         "app.events.worker.tasks.dispatch_event",
-                        args=[str(event_id)],
+                        args=[
+                            str(item.event_id),
+                            item.partition_key,
+                            item.ordering_policy.value,
+                            item.trace_id,
+                            item.lock_timeout_seconds,
+                        ],
                         queue="event_dispatch"
                     )
-                    logger.debug(f"Successfully sent event {event_id} to Celery broker.")
                     
-                    # 2. Transition State
-                    logger.debug(f"Transitioning event {event_id} to QUEUED...")
-                    await LifecycleManager.queue(session, event_id)
-                    logger.debug(f"Event {event_id} transitioned to QUEUED.")
+                    # Transition State
+                    await LifecycleManager.queue(session, item.event_id)
+
+                    # Priority telemetry counter
+                    prio_key = f"priority_{item.base_priority.value.lower()}_dispatched"
+                    try:
+                        event_metrics.increment(prio_key)
+                    except KeyError:
+                        pass
                     
                 except Exception as e:
                     logger.error(
-                        f"Failed to dispatch event {event_id}. "
+                        f"Failed to dispatch event {item.event_id}. "
                         f"Broker: {self.celery_app.conf.broker_url} | Error: {e}",
                         exc_info=True
                     )
-                    # If dispatch fails (e.g. Redis is down), we don't commit this row's change to QUEUED
-                    # The transaction will rollback at the end of the block or we can just ignore and retry later
-                    # Actually, if we raise, the whole batch rolls back.
-                    # Instead, we just let it rollback or proceed? 
-                    # For safety, we will re-raise so the whole batch rolls back and we try again.
                     raise
             
-            # Commit the batch
-            logger.debug(f"Committing batch of {len(event_ids)} events...")
+            # 9. Commit the batch
             await session.commit()
             logger.debug("Batch committed successfully.")

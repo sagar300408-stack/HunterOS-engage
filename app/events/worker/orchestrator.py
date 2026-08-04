@@ -40,6 +40,7 @@ import asyncio
 import time
 import traceback
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional, Sequence
 from uuid import UUID
@@ -85,10 +86,12 @@ class ConsumerResult:
     priority:       int
     status:         ConsumerStatus
     duration_ms:    int
-    stage_index:    Optional[int] = None
-    exception_type: Optional[str] = None
-    exception_msg:  Optional[str] = None
-    traceback:      Optional[str] = None
+    stage_index:    Optional[int]      = None
+    exception_type: Optional[str]      = None
+    exception_msg:  Optional[str]      = None
+    traceback:      Optional[str]      = None
+    started_at:     Optional[datetime] = None
+    finished_at:    Optional[datetime] = None
 
     @property
     def failed(self) -> bool:
@@ -102,6 +105,8 @@ class ConsumerResult:
             "stage":          self.stage_index,
             "status":         self.status.value,
             "duration_ms":    self.duration_ms,
+            "started_at":     self.started_at.isoformat() if self.started_at else None,
+            "finished_at":    self.finished_at.isoformat() if self.finished_at else None,
             "exception_type": self.exception_type,
             "exception_msg":  self.exception_msg,
         }
@@ -397,10 +402,26 @@ class ConsumerOrchestrator:
             stage=stage_index,
         )
 
+        from app.events.tracing import trace_manager
+        span = trace_manager.start_span(
+            component_name=f"consumer.{name}",
+            operation_name="handle_event",
+            tags={
+                "consumer_name": name,
+                "policy": policy.value,
+                "stage_index": stage_index,
+                "event_id": str(event_id),
+            },
+        )
+
+        started_at = datetime.now(timezone.utc)
         t0 = time.monotonic()
         try:
             await consumer.handle_event(event)
             duration_ms = int((time.monotonic() - t0) * 1000)
+            finished_at = datetime.now(timezone.utc)
+            if span:
+                trace_manager.finish_span(span)
             logger.info(
                 "consumer_completed",
                 event_id=str(event_id),
@@ -416,10 +437,15 @@ class ConsumerOrchestrator:
                 status=ConsumerStatus.SUCCESS,
                 duration_ms=duration_ms,
                 stage_index=stage_index,
+                started_at=started_at,
+                finished_at=finished_at,
             )
         except Exception as exc:
             duration_ms = int((time.monotonic() - t0) * 1000)
+            finished_at = datetime.now(timezone.utc)
             tb = traceback.format_exc()
+            if span:
+                trace_manager.finish_span(span, error=exc)
             logger.error(
                 "consumer_failed",
                 event_id=str(event_id),
@@ -441,6 +467,8 @@ class ConsumerOrchestrator:
                 exception_type=type(exc).__name__,
                 exception_msg=str(exc),
                 traceback=tb,
+                started_at=started_at,
+                finished_at=finished_at,
             )
 
     @classmethod

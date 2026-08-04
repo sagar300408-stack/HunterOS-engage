@@ -2,7 +2,8 @@ import pytest
 from datetime import datetime, timezone
 from uuid import uuid4
 from pydantic import ValidationError
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch, MagicMock
+from fastapi.testclient import TestClient
 
 from app.domain.scheduling.schemas import CreateEventRequest
 from app.domain.security.models import User
@@ -51,20 +52,7 @@ def test_schema_invalid_datetime_format():
 def test_api_naive_datetime_returns_422():
     """
     POST /api/v1/scheduling/events with a naive datetime must return HTTP 422.
-
-    Strategy:
-      - HTTPBearer requires an Authorization header, so we send a dummy token.
-      - We override get_current_user so the DB lookup is skipped and a valid
-        mock user is returned.
-      - require_permission("write_schedule") calls role_can(user.role, perm).
-        We use a MagicMock whose .role attribute returns a value that makes
-        role_can return True (easiest: mock role_can itself).
-      - With auth satisfied, FastAPI validates the request body and returns 422
-        because AwareDatetime rejects the naive datetime string.
     """
-    from unittest.mock import patch, MagicMock
-    from fastapi.testclient import TestClient
-
     mock_settings = MagicMock()
     mock_settings.whatsapp_verify_token = "x"
     mock_settings.whatsapp_access_token = "x"
@@ -81,46 +69,44 @@ def test_api_naive_datetime_returns_422():
 
     with (
         patch("app.config.get_settings", return_value=mock_settings),
-        patch("app.integrations.postgres.database.create_tables"),
-        patch("app.integrations.postgres.database.dispose_engine"),
+        patch("app.main.get_settings", return_value=mock_settings),
+        patch("app.main.create_tables", new=AsyncMock()),
+        patch("app.main.dispose_engine", new=AsyncMock()),
+        patch("app.integrations.postgres.database.create_tables", new=AsyncMock()),
+        patch("app.integrations.postgres.database.dispose_engine", new=AsyncMock()),
     ):
         from app.main import create_app
         test_app = create_app()
 
-    # Build a mock user; patch role_can to always return True
-    mock_user = MagicMock()
-    mock_user.id = uuid4()
-    mock_user.workspace_id = uuid4()
-    mock_user.is_active = True
+        # Build a mock user; patch role_can to always return True
+        mock_user = MagicMock()
+        mock_user.id = uuid4()
+        mock_user.workspace_id = uuid4()
+        mock_user.is_active = True
 
-    from app.api.v1.auth_deps import get_current_user
+        async def _mock_get_current_user():
+            return mock_user
 
-    async def _mock_get_current_user():
-        return mock_user
+        test_app.dependency_overrides[get_current_user] = _mock_get_current_user
 
-    test_app.dependency_overrides[get_current_user] = _mock_get_current_user
+        with (
+            patch("app.api.v1.auth_deps.role_can", return_value=True),
+            TestClient(test_app, raise_server_exceptions=False) as client,
+        ):
+            response = client.post(
+                "/api/v1/scheduling/events",
+                headers={"Authorization": "Bearer dummy-token-for-test"},
+                json={
+                    "event_type": "meeting",
+                    "title": "Naive test",
+                    "scheduled_for": "2026-07-24T14:25:00",  # no tz offset → 422
+                },
+            )
 
-    with (
-        patch("app.api.v1.auth_deps.role_can", return_value=True),
-        TestClient(test_app, raise_server_exceptions=False) as client,
-    ):
-        response = client.post(
-            "/api/v1/scheduling/events",
-            headers={"Authorization": "Bearer dummy-token-for-test"},
-            json={
-                "event_type": "meeting",
-                "title": "Naive test",
-                "scheduled_for": "2026-07-24T14:25:00",  # no tz offset → 422
-            },
+        test_app.dependency_overrides.clear()
+
+        assert response.status_code == 422, (
+            f"Expected 422 for naive datetime, got {response.status_code}: {response.text}"
         )
-
-    test_app.dependency_overrides.clear()
-
-    assert response.status_code == 422, (
-        f"Expected 422 for naive datetime, got {response.status_code}: {response.text}"
-    )
-    body = response.text.lower()
-    assert "timezone" in body or "input should have timezone info" in body
-
-
-
+        body = response.text.lower()
+        assert "timezone" in body or "input should have timezone info" in body
