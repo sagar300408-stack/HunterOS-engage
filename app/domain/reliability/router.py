@@ -691,6 +691,105 @@ async def get_intelligence_trends():
     return trends.to_dict()
 
 
+# ── Live Operational Diagnostics & Runtime Inspection Endpoints ─────────────
+
+@router.get("/reliability/runtime", summary="Get Complete Point-in-Time Runtime Snapshot")
+async def get_runtime_snapshot(session: AsyncSession = Depends(get_db)):
+    """
+    Returns a complete, consistent runtime snapshot across all event subsystems
+    generated from a single logical observation point (snapshot_id & snapshot_timestamp).
+    """
+    from app.events.diagnostics import diagnostics_engine
+
+    snapshot = await diagnostics_engine.get_runtime_snapshot(session=session)
+    return snapshot.model_dump()
+
+
+@router.get("/reliability/runtime/workers", summary="Get Live Worker Diagnostics")
+async def get_runtime_workers(session: AsyncSession = Depends(get_db)):
+    """
+    Returns live background worker diagnostics including active/idle counts,
+    utilization %, throughput, task assignments, and failure counts.
+    """
+    from app.events.diagnostics import diagnostics_engine
+
+    workers = await diagnostics_engine.get_worker_diagnostics(session=session)
+    return workers.model_dump()
+
+
+@router.get("/reliability/runtime/dispatchers", summary="Get Live Dispatcher Diagnostics")
+async def get_runtime_dispatchers(session: AsyncSession = Depends(get_db)):
+    """
+    Returns live outbox dispatcher diagnostics including active dispatchers,
+    leader status, poll frequency, scheduling latency, and queue depth.
+    """
+    from app.events.diagnostics import diagnostics_engine
+
+    dispatchers = await diagnostics_engine.get_dispatcher_diagnostics(session=session)
+    return dispatchers.model_dump()
+
+
+@router.get("/reliability/runtime/queues", summary="Get Live Queue Diagnostics")
+async def get_runtime_queues(session: AsyncSession = Depends(get_db)):
+    """
+    Returns live queue lifecycle distribution diagnostics across pending, queued,
+    processing, retrying, dead-letter, and replay states.
+    """
+    from app.events.diagnostics import diagnostics_engine
+
+    queues = await diagnostics_engine.get_queue_diagnostics(session=session)
+    return queues.model_dump()
+
+
+@router.get("/reliability/runtime/partitions", summary="Get Live Partition Diagnostics")
+async def get_runtime_partitions(session: AsyncSession = Depends(get_db)):
+    """
+    Returns live partition diagnostics including active/waiting counts, backlog depths,
+    hottest partitions, and oldest uncommitted event age.
+    """
+    from app.events.diagnostics import diagnostics_engine
+
+    partitions = await diagnostics_engine.get_partition_diagnostics(session=session)
+    return partitions.model_dump()
+
+
+@router.get("/reliability/runtime/locks", summary="Get Live Partition Lock Diagnostics")
+async def get_runtime_locks(session: AsyncSession = Depends(get_db)):
+    """
+    Returns live partition lock diagnostics including active leases, expired locks,
+    lock owner distributions, and contention counts.
+    """
+    from app.events.diagnostics import diagnostics_engine
+
+    locks = await diagnostics_engine.get_lock_diagnostics(session=session)
+    return locks.model_dump()
+
+
+@router.get("/reliability/runtime/consumers", summary="Get Live Consumer Diagnostics")
+async def get_runtime_consumers(session: AsyncSession = Depends(get_db)):
+    """
+    Returns live consumer diagnostics including execution counts, failure rates,
+    average and P95 latencies, slowest consumers, and dependency graph.
+    """
+    from app.events.diagnostics import diagnostics_engine
+
+    consumers = await diagnostics_engine.get_consumer_diagnostics(session=session)
+    return consumers.model_dump()
+
+
+@router.get("/reliability/runtime/health", summary="Get Live Runtime Health Summary")
+async def get_runtime_health(session: AsyncSession = Depends(get_db)):
+    """
+    Returns live runtime health summary with multi-dimensional subsystem scores,
+    resource utilization, capacity estimation, and early warning indicators.
+    """
+    from app.events.diagnostics import diagnostics_engine
+
+    health = await diagnostics_engine.get_runtime_health(session=session)
+    return health.model_dump()
+
+
+
 
 
 

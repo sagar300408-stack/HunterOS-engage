@@ -124,6 +124,15 @@ class MetricsSnapshot:
     partition_hotspots:                int = 0
     worker_hotspots:                   int = 0
     dispatcher_hotspots:               int = 0
+    # Runtime Diagnostics & Monitoring Metrics
+    dispatcher_utilization:            int = 0
+    consumer_utilization:              int = 0
+    partition_utilization:             int = 0
+    queue_utilization:                 int = 0
+    runtime_snapshot_requests:         int = 0
+    diagnostic_queries:                int = 0
+    health_checks:                     int = 0
+    active_runtime_objects:            int = 0
 
     @property
     def duplicate_rate(self) -> float:
@@ -212,6 +221,14 @@ class MetricsSnapshot:
             "partition_hotspots":                self.partition_hotspots,
             "worker_hotspots":                   self.worker_hotspots,
             "dispatcher_hotspots":               self.dispatcher_hotspots,
+            "dispatcher_utilization":            self.dispatcher_utilization,
+            "consumer_utilization":              self.consumer_utilization,
+            "partition_utilization":             self.partition_utilization,
+            "queue_utilization":                 self.queue_utilization,
+            "runtime_snapshot_requests":         self.runtime_snapshot_requests,
+            "diagnostic_queries":                self.diagnostic_queries,
+            "health_checks":                     self.health_checks,
+            "active_runtime_objects":            self.active_runtime_objects,
         }
 
 
@@ -291,6 +308,15 @@ _COUNTER_KEYS = (
     "partition_hotspots",
     "worker_hotspots",
     "dispatcher_hotspots",
+    # Runtime Diagnostics Keys
+    "dispatcher_utilization",
+    "consumer_utilization",
+    "partition_utilization",
+    "queue_utilization",
+    "runtime_snapshot_requests",
+    "diagnostic_queries",
+    "health_checks",
+    "active_runtime_objects",
 )
 
 # Canonical map for alias normalization
@@ -362,6 +388,61 @@ class EventMetrics:
         """Atomically records generated recommendations count."""
         with self._lock:
             self._counters["recommendations_generated"] += count
+
+    def set_worker_utilization(self, val: int) -> None:
+        """Atomically set worker utilization gauge."""
+        with self._lock:
+            self._counters["worker_utilization"] = max(0, min(100, val))
+
+    def set_dispatcher_utilization(self, val: int) -> None:
+        """Atomically set dispatcher utilization gauge."""
+        with self._lock:
+            self._counters["dispatcher_utilization"] = max(0, min(100, val))
+
+    def set_consumer_utilization(self, val: int) -> None:
+        """Atomically set consumer utilization gauge."""
+        with self._lock:
+            self._counters["consumer_utilization"] = max(0, min(100, val))
+
+    def set_partition_utilization(self, val: int) -> None:
+        """Atomically set partition utilization gauge."""
+        with self._lock:
+            self._counters["partition_utilization"] = max(0, min(100, val))
+
+    def set_queue_utilization(self, val: int) -> None:
+        """Atomically set queue utilization gauge."""
+        with self._lock:
+            self._counters["queue_utilization"] = max(0, min(100, val))
+
+    def record_runtime_snapshot_request(self, count: int = 1) -> None:
+        """Atomically record runtime snapshot requests."""
+        with self._lock:
+            self._counters["runtime_snapshot_requests"] += count
+
+    def record_diagnostic_query(self, count: int = 1) -> None:
+        """Atomically record diagnostic query requests."""
+        with self._lock:
+            self._counters["diagnostic_queries"] += count
+
+    def record_health_check(self, count: int = 1) -> None:
+        """Atomically record runtime health checks."""
+        with self._lock:
+            self._counters["health_checks"] += count
+
+    def set_active_runtime_objects(self, val: int) -> None:
+        """Atomically set active runtime objects gauge."""
+        with self._lock:
+            self._counters["active_runtime_objects"] = max(0, val)
+
+    def set_queue_health_score(self, val: int) -> None:
+        """Atomically set queue health score gauge."""
+        with self._lock:
+            self._counters["queue_health_score"] = max(0, min(100, val))
+
+    def set_cluster_health_score(self, val: int) -> None:
+        """Atomically set cluster health score gauge."""
+        with self._lock:
+            self._counters["cluster_health_score"] = max(0, min(100, val))
 
     def snapshot(self) -> MetricsSnapshot:
         """Return an immutable point-in-time copy of all counters."""
@@ -437,6 +518,14 @@ class EventMetrics:
                 partition_hotspots=c["partition_hotspots"],
                 worker_hotspots=c["worker_hotspots"],
                 dispatcher_hotspots=c["dispatcher_hotspots"],
+                dispatcher_utilization=c["dispatcher_utilization"],
+                consumer_utilization=c["consumer_utilization"],
+                partition_utilization=c["partition_utilization"],
+                queue_utilization=c["queue_utilization"],
+                runtime_snapshot_requests=c["runtime_snapshot_requests"],
+                diagnostic_queries=c["diagnostic_queries"],
+                health_checks=c["health_checks"],
+                active_runtime_objects=c["active_runtime_objects"],
             )
 
     def get_snapshot(self) -> MetricsSnapshot:

@@ -110,12 +110,15 @@ async def lifespan(app: FastAPI):
     from app.events.intelligence.validator import ExecutionIntelligenceStartupValidator
     ExecutionIntelligenceStartupValidator.validate()
 
+    from app.events.diagnostics import diagnostics_engine, DiagnosticsStartupValidator
+    DiagnosticsStartupValidator(diagnostics_engine).validate_sync()
+
     from app.events.categories.conversation_events import CustomerRepliedEvent
     
     if not registry.get_consumers(CustomerRepliedEvent):
         raise RuntimeError("Architecture Violation: No consumers registered for CustomerRepliedEvent (Critical Path broken)")
         
-    logger.info("Startup validation passed: Critical consumers, Idempotency Engine, Partitioning Engine, Priority Engine, Cluster Coordinator, Distributed Tracing, and Execution Intelligence are validated")
+    logger.info("Startup validation passed: Critical consumers, Idempotency Engine, Partitioning Engine, Priority Engine, Cluster Coordinator, Distributed Tracing, Execution Intelligence, and Live Diagnostics are validated")
     
     logger.info("Event Bus initialized and subscribers registered")
 
