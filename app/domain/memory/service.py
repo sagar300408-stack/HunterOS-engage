@@ -1,494 +1,470 @@
 """
-memory_service — Customer memory management.
+HunterOS Engage — Memory Domain Service Implementation (CQRS Orchestrator)
 
-Public API (stable — no later phase queries the DB directly):
-    get_customer_memory(session, customer_id)  -> CustomerMemory | None
-    get_or_create_memory(session, customer_id) -> CustomerMemory
-    update_customer_memory(session, customer_id, conversation_history, ai_response, trigger)
-    build_ai_context(session, customer_id, customer_name) -> list[dict]
-    append_memory_event(session, customer_id, event_type, payload) -> CustomerMemoryEvent
-
-Internal helpers:
-    _should_update_memory(message_count, ai_response, interval) -> bool
-    _snapshot_memory_version(session, memory) -> None
-    _extract_memory_with_ai(conversation_history, current_memory) -> dict
-    _detect_significant_fact(ai_response) -> bool
-
-Design:
-    - Memory is updated every N messages (configurable) OR immediately when
-      a significant business fact is detected in the AI response.
-    - Before every update the current state is snapped to customer_memory_versions.
-    - All AI extractions carry confidence scores. Only facts >= 0.85 enter AI context.
-    - The AI context is injected as a system message list in a fixed 4-block order:
-        Profile → Structured Memory → Rolling Summary → (recent msgs handled by pipeline)
+Orchestrates foundational customer memory operations by routing:
+  - State mutations (Commands) -> MemoryCommandBus / Command Handlers
+  - Queries (Reads)           -> SqlAlchemyMemoryReadRepository
 """
 
-import json
+import copy
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
-from app.utils.clock import SystemClock
 
-from openai import AsyncOpenAI
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.memory.audit.service import (
+    MemoryAuditService,
+    compute_memory_diff,
+    compute_snapshot_hash,
+    deep_merge_dicts,
+    get_memory_audit_service,
+    map_field_path_to_category,
+)
+from app.domain.memory.commands.bus import MemoryCommandBus, get_memory_command_bus
+from app.domain.memory.commands.models import (
+    ArchiveMemoryCommand,
+    ChangeStatusCommand,
+    CreateMemoryCommand,
+    DeleteMemoryCommand,
+    LockMemoryCommand,
+    ReplaceMemoryCommand,
+    RestoreMemoryCommand,
+    UnlockMemoryCommand,
+    UpdateMemoryCommand,
+)
+from app.domain.memory.interfaces.read_repository import AbstractMemoryReadRepository
+from app.domain.memory.interfaces.service import AbstractMemoryService
 from app.domain.memory.models import (
     CustomerMemory,
-    CustomerMemoryEvent,
+    CustomerMemoryTimelineEvent,
     CustomerMemoryVersion,
-    MemoryEventType,
+    LifecycleStatus,
+    MemoryChangeLog,
+    MemoryDomainError,
 )
+from app.domain.memory.repositories.read_repository import SqlAlchemyMemoryReadRepository
+from app.domain.memory.schemas import (
+    CustomerMemoryBulkCreateRequest,
+    CustomerMemoryBulkGetRequest,
+    CustomerMemoryBulkUpdateRequest,
+    CustomerMemoryCreateRequest,
+    CustomerMemoryHistoryResponse,
+    CustomerMemoryReplaceRequest,
+    CustomerMemoryResponse,
+    CustomerMemorySearchResponse,
+    CustomerMemorySearchResultItem,
+    CustomerMemoryTimelineEventResponse,
+    CustomerMemoryUpdateRequest,
+    CustomerMemoryVersionResponse,
+    MemoryChangeLogResponse,
+    MemoryPayloadSchema,
+    MemorySearchRequest,
+    MemoryTimelineFilterRequest,
+)
+from app.domain.memory.graph.facade import KnowledgeGraphFacade
+from app.domain.memory.queries.facade import MemoryQueryFacade
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Facts that trigger an immediate memory update regardless of message count
-_SIGNIFICANT_FACT_KEYWORDS = [
-    # Budget signals
-    "lakh", "lakhs", "₹", "crore", "budget", "afford", "price range",
-    "usd", "dollar", "$", "inr", "rs.", "rupee",
-    # Timeline signals
-    "months", "weeks", "years", "immediate", "asap", "urgently",
-    "planning to", "looking to buy", "want to buy", "ready to",
-    # Interest signals
-    "interested in", "looking for", "want a", "need a",
-    "apartment", "villa", "plot", "office", "flat", "bhk",
-    "commercial", "residential", "warehouse",
-    # Location signals
-    "bangalore", "mumbai", "delhi", "hyderabad", "pune", "chennai",
-    "area", "location", "neighbourhood", "north", "south",
-    # Appointment signals
-    "appointment", "visit", "meeting", "schedule", "call me",
-    "available", "free on",
-]
 
-# Confidence threshold for injecting facts into AI context
-_CONFIDENCE_THRESHOLD_AUTO = 0.85
-
-
-# ── Public API ────────────────────────────────────────────────────────────────
-
-async def get_customer_memory(
-    session: AsyncSession,
-    customer_id: UUID,
-) -> Optional[CustomerMemory]:
-    """Return the current CustomerMemory row, or None if not yet created."""
-    result = await session.execute(
-        select(CustomerMemory).where(CustomerMemory.customer_id == customer_id)
-    )
-    return result.scalar_one_or_none()
-
-
-async def get_or_create_memory(
-    session: AsyncSession,
-    customer_id: UUID,
-) -> CustomerMemory:
+class MemoryService(AbstractMemoryService):
     """
-    Return the CustomerMemory row, creating an empty one if absent.
-    Safe to call on every message — idempotent.
+    Unified CQRS Orchestrator for Memory Domain.
     """
-    memory = await get_customer_memory(session, customer_id)
 
-    if not memory:
-        memory = CustomerMemory(
+    def __init__(
+        self,
+        command_bus: Optional[MemoryCommandBus] = None,
+        read_repo: Optional[AbstractMemoryReadRepository] = None,
+        audit_service: Optional[MemoryAuditService] = None,
+        query_facade: Optional[MemoryQueryFacade] = None,
+        knowledge_graph: Optional[KnowledgeGraphFacade] = None,
+    ) -> None:
+        self._command_bus = command_bus or get_memory_command_bus()
+        self._read_repo = read_repo or SqlAlchemyMemoryReadRepository()
+        self._audit_service = audit_service or get_memory_audit_service()
+        self._query_facade = query_facade or MemoryQueryFacade(self._read_repo)
+        self._knowledge_graph = knowledge_graph or KnowledgeGraphFacade()
+
+    @property
+    def query_facade(self) -> MemoryQueryFacade:
+        """Access underlying Query Facade."""
+        return self._query_facade
+
+    @property
+    def knowledge_graph(self) -> KnowledgeGraphFacade:
+        """Access underlying Business Knowledge Graph Facade."""
+        return self._knowledge_graph
+
+    # ── Command Methods (Mutations) ───────────────────────────────────────────
+
+    async def create_customer_memory(
+        self, request: CustomerMemoryCreateRequest, session: AsyncSession
+    ) -> CustomerMemory:
+        """Initialize structured customer memory aggregate."""
+        if isinstance(request.memory_payload, MemoryPayloadSchema):
+            payload_dict = request.memory_payload.model_dump(mode="json")
+        elif isinstance(request.memory_payload, dict):
+            payload_dict = request.memory_payload
+        else:
+            payload_dict = MemoryPayloadSchema().model_dump(mode="json")
+
+        cmd = CreateMemoryCommand(
+            customer_id=request.customer_id,
+            workspace_id=request.workspace_id,
+            memory_payload=payload_dict,
+            source=request.source,
+            created_by=request.created_by,
+            idempotency_key=request.idempotency_key,
+        )
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            # Cached response returned from idempotency record
+            return await self._read_repo.get_by_customer_id(session, request.customer_id)
+        return res
+
+    async def update_customer_memory(
+        self,
+        customer_id: UUID,
+        request: CustomerMemoryUpdateRequest,
+        session: AsyncSession,
+    ) -> CustomerMemory:
+        """Update memory fields with automatic versioning (PATCH)."""
+        cmd = UpdateMemoryCommand(
             customer_id=customer_id,
-            summary=None,
-            structured_data={},
-            message_count=0,
+            workspace_id=request.workspace_id,
+            memory_payload=request.memory_payload or {},
+            reason=request.reason,
+            trigger=request.trigger,
+            changed_module=request.changed_module,
+            actor=request.changed_by or request.changed_module,
+            expected_revision_id=request.expected_revision_id,
+            expected_version=request.expected_version,
+            idempotency_key=request.idempotency_key,
         )
-        session.add(memory)
-        await session.flush()
-        logger.info("customer_memory_created", customer_id=str(customer_id))
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            return await self._read_repo.get_by_customer_id(session, customer_id)
+        return res
 
-    return memory
-
-
-async def build_ai_context(
-    session: AsyncSession,
-    customer_id: UUID,
-    customer_name: Optional[str] = None,
-) -> list[dict]:
-    """
-    Build the 4-block AI context prepended before every OpenAI call.
-
-    Returns an ordered list of OpenAI-compatible system message dicts:
-        Block 1 — Customer Profile
-        Block 2 — Structured Memory (high-confidence facts only)
-        Block 3 — Rolling Summary (if exists)
-
-    Recent conversation messages are added separately by the pipeline.
-    Returns [] for brand-new customers with no memory yet.
-    """
-    memory = await get_customer_memory(session, customer_id)
-
-    if not memory or (not memory.summary and not memory.structured_data):
-        logger.debug(
-            "memory_context_empty",
-            customer_id=str(customer_id),
-            reason="no_memory_yet",
+    async def replace_customer_memory(
+        self,
+        customer_id: UUID,
+        request: CustomerMemoryReplaceRequest,
+        session: AsyncSession,
+    ) -> CustomerMemory:
+        """Completely replace memory payload (PUT)."""
+        payload_dict = (
+            request.memory_payload.model_dump(mode="json")
+            if isinstance(request.memory_payload, MemoryPayloadSchema)
+            else request.memory_payload
         )
-        return []
+        cmd = ReplaceMemoryCommand(
+            customer_id=customer_id,
+            workspace_id=request.workspace_id,
+            memory_payload=payload_dict,
+            reason=request.reason,
+            trigger=request.trigger,
+            changed_module=request.changed_module,
+            actor=request.changed_by or request.changed_module,
+            expected_revision_id=request.expected_revision_id,
+            expected_version=request.expected_version,
+            idempotency_key=request.idempotency_key,
+        )
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            return await self._read_repo.get_by_customer_id(session, customer_id)
+        return res
 
-    context_blocks: list[dict] = []
+    async def soft_delete_memory(
+        self,
+        customer_id: UUID,
+        reason: Optional[str] = None,
+        changed_by: Optional[str] = None,
+        session: AsyncSession = None,
+    ) -> CustomerMemory:
+        """Soft-delete memory record."""
+        cmd = DeleteMemoryCommand(
+            customer_id=customer_id,
+            reason=reason or "Customer memory soft-deleted",
+            actor=changed_by or "API",
+        )
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            return await self._read_repo.get_by_customer_id(session, customer_id, include_deleted=True)
+        return res
 
-    # ── Block 1: Customer Profile ─────────────────────────────────────────────
-    profile_parts = []
-    if customer_name:
-        profile_parts.append(f"Customer name: {customer_name}")
-    profile_parts.append(f"Total interactions: {memory.message_count}")
+    async def restore_memory(
+        self,
+        customer_id: UUID,
+        changed_by: Optional[str] = None,
+        session: AsyncSession = None,
+    ) -> CustomerMemory:
+        """Restore soft-deleted memory record."""
+        cmd = RestoreMemoryCommand(
+            customer_id=customer_id,
+            reason="Customer memory restored",
+            actor=changed_by or "API",
+        )
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            return await self._read_repo.get_by_customer_id(session, customer_id)
+        return res
 
-    context_blocks.append({
-        "role": "system",
-        "content": "CUSTOMER PROFILE:\n" + "\n".join(profile_parts),
-    })
+    async def change_lifecycle_status(
+        self,
+        customer_id: UUID,
+        target_status: LifecycleStatus,
+        reason: Optional[str] = None,
+        changed_by: Optional[str] = None,
+        session: AsyncSession = None,
+    ) -> CustomerMemory:
+        """Transition customer memory lifecycle status."""
+        cmd = ChangeStatusCommand(
+            customer_id=customer_id,
+            target_status=target_status,
+            reason=reason,
+            actor=changed_by or "API",
+        )
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            return await self._read_repo.get_by_customer_id(session, customer_id, include_deleted=True)
+        return res
 
-    # ── Block 2: Structured Memory (high-confidence facts only) ───────────────
-    structured = memory.structured_data or {}
-    fact_lines = []
+    async def lock_memory(
+        self,
+        customer_id: UUID,
+        reason: Optional[str] = "Administrative lock",
+        changed_by: Optional[str] = None,
+        session: AsyncSession = None,
+    ) -> CustomerMemory:
+        """Lock customer memory."""
+        cmd = LockMemoryCommand(
+            customer_id=customer_id,
+            reason=reason,
+            actor=changed_by or "API",
+        )
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            return await self._read_repo.get_by_customer_id(session, customer_id)
+        return res
 
-    # Budget
-    budget = structured.get("budget")
-    if budget and isinstance(budget, dict):
-        if budget.get("confidence", 0) >= _CONFIDENCE_THRESHOLD_AUTO:
-            fact_lines.append(f"- Budget: {budget['value']}")
+    async def unlock_memory(
+        self,
+        customer_id: UUID,
+        reason: Optional[str] = "Administrative unlock",
+        changed_by: Optional[str] = None,
+        session: AsyncSession = None,
+    ) -> CustomerMemory:
+        """Unlock customer memory."""
+        cmd = UnlockMemoryCommand(
+            customer_id=customer_id,
+            reason=reason,
+            actor=changed_by or "API",
+        )
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            return await self._read_repo.get_by_customer_id(session, customer_id)
+        return res
 
-    # Timeline
-    timeline = structured.get("timeline")
-    if timeline and isinstance(timeline, dict):
-        if timeline.get("confidence", 0) >= _CONFIDENCE_THRESHOLD_AUTO:
-            fact_lines.append(f"- Purchase timeline: {timeline['value']}")
+    async def archive_memory(
+        self,
+        customer_id: UUID,
+        reason: Optional[str] = "Archival transition",
+        changed_by: Optional[str] = None,
+        session: AsyncSession = None,
+    ) -> CustomerMemory:
+        """Archive customer memory."""
+        cmd = ArchiveMemoryCommand(
+            customer_id=customer_id,
+            reason=reason,
+            actor=changed_by or "API",
+        )
+        res = await self._command_bus.execute(session, cmd)
+        if isinstance(res, dict):
+            return await self._read_repo.get_by_customer_id(session, customer_id)
+        return res
 
-    # Preferred location
-    location = structured.get("preferred_location")
-    if location and isinstance(location, dict):
-        if location.get("confidence", 0) >= _CONFIDENCE_THRESHOLD_AUTO:
-            fact_lines.append(f"- Preferred location: {location['value']}")
+    async def bulk_create_memories(
+        self, requests: List[CustomerMemoryCreateRequest], session: AsyncSession
+    ) -> List[CustomerMemory]:
+        """Bulk initialize customer memories."""
+        results: List[CustomerMemory] = []
+        for req in requests:
+            mem = await self.create_customer_memory(req, session=session)
+            results.append(mem)
+        return results
 
-    # Interests
-    interests = structured.get("interests", [])
-    if isinstance(interests, list):
-        high_conf_interests = [
-            i["value"] for i in interests
-            if isinstance(i, dict) and i.get("confidence", 0) >= _CONFIDENCE_THRESHOLD_AUTO
+    async def bulk_update_memories(
+        self, requests: List[Any], session: AsyncSession
+    ) -> List[CustomerMemory]:
+        """Bulk update customer memories."""
+        results: List[CustomerMemory] = []
+        for item in requests:
+            cust_id = item.customer_id
+            update_data = item.update_data
+            mem = await self.update_customer_memory(cust_id, update_data, session=session)
+            results.append(mem)
+        return results
+
+    # ── Query Methods (Reads) ─────────────────────────────────────────────────
+
+    async def get_customer_memory(
+        self,
+        customer_id: UUID,
+        include_deleted: bool = False,
+        session: AsyncSession = None,
+    ) -> Optional[CustomerMemory]:
+        """Retrieve customer memory record."""
+        if not session:
+            raise ValueError("AsyncSession is required")
+        return await self._read_repo.get_by_customer_id(
+            session, customer_id, include_deleted=include_deleted
+        )
+
+    async def bulk_get_memories(
+        self,
+        customer_ids: List[UUID],
+        include_deleted: bool = False,
+        session: AsyncSession = None,
+    ) -> List[CustomerMemory]:
+        """Bulk retrieve customer memories."""
+        return await self._read_repo.bulk_get(
+            session, customer_ids, include_deleted=include_deleted
+        )
+
+    async def get_timeline(
+        self,
+        customer_id: UUID,
+        category: Optional[str] = None,
+        event_type: Optional[str] = None,
+        importance: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        page: int = 1,
+        page_size: int = 50,
+        session: AsyncSession = None,
+    ) -> Tuple[List[CustomerMemoryTimelineEvent], int]:
+        """Retrieve paginated timeline events."""
+        return await self._read_repo.get_timeline(
+            session=session,
+            customer_id=customer_id,
+            category=category,
+            event_type=event_type,
+            importance=importance,
+            start_time=start_time,
+            end_time=end_time,
+            page=page,
+            page_size=page_size,
+        )
+
+    async def get_versions(
+        self,
+        customer_id: UUID,
+        page: int = 1,
+        page_size: int = 50,
+        session: AsyncSession = None,
+    ) -> Tuple[List[CustomerMemoryVersion], int]:
+        """Retrieve paginated version history."""
+        return await self._read_repo.get_versions(
+            session=session,
+            customer_id=customer_id,
+            page=page,
+            page_size=page_size,
+        )
+
+    async def get_version_by_number(
+        self, customer_id: UUID, version_number: int, session: AsyncSession = None
+    ) -> Optional[CustomerMemoryVersion]:
+        """Retrieve specific historical version snapshot."""
+        return await self._read_repo.get_version_by_number(
+            session=session,
+            customer_id=customer_id,
+            version_number=version_number,
+        )
+
+    async def get_change_logs(
+        self,
+        customer_id: UUID,
+        version_number: Optional[int] = None,
+        field_path: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 100,
+        session: AsyncSession = None,
+    ) -> Tuple[List[MemoryChangeLog], int]:
+        """Retrieve granular field-level change history."""
+        return await self._read_repo.get_change_logs(
+            session=session,
+            customer_id=customer_id,
+            version_number=version_number,
+            field_path=field_path,
+            page=page,
+            page_size=page_size,
+        )
+
+    async def get_customer_memory_history(
+        self, customer_id: UUID, session: AsyncSession = None
+    ) -> CustomerMemoryHistoryResponse:
+        """
+        Unified history query returning current memory state, timeline,
+        versions, and change logs in a single payload.
+        """
+        memory = await self._read_repo.get_by_customer_id(session, customer_id, include_deleted=True)
+        timeline_events, _ = await self._read_repo.get_timeline(session, customer_id=customer_id, page=1, page_size=50)
+        versions, _ = await self._read_repo.get_versions(session, customer_id=customer_id, page=1, page_size=50)
+        change_logs, _ = await self._read_repo.get_change_logs(session, customer_id=customer_id, page=1, page_size=100)
+
+        mem_resp = CustomerMemoryResponse.model_validate(memory) if memory else None
+        timeline_resps = [CustomerMemoryTimelineEventResponse.model_validate(e) for e in timeline_events]
+        version_resps = [CustomerMemoryVersionResponse.model_validate(v) for v in versions]
+        log_resps = [MemoryChangeLogResponse.model_validate(l) for l in change_logs]
+
+        return CustomerMemoryHistoryResponse(
+            memory=mem_resp,
+            timeline=timeline_resps,
+            versions=version_resps,
+            change_logs=log_resps,
+        )
+
+    async def search_memory(
+        self, request: MemorySearchRequest, session: AsyncSession = None
+    ) -> CustomerMemorySearchResponse:
+        """Execute multi-criteria search over memory records."""
+        items, total = await self._read_repo.search(
+            session=session,
+            workspace_id=request.workspace_id,
+            search_term=request.search_term,
+            current_stage=request.current_stage,
+            tags=request.tags,
+            location_city=request.location_city,
+            min_budget=request.min_budget,
+            max_budget=request.max_budget,
+            property_types=request.property_types,
+            lifecycle_status=request.lifecycle_status,
+            page=request.page,
+            page_size=request.page_size,
+        )
+
+        result_items = [
+            CustomerMemorySearchResultItem(
+                id=m.id,
+                customer_id=m.customer_id,
+                workspace_id=m.workspace_id,
+                version_number=m.version_number,
+                revision_id=m.revision_id,
+                lifecycle_status=m.lifecycle_status,
+                memory_payload=m.memory_payload,
+                created_at=m.created_at,
+                updated_at=m.updated_at,
+            )
+            for m in items
         ]
-        if high_conf_interests:
-            fact_lines.append(f"- Interests: {', '.join(high_conf_interests)}")
 
-    if fact_lines:
-        context_blocks.append({
-            "role": "system",
-            "content": "KNOWN CUSTOMER FACTS (high-confidence):\n" + "\n".join(fact_lines),
-        })
-
-    # ── Block 3: Rolling Summary ──────────────────────────────────────────────
-    if memory.summary:
-        context_blocks.append({
-            "role": "system",
-            "content": f"CONVERSATION HISTORY SUMMARY:\n{memory.summary}",
-        })
-
-    logger.debug(
-        "memory_context_built",
-        customer_id=str(customer_id),
-        blocks=len(context_blocks),
-        has_summary=bool(memory.summary),
-        fact_count=len(fact_lines),
-    )
-
-    return context_blocks
-
-
-async def update_customer_memory(
-    session: AsyncSession,
-    customer_id: UUID,
-    conversation_history: list[dict],
-    ai_response: str,
-    trigger: str = "interval",
-) -> None:
-    """
-    Update the customer memory after a significant interaction.
-
-    Flow:
-        1. Get/create memory row
-        2. Snapshot current state to customer_memory_versions (immutable archive)
-        3. Call OpenAI extraction prompt to generate new summary + structured fields
-        4. Write updated memory
-        5. Append memory_summarized event
-
-    Args:
-        session:              Active async database session.
-        customer_id:          UUID of the customer.
-        conversation_history: Recent messages as OpenAI dicts (for extraction context).
-        ai_response:          The latest AI response (included in context).
-        trigger:              "interval" | "significant_fact"
-    """
-    memory = await get_or_create_memory(session, customer_id)
-
-    # ── 1. Snapshot current state before overwriting ───────────────────────────
-    if memory.summary or memory.structured_data:
-        await _snapshot_memory_version(session, memory, customer_id)
-
-    # ── 2. Extract new summary + structured data via OpenAI ───────────────────
-    extracted = await _extract_memory_with_ai(
-        conversation_history=conversation_history,
-        current_summary=memory.summary,
-        current_structured=memory.structured_data or {},
-    )
-
-    # ── 3. Write updated memory ────────────────────────────────────────────────
-    memory.summary = extracted.get("summary", memory.summary)
-    memory.structured_data = extracted.get("structured_data", memory.structured_data)
-    memory.last_updated = SystemClock.now()
-    await session.flush()
-
-    # ── 4. Emit events for each detected significant fact ─────────────────────
-    structured = extracted.get("structured_data", {})
-
-    if structured.get("budget"):
-        await append_memory_event(
-            session, customer_id, MemoryEventType.budget_detected,
-            {"value": structured["budget"].get("value"),
-             "confidence": structured["budget"].get("confidence")},
+        return CustomerMemorySearchResponse(
+            items=result_items,
+            total=total,
+            page=request.page,
+            page_size=request.page_size,
         )
-    if structured.get("timeline"):
-        await append_memory_event(
-            session, customer_id, MemoryEventType.timeline_detected,
-            {"value": structured["timeline"].get("value"),
-             "confidence": structured["timeline"].get("confidence")},
-        )
-    if structured.get("interests"):
-        await append_memory_event(
-            session, customer_id, MemoryEventType.interest_detected,
-            {"interests": structured["interests"]},
-        )
-    if structured.get("preferred_location"):
-        await append_memory_event(
-            session, customer_id, MemoryEventType.location_detected,
-            {"value": structured["preferred_location"].get("value"),
-             "confidence": structured["preferred_location"].get("confidence")},
-        )
-
-    # ── 5. Append memory_summarized event ─────────────────────────────────────
-    await append_memory_event(
-        session, customer_id, MemoryEventType.memory_summarized,
-        {"trigger": trigger, "message_count": memory.message_count},
-    )
-
-    logger.info(
-        "customer_memory_updated",
-        customer_id=str(customer_id),
-        trigger=trigger,
-        message_count=memory.message_count,
-        has_summary=bool(memory.summary),
-    )
-
-
-async def append_memory_event(
-    session: AsyncSession,
-    customer_id: UUID,
-    event_type: MemoryEventType,
-    payload: Optional[dict[str, Any]] = None,
-) -> CustomerMemoryEvent:
-    """
-    Append an event to the customer_memory_events log.
-
-    This is the only write method for the event log — append-only, never updated.
-    Called by customer_service, memory_service, and conversation_service.
-    """
-    event = CustomerMemoryEvent(
-        customer_id=customer_id,
-        event_type=event_type,
-        payload=payload,
-        created_at=SystemClock.now(),
-    )
-    session.add(event)
-    await session.flush()
-
-    logger.debug(
-        "memory_event_appended",
-        customer_id=str(customer_id),
-        event_type=event_type.value,
-    )
-
-    return event
-
-
-# ── Internal helpers ──────────────────────────────────────────────────────────
-
-def _should_update_memory(
-    message_count: int,
-    ai_response: str,
-    interval: int = 5,
-) -> tuple[bool, str]:
-    """
-    Pure function — no DB access.
-
-    Returns (should_update: bool, trigger: str).
-
-    Triggers:
-        1. message_count is a multiple of interval
-        2. Significant business fact detected in ai_response (keyword scan)
-    """
-    if message_count > 0 and message_count % interval == 0:
-        return True, "interval"
-
-    if _detect_significant_fact(ai_response):
-        return True, "significant_fact"
-
-    return False, ""
-
-
-def _detect_significant_fact(text: str) -> bool:
-    """
-    Lightweight keyword scan — no OpenAI call.
-    Returns True if the text contains a significant business signal.
-    """
-    lower = text.lower()
-    return any(keyword in lower for keyword in _SIGNIFICANT_FACT_KEYWORDS)
-
-
-async def _snapshot_memory_version(
-    session: AsyncSession,
-    memory: CustomerMemory,
-    customer_id: UUID,
-) -> None:
-    """
-    Write the current memory state to customer_memory_versions before overwriting.
-    Enables rollback and full audit trail.
-    """
-    version = CustomerMemoryVersion(
-        customer_id=customer_id,
-        summary=memory.summary,
-        structured_data=memory.structured_data,
-        created_at=SystemClock.now(),
-    )
-    session.add(version)
-    await session.flush()
-
-    await append_memory_event(
-        session, customer_id, MemoryEventType.memory_version_created,
-        {"version_id": str(version.id)},
-    )
-
-    logger.debug(
-        "memory_version_created",
-        customer_id=str(customer_id),
-        version_id=str(version.id),
-    )
-
-
-async def _extract_memory_with_ai(
-    conversation_history: list[dict],
-    current_summary: Optional[str],
-    current_structured: dict,
-) -> dict:
-    """
-    Call OpenAI with a compact extraction prompt to generate:
-        - An updated rolling summary
-        - Confidence-scored structured fields (budget, timeline, location, interests)
-
-    Uses a dedicated low-temperature call separate from the main chat response.
-    Returns a dict matching UpdateMemoryDTO structure.
-    """
-    from app.integrations.openai.client import get_openai_client
-    from app.config import get_settings
-
-    settings = get_settings()
-    client = get_openai_client()
-
-    # Format conversation context for extraction
-    conversation_text = "\n".join(
-        f"{msg['role'].upper()}: {msg['content']}"
-        for msg in conversation_history[-20:]  # last 20 messages max
-    )
-
-    current_summary_text = current_summary or "None yet."
-    current_structured_text = json.dumps(current_structured, ensure_ascii=False) if current_structured else "{}"
-
-    extraction_prompt = f"""You are a memory extraction system for a real estate sales AI assistant.
-
-Your task: Analyse the conversation below and extract/update customer information.
-
-CURRENT MEMORY SUMMARY:
-{current_summary_text}
-
-CURRENT STRUCTURED DATA:
-{current_structured_text}
-
-RECENT CONVERSATION:
-{conversation_text}
-
-Return a JSON object with EXACTLY this structure (no extra keys):
-{{
-  "summary": "A concise 2-4 sentence narrative describing who this customer is, what they are looking for, their key requirements, and where they are in their buying journey. Write in third person.",
-  "structured_data": {{
-    "budget": {{"value": "extracted budget or null", "confidence": 0.0}},
-    "timeline": {{"value": "extracted timeline or null", "confidence": 0.0}},
-    "preferred_location": {{"value": "extracted location or null", "confidence": 0.0}},
-    "interests": [
-      {{"value": "interest description", "confidence": 0.0}}
-    ]
-  }}
-}}
-
-Rules:
-- confidence is a float 0.0–1.0 reflecting how certain you are from the conversation
-- If a field cannot be determined, set value to null and confidence to 0.0
-- Do NOT invent information not present in the conversation
-- Merge new information with existing structured_data — do not discard previous facts unless contradicted
-- Return ONLY the JSON object, no explanation, no markdown code fences"""
-
-    try:
-        response = await client.chat.completions.create(
-            model=settings.openai_model,
-            messages=[
-                {"role": "system", "content": "You are a precise data extraction system. Return only valid JSON."},
-                {"role": "user", "content": extraction_prompt},
-            ],
-            max_tokens=600,
-            temperature=0.1,  # Low temperature for deterministic extraction
-            response_format={"type": "json_object"},
-        )
-
-        raw = response.choices[0].message.content.strip()
-        extracted = json.loads(raw)
-
-        logger.info(
-            "memory_extraction_completed",
-            model=response.model,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-        )
-
-        return extracted
-
-    except (json.JSONDecodeError, KeyError, Exception) as exc:
-        logger.error(
-            "memory_extraction_failed",
-            error=str(exc),
-            error_type=type(exc).__name__,
-        )
-        # Return existing memory unchanged on failure — never corrupt state
-        return {
-            "summary": current_summary,
-            "structured_data": current_structured,
-        }
-
-
-# ── Legacy stub compatibility (called by pipeline/memory.py) ──────────────────
-# This function is retained for backward compatibility with the Phase 1 pipeline stub.
-# The pipeline/memory.py inject_memory() function calls this during Phase 1.
-# Phase 2 replaces the inject_memory() call with build_ai_context() directly.
-
-async def get_memory_context(customer_phone: str) -> list[dict]:
-    """
-    Phase 1 stub — preserved for import compatibility.
-    Phase 2 callers use build_ai_context(session, customer_id) instead.
-    """
-    logger.debug(
-        "get_memory_context_legacy_stub_called",
-        phone=customer_phone,
-        note="Phase 2 uses build_ai_context() directly",
-    )
-    return []

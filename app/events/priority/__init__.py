@@ -23,6 +23,7 @@ from app.events.priority.scheduler import (
 from app.events.priority.health import (
     QueueHealthSnapshot,
     QueueHealthMonitor,
+    default_queue_health_monitor,
 )
 from app.events.priority.flow_control import (
     SystemLoadState,
@@ -48,6 +49,7 @@ __all__ = [
     "DefaultPriorityScheduler",
     "QueueHealthSnapshot",
     "QueueHealthMonitor",
+    "default_queue_health_monitor",
     "SystemLoadState",
     "FlowControlledDispatchPlan",
     "FlowController",

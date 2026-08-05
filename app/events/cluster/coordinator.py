@@ -169,3 +169,8 @@ class ClusterCoordinator:
             "healthy_node_count": healthy,
             "total_node_count": total,
         }
+
+
+# Global singleton cluster coordinator instance
+default_cluster_coordinator = ClusterCoordinator()
+

@@ -9,7 +9,7 @@ from app.events.cluster.cluster_scheduler import (
     DefaultConsistentHashRing,
     PartitionAssignmentPlan,
 )
-from app.events.cluster.coordinator import ClusterCoordinator
+from app.events.cluster.coordinator import ClusterCoordinator, default_cluster_coordinator
 from app.events.cluster.heartbeat import HeartbeatManager
 from app.events.cluster.leader import LeaderElectionEngine
 from app.events.cluster.lease import (
@@ -32,6 +32,7 @@ __all__ = [
     "PartitionAssignmentPlan",
     "ClusterDispatchCoordinator",
     "ClusterCoordinator",
+    "default_cluster_coordinator",
     "HeartbeatManager",
     "LeaderElectionEngine",
     "AbstractDispatcherLeaseManager",

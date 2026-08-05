@@ -263,6 +263,15 @@ def create_app() -> FastAPI:
     from app.domain.ui.router import router as ui_router
     app.include_router(ui_router, prefix="/api/v1")
     
+    from app.domain.memory.router import router as memory_router
+    app.include_router(memory_router, prefix="/api/v1")
+    
+    from app.domain.memory.graph.router import router as graph_router
+    app.include_router(graph_router)
+    
+    from app.domain.memory.intelligence.router import router as memory_context_router
+    app.include_router(memory_context_router, prefix="/api/v1/memory")
+    
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
     

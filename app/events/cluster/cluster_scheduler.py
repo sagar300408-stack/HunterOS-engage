@@ -61,25 +61,47 @@ class AbstractConsistentHashRing(ABC):
 class DefaultConsistentHashRing(AbstractConsistentHashRing):
     """
     Production-grade consistent hash ring with configurable virtual nodes per dispatcher.
-    Uses SHA-256 (or configured algorithm) and bisect binary search for O(log N) lookups.
+    Uses fast 64-bit integer hashing and bisect binary search for sub-microsecond O(log N) lookups.
     """
 
     def __init__(
         self,
         virtual_nodes: int = 128,
-        hash_algorithm: str = "sha256",
+        hash_algorithm: str = "md5",
     ):
         self.virtual_nodes = virtual_nodes
         self.hash_algorithm = hash_algorithm
         self._ring: List[int] = []  # Sorted list of virtual node hash values
+        self._ring_nodes: List[str] = []  # Parallel list of assigned physical dispatcher_id
         self._ring_map: Dict[int, str] = {}  # hash_val -> physical dispatcher_id
         self._nodes: Set[str] = set()
         self._ring_version: int = 0
 
-    def _hash(self, key: str) -> int:
+    def _hash(self, key: Any) -> int:
+        if hasattr(key, "int"):
+            return key.int & 0xFFFFFFFFFFFFFFFF
+        if isinstance(key, bytes):
+            b = key
+        elif isinstance(key, str):
+            b = key.encode("utf-8")
+        elif hasattr(key, "bytes"):
+            b = key.bytes
+        else:
+            b = str(key).encode("utf-8")
+
+        if self.hash_algorithm == "md5":
+            return int.from_bytes(hashlib.md5(b).digest()[:8], "big")
+        elif self.hash_algorithm == "sha256":
+            return int.from_bytes(hashlib.sha256(b).digest()[:8], "big")
         hasher = getattr(hashlib, self.hash_algorithm, hashlib.sha256)()
-        hasher.update(key.encode("utf-8"))
-        return int(hasher.hexdigest(), 16)
+        hasher.update(b)
+        return int.from_bytes(hasher.digest()[:8], "big")
+
+    def _sync_ring(self) -> None:
+        """Rebuilds the sorted parallel ring arrays."""
+        sorted_pairs = sorted(self._ring_map.items(), key=lambda x: x[0])
+        self._ring = [h for h, _ in sorted_pairs]
+        self._ring_nodes = [node for _, node in sorted_pairs]
 
     def add_node(self, node_id: str) -> None:
         if node_id in self._nodes:
@@ -88,24 +110,21 @@ class DefaultConsistentHashRing(AbstractConsistentHashRing):
         for i in range(self.virtual_nodes):
             vnode_key = f"{node_id}#vnode_{i}"
             h = self._hash(vnode_key)
-            bisect.insort(self._ring, h)
             self._ring_map[h] = node_id
+        self._sync_ring()
         self._ring_version += 1
 
     def remove_node(self, node_id: str) -> None:
         if node_id not in self._nodes:
             return
         self._nodes.remove(node_id)
-        self._ring = []
         self._ring_map = {}
-        # Re-insert remaining nodes
         for remaining in self._nodes:
             for i in range(self.virtual_nodes):
                 vnode_key = f"{remaining}#vnode_{i}"
                 h = self._hash(vnode_key)
-                self._ring.append(h)
                 self._ring_map[h] = remaining
-        self._ring.sort()
+        self._sync_ring()
         self._ring_version += 1
 
     def rebuild(self, nodes: List[str]) -> None:
@@ -113,15 +132,13 @@ class DefaultConsistentHashRing(AbstractConsistentHashRing):
         if current_set == self._nodes:
             return  # No change in membership
         self._nodes = set(nodes)
-        self._ring = []
         self._ring_map = {}
         for node_id in self._nodes:
             for i in range(self.virtual_nodes):
                 vnode_key = f"{node_id}#vnode_{i}"
                 h = self._hash(vnode_key)
-                self._ring.append(h)
                 self._ring_map[h] = node_id
-        self._ring.sort()
+        self._sync_ring()
         self._ring_version += 1
 
     def get_node(self, key: str) -> Optional[str]:
@@ -131,7 +148,7 @@ class DefaultConsistentHashRing(AbstractConsistentHashRing):
         idx = bisect.bisect_right(self._ring, h)
         if idx == len(self._ring):
             idx = 0  # Wrap around the ring
-        return self._ring_map[self._ring[idx]]
+        return self._ring_nodes[idx]
 
     def get_ring_version(self) -> int:
         return self._ring_version

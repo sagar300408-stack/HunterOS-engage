@@ -222,3 +222,8 @@ class QueueHealthMonitor:
             score -= (worker_utilization - 0.85) / 0.15 * 20.0
 
         return max(0.0, min(100.0, score))
+
+
+# Global default queue health monitor instance
+default_queue_health_monitor = QueueHealthMonitor()
+

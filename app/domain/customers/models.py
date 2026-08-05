@@ -90,9 +90,9 @@ class Customer(Base):
         cascade="all, delete-orphan",
     )
     memory_events = relationship(
-        "CustomerMemoryEvent",
+        "CustomerMemoryTimelineEvent",
         back_populates="customer",
-        order_by="CustomerMemoryEvent.created_at",
+        order_by="CustomerMemoryTimelineEvent.created_at",
         cascade="all, delete-orphan",
     )
     intent_history = relationship(
