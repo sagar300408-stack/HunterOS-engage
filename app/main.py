@@ -272,6 +272,9 @@ def create_app() -> FastAPI:
     from app.domain.memory.intelligence.router import router as memory_context_router
     app.include_router(memory_context_router, prefix="/api/v1/memory")
     
+    from app.domain.conversations.analysis.router import router as conversation_analysis_router
+    app.include_router(conversation_analysis_router, prefix="/api/v1")
+    
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
     
