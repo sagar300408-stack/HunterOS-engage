@@ -200,6 +200,18 @@ class ExtractedFact(BaseModel):
     provenance: ArtifactProvenance
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
+    @property
+    def value(self) -> Any:
+        if self.canonical_value and self.canonical_value.normalized_value is not None:
+            return self.canonical_value.normalized_value
+        return self.raw_value
+
+    @property
+    def source_message_ids(self) -> List[str]:
+        if self.provenance and self.provenance.source_messages:
+            return [sm.message_id for sm in self.provenance.source_messages]
+        return []
+
 
 class ConversationSummary(BaseModel):
     """Structured multi-perspective summary of the conversation."""

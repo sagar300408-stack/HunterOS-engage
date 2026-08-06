@@ -275,6 +275,9 @@ def create_app() -> FastAPI:
     from app.domain.conversations.analysis.router import router as conversation_analysis_router
     app.include_router(conversation_analysis_router, prefix="/api/v1")
     
+    from app.domain.conversations.insight.router import router as conversation_insight_router
+    app.include_router(conversation_insight_router, prefix="/api/v1")
+    
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
     
