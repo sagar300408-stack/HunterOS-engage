@@ -1,0 +1,81 @@
+"""
+HunterOS Engage V1 - Taxonomy Graph Data Models
+Graph nodes, edges, and path representations.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.domain.intents.classification.models import (
+    BusinessDomain,
+    IntentCategory,
+)
+
+
+class TaxonomyNode(BaseModel):
+    """
+    A single classification node in the taxonomy graph.
+    Nodes can have multiple parents and belong to cross-cutting categories.
+    """
+    model_config = ConfigDict(frozen=True)
+
+    node_id: str
+    category: IntentCategory
+    display_name: str
+    description: str = ""
+    business_domain: BusinessDomain = BusinessDomain.CROSS_INDUSTRY
+    default_process: str = "GENERAL_DISCOVERY"
+    aliases: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "node_id": self.node_id,
+            "category": self.category.value,
+            "display_name": self.display_name,
+            "description": self.description,
+            "business_domain": self.business_domain.value,
+            "default_process": self.default_process,
+            "aliases": self.aliases,
+            "metadata": self.metadata,
+        }
+
+
+class TaxonomyEdge(BaseModel):
+    """
+    Directed relationship between taxonomy nodes (e.g. PARENT_OF, CROSS_LINK).
+    """
+    model_config = ConfigDict(frozen=True)
+
+    source_node_id: str
+    target_node_id: str
+    relation: str = "PARENT_OF"
+    weight: float = 1.0
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "source_node_id": self.source_node_id,
+            "target_node_id": self.target_node_id,
+            "relation": self.relation,
+            "weight": self.weight,
+            "metadata": self.metadata,
+        }
+
+
+class TaxonomyPath(BaseModel):
+    """
+    Hierarchical trace through the taxonomy graph from root to node.
+    """
+    model_config = ConfigDict(frozen=True)
+
+    path_str: str
+    node_ids: List[str]
+    length: int
+
+    @classmethod
+    def from_nodes(cls, node_ids: List[str]) -> TaxonomyPath:
+        path_str = " > ".join(node_ids)
+        return cls(path_str=path_str, node_ids=node_ids, length=len(node_ids))
