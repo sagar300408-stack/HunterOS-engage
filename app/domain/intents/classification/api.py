@@ -163,5 +163,6 @@ class CanonicalIntentAPIv1:
 
 # Singleton default API instance
 canonical_intent_api_v1 = CanonicalIntentAPIv1()
+intent_classification_api_v1 = canonical_intent_api_v1
 # Alias for backward compatibility
 IntentClassificationAPIv1 = CanonicalIntentAPIv1

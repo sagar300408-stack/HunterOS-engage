@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import uuid
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ── Enumerations ─────────────────────────────────────────────────────────────
@@ -40,6 +40,7 @@ class IntentLifecycleState(str, Enum):
     RESOLVED = "RESOLVED"
     INACTIVE = "INACTIVE"
     CLOSED = "CLOSED"
+    ESCALATED = "ACTIVE"
 
 
 class IntentEvolutionEventType(str, Enum):
@@ -281,6 +282,34 @@ class IntentTimeline(BaseModel):
         }
 
 
+class TurnTrajectory(BaseModel):
+    """Fine-grained turn-level observation trajectory."""
+    model_config = ConfigDict(frozen=True)
+
+    turn_index: int = 0
+    message_id: str = ""
+    speaker: str = "customer"
+    lifecycle_state: IntentLifecycleState = IntentLifecycleState.ACTIVE
+    confidence: float = 1.0
+    detected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class IntentObservation(BaseModel):
+    """Observation of an intent at a particular turn."""
+    model_config = ConfigDict(frozen=True)
+
+    observation_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    intent_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    turn_index: int = 0
+    confidence: float = 1.0
+    lifecycle_state: IntentLifecycleState = IntentLifecycleState.ACTIVE
+    message_id: Optional[str] = None
+    evidence_message_ids: List[str] = Field(default_factory=list)
+    observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class IntentHistory(BaseModel):
     """
     Cumulative multi-conversation history for a distinct intent.
@@ -290,15 +319,24 @@ class IntentHistory(BaseModel):
     history_id: uuid.UUID = Field(default_factory=uuid.uuid4)
     intent_id: uuid.UUID
     entity_type: EntityType = EntityType.CUSTOMER
-    entity_id: str
+    entity_id: str = ""
     workspace_id: Optional[uuid.UUID] = None
-    canonical_intent_name: str
-    current_state: IntentLifecycleState
-    timeline: IntentTimeline
+    canonical_intent_name: str = ""
+    current_state: IntentLifecycleState = IntentLifecycleState.ACTIVE
+    timeline: Optional[IntentTimeline] = None
     snapshots: List[IntentStateSnapshot] = Field(default_factory=list)
     events: List[IntentEvolutionEvent] = Field(default_factory=list)
+    first_turn_index: int = 1
+    last_turn_index: int = 1
+    observation_count: int = 1
+    observations: List[IntentObservation] = Field(default_factory=list)
+    trajectories: List[TurnTrajectory] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @property
+    def trajectory_path(self) -> List[TurnTrajectory]:
+        return self.trajectories
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -309,9 +347,12 @@ class IntentHistory(BaseModel):
             "workspace_id": str(self.workspace_id) if self.workspace_id else None,
             "canonical_intent_name": self.canonical_intent_name,
             "current_state": self.current_state.value,
-            "timeline": self.timeline.to_dict(),
+            "timeline": self.timeline.to_dict() if self.timeline else None,
             "snapshots": [s.to_dict() for s in self.snapshots],
             "events": [e.to_dict() for e in self.events],
+            "first_turn_index": self.first_turn_index,
+            "last_turn_index": self.last_turn_index,
+            "observation_count": self.observation_count,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
@@ -384,17 +425,30 @@ class IntentEvolutionResult(BaseModel):
     """
     model_config = ConfigDict(frozen=True)
 
-    evolution_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    evolution_id: Union[uuid.UUID, str] = Field(default_factory=uuid.uuid4)
     entity_type: EntityType = EntityType.CUSTOMER
-    entity_id: str
-    workspace_id: Optional[uuid.UUID] = None
-    current_conversation_id: str
+    entity_id: str = ""
+    workspace_id: Optional[Union[uuid.UUID, str]] = None
+    current_conversation_id: str = ""
     intent_histories: List[IntentHistory] = Field(default_factory=list)
     timelines: List[IntentTimeline] = Field(default_factory=list)
     event_stream: IntentEvolutionEventStream = Field(default_factory=IntentEvolutionEventStream)
     metadata: EvolutionMetadata = Field(default_factory=EvolutionMetadata)
     diagnostics: EvolutionDiagnostics = Field(default_factory=EvolutionDiagnostics)
+    provenance: EvolutionProvenance = Field(default_factory=EvolutionProvenance)
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "conversation_id" in data and "current_conversation_id" not in data:
+                data["current_conversation_id"] = data["conversation_id"]
+        return data
+
+    @property
+    def conversation_id(self) -> str:
+        return self.current_conversation_id
 
     @property
     def customer_id(self) -> Optional[str]:
@@ -425,5 +479,17 @@ class IntentEvolutionResult(BaseModel):
             "event_stream": self.event_stream.to_dict(),
             "metadata": self.metadata.to_dict(),
             "diagnostics": self.diagnostics.to_dict(),
+            "provenance": self.provenance.to_dict(),
             "generated_at": self.generated_at.isoformat(),
         }
+
+
+# Aliases for cross-subsystem consistency
+IntentEvolutionProvenance = EvolutionProvenance
+IntentEvolutionMetadata = EvolutionMetadata
+IntentEvolutionDiagnostics = EvolutionDiagnostics
+
+EvolutionProvenance.model_rebuild()
+EvolutionMetadata.model_rebuild()
+EvolutionDiagnostics.model_rebuild()
+IntentEvolutionResult.model_rebuild()

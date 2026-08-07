@@ -29,6 +29,9 @@ router.include_router(classification_router)
 from app.domain.intents.evolution.router import router as evolution_router
 router.include_router(evolution_router)
 
+from app.domain.intents.integration.router import router as integration_router
+router.include_router(integration_router)
+
 
 @router.get(
     "/taxonomy",

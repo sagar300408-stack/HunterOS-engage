@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,6 +23,11 @@ class IntentCategory(str, Enum):
     RELATIONSHIP = "RELATIONSHIP"
     INFORMATION = "INFORMATION"
     CUSTOM = "CUSTOM"
+    SUPPORT = "OPERATIONAL"
+
+
+# Alias for backward compatibility
+BusinessCategory = IntentCategory
 
 
 class BusinessDomain(str, Enum):
@@ -36,6 +41,8 @@ class BusinessDomain(str, Enum):
     CROSS_INDUSTRY = "CROSS_INDUSTRY"
     TECHNOLOGY = "TECHNOLOGY"
     CUSTOM = "CUSTOM"
+    REVENUE = "COMMERCIAL"
+    OPERATIONS = "OPERATIONAL"
 
 
 class ClassificationMethod(str, Enum):
@@ -140,18 +147,18 @@ class ClassifiedIntent(BaseModel):
     classified_intent_id: uuid.UUID = Field(default_factory=uuid.uuid4)
     original_intent_id: uuid.UUID = Field(default_factory=uuid.uuid4)
     canonical_intent_id: uuid.UUID = Field(default_factory=uuid.uuid4)
-    conversation_id: str
+    conversation_id: str = ""
     workspace_id: Optional[uuid.UUID] = None
     customer_id: Optional[str] = None
-    business_category: IntentCategory
-    business_domain: BusinessDomain
-    business_process: str
-    taxonomy_path: str
+    business_category: IntentCategory = IntentCategory.COMMERCIAL
+    business_domain: BusinessDomain = BusinessDomain.CROSS_INDUSTRY
+    business_process: str = ""
+    taxonomy_path: Any = ""
     taxonomy_paths: List[str] = Field(default_factory=list)
     aliases: List[str] = Field(default_factory=list)
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
-    classification_method: ClassificationMethod
-    supporting_evidence: IntentEvidence
+    classification_method: ClassificationMethod = ClassificationMethod.RULE_BASED
+    supporting_evidence: Optional[IntentEvidence] = Field(default_factory=lambda: IntentEvidence())
     relationships: List[IntentRelationship] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     classified_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -260,8 +267,10 @@ class ClassificationProvenance(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     classification_version: str = "2.3.2"
+    classification_engine_version: str = "2.3.2"
+    pipeline_version: str = "1.0.0"
     taxonomy_version: str = "2.3.2"
-    detection_result_id: Optional[uuid.UUID] = None
+    detection_result_id: Optional[Union[uuid.UUID, str]] = None
     rule_packs: List[str] = Field(default_factory=list)
     plugin_versions: Dict[str, str] = Field(default_factory=dict)
     source_event_count: int = 0
@@ -273,6 +282,8 @@ class ClassificationProvenance(BaseModel):
     def to_dict(self) -> Dict[str, Any]:
         return {
             "classification_version": self.classification_version,
+            "classification_engine_version": self.classification_engine_version,
+            "pipeline_version": self.pipeline_version,
             "taxonomy_version": self.taxonomy_version,
             "detection_result_id": str(self.detection_result_id) if self.detection_result_id else None,
             "rule_packs": self.rule_packs,
@@ -294,15 +305,15 @@ class IntentClassificationResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     classification_id: uuid.UUID = Field(default_factory=uuid.uuid4)
-    conversation_id: str
-    workspace_id: Optional[uuid.UUID] = None
+    conversation_id: str = ""
+    workspace_id: Optional[Union[uuid.UUID, str]] = None
     customer_id: Optional[str] = None
     classified_intents: List[ClassifiedIntent] = Field(default_factory=list)
     relationships: List[IntentRelationship] = Field(default_factory=list)
     groups: List[IntentGroup] = Field(default_factory=list)
-    metadata: ClassificationMetadata
-    diagnostics: ClassificationDiagnostics
-    provenance: ClassificationProvenance
+    metadata: ClassificationMetadata = Field(default_factory=lambda: ClassificationMetadata(conversation_id=""))
+    diagnostics: ClassificationDiagnostics = Field(default_factory=lambda: ClassificationDiagnostics())
+    provenance: ClassificationProvenance = Field(default_factory=lambda: ClassificationProvenance())
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -317,3 +328,16 @@ class IntentClassificationResult(BaseModel):
             "diagnostics": self.diagnostics.to_dict(),
             "provenance": self.provenance.to_dict(),
         }
+
+
+# Aliases for cross-subsystem consistency
+IntentClassificationProvenance = ClassificationProvenance
+IntentClassificationMetadata = ClassificationMetadata
+IntentClassificationDiagnostics = ClassificationDiagnostics
+
+from app.domain.intents.classification.taxonomy.models import TaxonomyPath
+
+ClassificationProvenance.model_rebuild()
+ClassificationMetadata.model_rebuild()
+ClassificationDiagnostics.model_rebuild()
+IntentClassificationResult.model_rebuild()
