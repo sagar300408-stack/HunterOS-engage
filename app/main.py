@@ -312,6 +312,9 @@ def create_app() -> FastAPI:
     from app.domain.commercial.router import router as commercial_router
     app.include_router(commercial_router, prefix="/api/v1")
 
+    from app.domain.journey.router import router as journey_router
+    app.include_router(journey_router)
+
     @app.on_event("startup")
     async def startup_event():
         """
