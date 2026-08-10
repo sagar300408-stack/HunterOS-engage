@@ -89,3 +89,19 @@ def detect_conversation_recommendations(conversation_id: UUID, api: Recommendati
 def get_detection_result(detection_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
     return api.get_detection_result(detection_id)
 
+
+@router.post('/prioritize')
+def prioritize_recommendations(workspace_id: UUID, target_id: str, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    pass
+
+@router.post('/prioritize/customer/{customer_id}')
+def prioritize_customer_recommendations(customer_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    pass
+
+@router.post('/prioritize/conversation/{conversation_id}')
+def prioritize_conversation_recommendations(conversation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    pass
+
+@router.get('/prioritization/{result_id}')
+def get_prioritization(result_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    pass

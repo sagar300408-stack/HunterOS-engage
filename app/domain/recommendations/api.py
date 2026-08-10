@@ -65,6 +65,24 @@ class RecommendationIntelligenceAPIv1:
         class DummyTarget: id = str(conversation_id)
         return self.detect_recommendations(UUID(int=0), DummyTarget())
 
+    def prioritize_recommendations(self, workspace_id: UUID, target: Any) -> Any:
+        pass
+
+    def prioritize_customer_recommendations(self, customer_id: UUID) -> Any:
+        pass
+
+    def prioritize_conversation_recommendations(self, conversation_id: UUID) -> Any:
+        pass
+
+    def get_prioritization(self, result_id: UUID) -> Any:
+        pass
+
+    def get_customer_prioritization(self, customer_id: UUID) -> Any:
+        pass
+
+    def get_priority_view(self, view_id: UUID) -> Any:
+        pass
+
     def get_detection_result(self, detection_id: UUID) -> RecommendationDetectionResultDTO:
         # Mocking retrieval
         return RecommendationDetectionResultDTO(

@@ -132,3 +132,9 @@ class RecommendationDetectionResultDTO(BaseModel):
     target_id: Optional[str] = None
     candidates: List[Dict[str, Any]] = Field(default_factory=list)
 
+
+class RecommendationPrioritizationResultDTO:
+    pass
+
+class RecommendationPriorityViewDTO:
+    pass
