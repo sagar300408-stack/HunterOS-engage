@@ -80,6 +80,8 @@ from app.domain.journey.schemas import (
     StageDefinitionDTO,
     StageResidencyDTO,
     StageVelocityDTO,
+    CalculateAnalyticsRequest,
+    CohortAnalyticsRequest,
 )
 
 router = APIRouter(prefix="/api/v1/journeys", tags=["Journey Intelligence"])
@@ -852,3 +854,402 @@ def get_journey_health(journey_id: str) -> Dict[str, Any]:
         return _health_to_dto(res.health)
     except JourneyNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ── Phase 2.4.4: Journey Analytics Endpoints ─────────────────────────────────
+
+
+def _analytics_result_to_dto(result) -> Dict[str, Any]:
+    """Convert JourneyAnalyticsResult to a serializable dict."""
+    window = result.observation_window
+    prov = result.provenance
+    diag = result.diagnostics
+
+    return {
+        "analytics_id": str(result.analytics_id),
+        "workspace_id": str(result.workspace_id),
+        "journey_type": result.journey_type,
+        "definition_version": result.definition_version,
+        "observation_window": {
+            "start_at": window.start_at.isoformat(),
+            "end_at": window.end_at.isoformat(),
+            "timezone": window.timezone,
+            "duration_days": window.duration_days,
+        },
+        "generated_at": result.generated_at.isoformat(),
+        "journey_count": result.journey_count,
+        "distribution": {
+            "total_journeys": result.distribution.total_journeys,
+            "active_journeys": result.distribution.active_journeys,
+            "completed_journeys": result.distribution.completed_journeys,
+            "cancelled_journeys": result.distribution.cancelled_journeys,
+            "inactive_journeys": result.distribution.inactive_journeys,
+            "archived_journeys": result.distribution.archived_journeys,
+            "by_status": result.distribution.by_status,
+            "by_current_stage": result.distribution.by_current_stage,
+            "by_journey_type": result.distribution.by_journey_type,
+            "by_maturity_level": result.distribution.by_maturity_level,
+            "by_momentum_state": result.distribution.by_momentum_state,
+            "by_stability_level": result.distribution.by_stability_level,
+            "by_velocity_state": result.distribution.by_velocity_state,
+            "by_health_state": result.distribution.by_health_state,
+        },
+        "stage_analytics": {
+            k: {
+                "stage": v.stage,
+                "journey_count": v.journey_count,
+                "percentage_of_journeys": v.percentage_of_journeys,
+                "unique_entries": v.unique_entries,
+                "unique_exits": v.unique_exits,
+                "current_residency_count": v.current_residency_count,
+                "completed_residency_count": v.completed_residency_count,
+                "average_residency_days": v.average_residency_days,
+                "median_residency_days": v.median_residency_days,
+                "p25_residency_days": v.p25_residency_days,
+                "p75_residency_days": v.p75_residency_days,
+            }
+            for k, v in result.stage_analytics.items()
+        },
+        "transition_metrics": {
+            "total_transitions": result.transition_metrics.total_transitions,
+            "forward_transition_count": result.transition_metrics.forward_transition_count,
+            "regression_transition_count": result.transition_metrics.regression_transition_count,
+            "same_stage_reentry_count": result.transition_metrics.same_stage_reentry_count,
+            "terminal_transition_count": result.transition_metrics.terminal_transition_count,
+            "by_transition": [
+                {
+                    "from_stage": t.from_stage,
+                    "to_stage": t.to_stage,
+                    "transition_count": t.transition_count,
+                    "unique_journeys": t.unique_journeys,
+                    "transition_percentage": t.transition_percentage,
+                    "is_forward": t.is_forward,
+                    "is_regression": t.is_regression,
+                    "is_reentry": t.is_reentry,
+                    "is_terminal": t.is_terminal,
+                }
+                for t in result.transition_metrics.by_transition
+            ],
+        },
+        "funnel": {
+            "funnel_stages": result.funnel.funnel_stages,
+            "total_entered": result.funnel.total_entered,
+            "total_completed": result.funnel.total_completed,
+            "overall_completion_rate": result.funnel.overall_completion_rate,
+            "has_regressions": result.funnel.has_regressions,
+            "has_skip_patterns": result.funnel.has_skip_patterns,
+            "stage_metrics": [
+                {
+                    "stage": sm.stage,
+                    "sequence": sm.sequence,
+                    "entered_count": sm.entered_count,
+                    "advanced_count": sm.advanced_count,
+                    "regressed_count": sm.regressed_count,
+                    "exited_count": sm.exited_count,
+                    "remaining_count": sm.remaining_count,
+                    "historical_completion_rate": sm.historical_completion_rate,
+                }
+                for sm in result.funnel.stage_metrics
+            ],
+        } if result.funnel else None,
+        "duration_metrics": {
+            "total_sample_size": result.duration_metrics.total_sample_size,
+            "average_duration_days": result.duration_metrics.average_duration_days,
+            "median_duration_days": result.duration_metrics.median_duration_days,
+            "minimum_duration_days": result.duration_metrics.minimum_duration_days,
+            "maximum_duration_days": result.duration_metrics.maximum_duration_days,
+            "p25_duration_days": result.duration_metrics.p25_duration_days,
+            "p75_duration_days": result.duration_metrics.p75_duration_days,
+            "active_average_days": result.duration_metrics.active_average_days,
+            "completed_average_days": result.duration_metrics.completed_average_days,
+            "cancelled_average_days": result.duration_metrics.cancelled_average_days,
+        },
+        "maturity_analytics": {
+            "sample_size": result.maturity_analytics.sample_size,
+            "average_maturity_score": result.maturity_analytics.average_maturity_score,
+            "median_maturity_score": result.maturity_analytics.median_maturity_score,
+            "maturity_level_counts": result.maturity_analytics.maturity_level_counts,
+            "maturity_level_percentages": result.maturity_analytics.maturity_level_percentages,
+            "lowest_maturity_bucket": result.maturity_analytics.lowest_maturity_bucket,
+            "highest_maturity_bucket": result.maturity_analytics.highest_maturity_bucket,
+        },
+        "momentum_analytics": {
+            "sample_size": result.momentum_analytics.sample_size,
+            "state_counts": result.momentum_analytics.state_counts,
+            "state_percentages": result.momentum_analytics.state_percentages,
+            "advancing_percentage": result.momentum_analytics.advancing_percentage,
+            "stable_percentage": result.momentum_analytics.stable_percentage,
+            "weakening_percentage": result.momentum_analytics.weakening_percentage,
+            "regressing_percentage": result.momentum_analytics.regressing_percentage,
+            "inactive_percentage": result.momentum_analytics.inactive_percentage,
+        },
+        "stability_analytics": {
+            "sample_size": result.stability_analytics.sample_size,
+            "level_counts": result.stability_analytics.level_counts,
+            "level_percentages": result.stability_analytics.level_percentages,
+            "average_stability_score": result.stability_analytics.average_stability_score,
+            "reentry_frequency": result.stability_analytics.reentry_frequency,
+            "oscillation_frequency": result.stability_analytics.oscillation_frequency,
+        },
+        "velocity_analytics": {
+            "sample_size": result.velocity_analytics.sample_size,
+            "state_counts": result.velocity_analytics.state_counts,
+            "state_percentages": result.velocity_analytics.state_percentages,
+            "average_transitions_per_day": result.velocity_analytics.average_transitions_per_day,
+            "average_transitions_per_week": result.velocity_analytics.average_transitions_per_week,
+            "average_stage_duration_days": result.velocity_analytics.average_stage_duration_days,
+        },
+        "health_analytics": {
+            "sample_size": result.health_analytics.sample_size,
+            "health_distribution": result.health_analytics.health_distribution,
+            "health_percentages": result.health_analytics.health_percentages,
+            "healthy_percentage": result.health_analytics.healthy_percentage,
+            "stalled_percentage": result.health_analytics.stalled_percentage,
+            "regressing_percentage": result.health_analytics.regressing_percentage,
+            "inactive_percentage": result.health_analytics.inactive_percentage,
+        },
+        "progression_patterns": {
+            "sample_size": result.progression_patterns.sample_size,
+            "average_forward_transitions": result.progression_patterns.average_forward_transitions,
+            "average_regressions": result.progression_patterns.average_regressions,
+            "progression_consistency_score": result.progression_patterns.progression_consistency_score,
+            "pattern_distribution": result.progression_patterns.pattern_distribution,
+            "pattern_percentages": result.progression_patterns.pattern_percentages,
+        },
+        "outcome_analytics": {
+            k: {
+                "stage": v.stage,
+                "outcome": v.outcome,
+                "sample_size": v.sample_size,
+                "observed_rate": v.observed_rate,
+                "minimum_sample_met": v.minimum_sample_met,
+                "confidence_interval_lower": v.confidence_interval_lower,
+                "confidence_interval_upper": v.confidence_interval_upper,
+                "confidence_level": v.confidence_level,
+                "limitations": v.limitations,
+                "data_status": v.data_status.value,
+            }
+            for k, v in result.outcome_analytics.items()
+        },
+        "trend_analytics": {
+            "granularity": result.trend_analytics.granularity.value,
+            "metrics": result.trend_analytics.metrics,
+            "total_periods": result.trend_analytics.total_periods,
+            "data_points": [
+                {
+                    "period_label": dp.period_label,
+                    "metric": dp.metric,
+                    "value": dp.value,
+                    "sample_size": dp.sample_size,
+                }
+                for dp in result.trend_analytics.data_points
+            ],
+        } if result.trend_analytics else None,
+        "diagnostics": {
+            "total_execution_time_ms": diag.total_execution_time_ms,
+            "journeys_processed": diag.journeys_processed,
+            "transitions_processed": diag.transitions_processed,
+            "maturity_results_processed": diag.maturity_results_processed,
+            "metrics_calculated": diag.metrics_calculated,
+            "warnings": diag.warnings,
+            "validation_errors": diag.validation_errors,
+            "empty_dataset": diag.empty_dataset,
+            "partial_dataset": diag.partial_dataset,
+        },
+        "provenance": {
+            "analytics_id": str(prov.analytics_id),
+            "workspace_id": str(prov.workspace_id),
+            "generated_at": prov.generated_at.isoformat(),
+            "engine_version": prov.engine_version,
+            "pipeline_version": prov.pipeline_version,
+            "configuration_version": prov.configuration_version,
+            "source_journey_count": prov.source_journey_count,
+            "source_transition_count": prov.source_transition_count,
+            "source_maturity_count": prov.source_maturity_count,
+            "calculation_methods": prov.calculation_methods,
+            "statistical_methods": prov.statistical_methods,
+        },
+    }
+
+
+@router.post(
+    "/analytics",
+    response_model=None,
+    summary="Calculate Journey Analytics",
+    description="Execute the full analytics pipeline for a workspace. Returns descriptive, historical, read-only analytics across all journeys.",
+)
+def calculate_analytics(
+    request: CalculateAnalyticsRequest,
+) -> Dict[str, Any]:
+    """POST /api/v1/journeys/analytics — Execute the full analytics pipeline."""
+    try:
+        result = journey_api_v1.calculate_analytics(
+            workspace_id=request.workspace_id,
+            journey_type=request.journey_type,
+            definition_version=request.definition_version,
+            configuration_version=request.configuration_version,
+            observation_window_days=request.observation_window_days,
+            use_cache=request.use_cache,
+        )
+        return _analytics_result_to_dto(result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Analytics calculation failed: {str(e)}",
+        )
+
+
+@router.get(
+    "/analytics",
+    response_model=None,
+    summary="Get Latest Analytics",
+    description="Retrieve the latest cached analytics result for a workspace without recalculating.",
+)
+def get_analytics(
+    workspace_id: str = Query(..., description="Workspace ID"),
+    journey_type: Optional[str] = Query(None, description="Filter by journey type"),
+) -> Dict[str, Any]:
+    """GET /api/v1/journeys/analytics — Get latest analytics result."""
+    result = journey_api_v1.get_latest_analytics(workspace_id, journey_type)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No analytics found for workspace {workspace_id}. Run POST /analytics first.",
+        )
+    return _analytics_result_to_dto(result)
+
+
+@router.get(
+    "/analytics/distribution",
+    response_model=None,
+    summary="Get Journey Distribution",
+    description="Get the latest journey distribution metrics for a workspace.",
+)
+def get_analytics_distribution(
+    workspace_id: str = Query(..., description="Workspace ID"),
+    journey_type: Optional[str] = Query(None),
+) -> Dict[str, Any]:
+    """GET /api/v1/journeys/analytics/distribution"""
+    dist = journey_api_v1.get_analytics_distribution(workspace_id, journey_type)
+    if dist is None:
+        raise HTTPException(status_code=404, detail="No analytics distribution found. Run POST /analytics first.")
+    return {
+        "total_journeys": dist.total_journeys,
+        "active_journeys": dist.active_journeys,
+        "completed_journeys": dist.completed_journeys,
+        "cancelled_journeys": dist.cancelled_journeys,
+        "by_status": dist.by_status,
+        "by_current_stage": dist.by_current_stage,
+        "by_maturity_level": dist.by_maturity_level,
+        "by_momentum_state": dist.by_momentum_state,
+        "by_health_state": dist.by_health_state,
+    }
+
+
+@router.get(
+    "/analytics/funnel",
+    response_model=None,
+    summary="Get Journey Funnel",
+    description="Get the observed stage funnel analytics for a workspace.",
+)
+def get_analytics_funnel(
+    workspace_id: str = Query(..., description="Workspace ID"),
+    journey_type: Optional[str] = Query(None),
+) -> Dict[str, Any]:
+    """GET /api/v1/journeys/analytics/funnel"""
+    funnel = journey_api_v1.get_analytics_funnel(workspace_id, journey_type)
+    if funnel is None:
+        raise HTTPException(status_code=404, detail="No funnel analytics found. Run POST /analytics first.")
+    return {
+        "funnel_stages": funnel.funnel_stages,
+        "total_entered": funnel.total_entered,
+        "total_completed": funnel.total_completed,
+        "overall_completion_rate": funnel.overall_completion_rate,
+        "has_regressions": funnel.has_regressions,
+        "has_skip_patterns": funnel.has_skip_patterns,
+        "stage_metrics": [
+            {
+                "stage": sm.stage,
+                "sequence": sm.sequence,
+                "entered_count": sm.entered_count,
+                "advanced_count": sm.advanced_count,
+                "historical_completion_rate": sm.historical_completion_rate,
+            }
+            for sm in funnel.stage_metrics
+        ],
+    }
+
+
+@router.get(
+    "/analytics/outcomes",
+    response_model=None,
+    summary="Get Stage Outcome Analytics",
+    description="Get historical observed outcome rates per stage. Only available when sample size meets minimum threshold.",
+)
+def get_analytics_outcomes(
+    workspace_id: str = Query(..., description="Workspace ID"),
+    stage: Optional[str] = Query(None, description="Filter to a specific stage"),
+    journey_type: Optional[str] = Query(None),
+) -> Dict[str, Any]:
+    """GET /api/v1/journeys/analytics/outcomes"""
+    outcomes = journey_api_v1.get_analytics_outcomes(workspace_id, stage, journey_type)
+    if outcomes is None:
+        raise HTTPException(status_code=404, detail="No outcome analytics found. Run POST /analytics first.")
+    return {
+        k: {
+            "stage": v.stage,
+            "outcome": v.outcome,
+            "sample_size": v.sample_size,
+            "observed_rate": v.observed_rate,
+            "minimum_sample_met": v.minimum_sample_met,
+            "confidence_interval_lower": v.confidence_interval_lower,
+            "confidence_interval_upper": v.confidence_interval_upper,
+            "data_status": v.data_status.value,
+            "limitations": v.limitations,
+        }
+        for k, v in outcomes.items()
+    }
+
+
+@router.get(
+    "/analytics/trends",
+    response_model=None,
+    summary="Get Journey Trends",
+    description="Get time-series trend data for journey metrics over the observation window.",
+)
+def get_analytics_trends(
+    workspace_id: str = Query(..., description="Workspace ID"),
+    journey_type: Optional[str] = Query(None),
+) -> Dict[str, Any]:
+    """GET /api/v1/journeys/analytics/trends"""
+    trends = journey_api_v1.get_analytics_trends(workspace_id, journey_type)
+    if trends is None:
+        raise HTTPException(status_code=404, detail="No trend analytics found. Run POST /analytics first.")
+    return {
+        "granularity": trends.granularity.value,
+        "metrics": trends.metrics,
+        "total_periods": trends.total_periods,
+        "data_points": [
+            {
+                "period_label": dp.period_label,
+                "metric": dp.metric,
+                "value": dp.value,
+                "sample_size": dp.sample_size,
+            }
+            for dp in trends.data_points
+        ],
+    }
+
+
+@router.delete(
+    "/analytics/cache",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Invalidate Analytics Cache",
+    description="Invalidate the analytics cache for a workspace, forcing recalculation on next request.",
+)
+def invalidate_analytics_cache(
+    workspace_id: str = Query(..., description="Workspace ID"),
+    journey_type: Optional[str] = Query(None),
+) -> None:
+    """DELETE /api/v1/journeys/analytics/cache"""
+    journey_api_v1.invalidate_analytics_cache(workspace_id, journey_type)

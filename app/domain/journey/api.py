@@ -381,5 +381,95 @@ class JourneyIntelligenceAPIv1:
         return self._audit_view.render(state, transitions, [], timeline, maturity_result)
 
 
+    # ── Phase 2.4.4: Journey Analytics API ───────────────────────────────────
+
+    def calculate_analytics(
+        self,
+        workspace_id: Union[uuid.UUID, str],
+        journey_type: Optional[str] = None,
+        definition_version: Optional[str] = None,
+        configuration_version: Optional[str] = None,
+        observation_window_days: Optional[int] = None,
+        evaluated_at: Optional[datetime] = None,
+        use_cache: bool = True,
+    ) -> Any:  # returns JourneyAnalyticsResult
+        """Execute the full analytics pipeline for a workspace."""
+        from app.domain.journey.analytics.engine import default_analytics_engine
+        return default_analytics_engine.calculate(
+            workspace_id=workspace_id,
+            journey_type=journey_type,
+            definition_version=definition_version,
+            configuration_version=configuration_version,
+            observation_window_days=observation_window_days,
+            evaluated_at=evaluated_at,
+            use_cache=use_cache,
+        )
+
+    def get_latest_analytics(
+        self,
+        workspace_id: Union[uuid.UUID, str],
+        journey_type: Optional[str] = None,
+    ) -> Optional[Any]:  # returns Optional[JourneyAnalyticsResult]
+        """Get the latest persisted analytics result without recalculating."""
+        from app.domain.journey.analytics.engine import default_analytics_engine
+        return default_analytics_engine.get_latest(workspace_id, journey_type)
+
+    def get_analytics_distribution(
+        self,
+        workspace_id: Union[uuid.UUID, str],
+        journey_type: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Get the latest journey distribution metrics."""
+        from app.domain.journey.analytics.query import default_analytics_query_engine
+        return default_analytics_query_engine.get_distribution(workspace_id, journey_type)
+
+    def get_analytics_funnel(
+        self,
+        workspace_id: Union[uuid.UUID, str],
+        journey_type: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Get the latest funnel analytics."""
+        from app.domain.journey.analytics.query import default_analytics_query_engine
+        return default_analytics_query_engine.get_funnel(workspace_id, journey_type)
+
+    def get_analytics_stage(
+        self,
+        workspace_id: Union[uuid.UUID, str],
+        stage: Optional[str] = None,
+        journey_type: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Get per-stage analytics."""
+        from app.domain.journey.analytics.query import default_analytics_query_engine
+        return default_analytics_query_engine.get_stage_analytics(workspace_id, stage, journey_type)
+
+    def get_analytics_outcomes(
+        self,
+        workspace_id: Union[uuid.UUID, str],
+        stage: Optional[str] = None,
+        journey_type: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Get historical observed stage outcome analytics."""
+        from app.domain.journey.analytics.query import default_analytics_query_engine
+        return default_analytics_query_engine.get_outcome_metrics(workspace_id, stage, journey_type)
+
+    def get_analytics_trends(
+        self,
+        workspace_id: Union[uuid.UUID, str],
+        journey_type: Optional[str] = None,
+    ) -> Optional[Any]:
+        """Get trend analytics over the observation window."""
+        from app.domain.journey.analytics.query import default_analytics_query_engine
+        return default_analytics_query_engine.get_trends(workspace_id, journey_type)
+
+    def invalidate_analytics_cache(
+        self,
+        workspace_id: Union[uuid.UUID, str],
+        journey_type: Optional[str] = None,
+    ) -> None:
+        """Invalidate cached analytics for a workspace."""
+        from app.domain.journey.analytics.engine import default_analytics_engine
+        default_analytics_engine.invalidate_cache(workspace_id, journey_type)
+
+
 # Module-level singleton
 journey_api_v1: JourneyIntelligenceAPIv1 = JourneyIntelligenceAPIv1()

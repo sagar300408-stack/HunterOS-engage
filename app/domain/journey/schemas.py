@@ -339,3 +339,310 @@ class CalculateObservedProbabilityRequest(BaseModel):
     minimum_sample: Optional[int] = None
     observation_window_days: int = 365
     cohort_filters: Optional[Dict[str, Any]] = None
+
+
+# ── Phase 2.4.4: Journey Analytics DTOs ──────────────────────────────────────
+
+
+class AnalyticsObservationWindowDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    start_at: datetime
+    end_at: datetime
+    timezone: str = "UTC"
+    duration_days: float
+
+
+class JourneyDistributionDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    total_journeys: int
+    active_journeys: int
+    completed_journeys: int
+    cancelled_journeys: int
+    inactive_journeys: int
+    archived_journeys: int
+    by_journey_type: Dict[str, Any] = Field(default_factory=dict)
+    by_status: Dict[str, Any] = Field(default_factory=dict)
+    by_current_stage: Dict[str, Any] = Field(default_factory=dict)
+    by_maturity_level: Dict[str, Any] = Field(default_factory=dict)
+    by_momentum_state: Dict[str, Any] = Field(default_factory=dict)
+    by_stability_level: Dict[str, Any] = Field(default_factory=dict)
+    by_velocity_state: Dict[str, Any] = Field(default_factory=dict)
+    by_health_state: Dict[str, Any] = Field(default_factory=dict)
+
+
+class StageAnalyticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    stage: str
+    journey_count: int
+    percentage_of_journeys: float
+    unique_entries: int
+    unique_exits: int
+    current_residency_count: int
+    completed_residency_count: int
+    average_residency_days: Optional[float] = None
+    median_residency_days: Optional[float] = None
+    minimum_residency_days: Optional[float] = None
+    maximum_residency_days: Optional[float] = None
+    p25_residency_days: Optional[float] = None
+    p75_residency_days: Optional[float] = None
+
+
+class TransitionPairDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    from_stage: Optional[str] = None
+    to_stage: str
+    transition_count: int
+    unique_journeys: int
+    transition_percentage: float
+    average_time_to_transition_days: Optional[float] = None
+    median_time_to_transition_days: Optional[float] = None
+    is_forward: bool
+    is_regression: bool
+    is_reentry: bool
+    is_terminal: bool
+
+
+class TransitionSummaryDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    total_transitions: int
+    forward_transition_count: int
+    regression_transition_count: int
+    same_stage_reentry_count: int
+    terminal_transition_count: int
+    by_transition: List[TransitionPairDTO] = Field(default_factory=list)
+
+
+class FunnelStageDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    stage: str
+    sequence: int
+    entered_count: int
+    advanced_count: int
+    regressed_count: int
+    exited_count: int
+    remaining_count: int
+    historical_completion_rate: Optional[float] = None
+
+
+class JourneyFunnelDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    funnel_stages: List[str]
+    stage_metrics: List[FunnelStageDTO]
+    total_entered: int
+    total_completed: int
+    overall_completion_rate: Optional[float] = None
+    has_regressions: bool
+    has_skip_patterns: bool
+
+
+class JourneyDurationDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    total_sample_size: int
+    average_duration_days: Optional[float] = None
+    median_duration_days: Optional[float] = None
+    minimum_duration_days: Optional[float] = None
+    maximum_duration_days: Optional[float] = None
+    p25_duration_days: Optional[float] = None
+    p75_duration_days: Optional[float] = None
+    active_average_days: Optional[float] = None
+    completed_average_days: Optional[float] = None
+    cancelled_average_days: Optional[float] = None
+
+
+class StageResidencyAnalyticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    stage: str
+    sample_size: int
+    average_duration_days: Optional[float] = None
+    median_duration_days: Optional[float] = None
+    p25_days: Optional[float] = None
+    p75_days: Optional[float] = None
+    minimum_days: Optional[float] = None
+    maximum_days: Optional[float] = None
+    reentry_rate: float
+    oscillation_rate: float
+    current_residency_count: int
+    residency_category: str
+
+
+class MaturityAnalyticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    sample_size: int
+    average_maturity_score: Optional[float] = None
+    median_maturity_score: Optional[float] = None
+    lowest_maturity_score: Optional[float] = None
+    highest_maturity_score: Optional[float] = None
+    maturity_level_counts: Dict[str, int] = Field(default_factory=dict)
+    maturity_level_percentages: Dict[str, float] = Field(default_factory=dict)
+    lowest_maturity_bucket: Optional[str] = None
+    highest_maturity_bucket: Optional[str] = None
+
+
+class MomentumAnalyticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    sample_size: int
+    state_counts: Dict[str, int] = Field(default_factory=dict)
+    state_percentages: Dict[str, float] = Field(default_factory=dict)
+    advancing_percentage: float
+    stable_percentage: float
+    weakening_percentage: float
+    regressing_percentage: float
+    inactive_percentage: float
+    unknown_percentage: float
+
+
+class StabilityAnalyticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    sample_size: int
+    level_counts: Dict[str, int] = Field(default_factory=dict)
+    level_percentages: Dict[str, float] = Field(default_factory=dict)
+    average_stability_score: Optional[float] = None
+    reentry_frequency: float
+    oscillation_frequency: float
+    conflicting_evidence_frequency: float
+
+
+class VelocityAnalyticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    sample_size: int
+    state_counts: Dict[str, int] = Field(default_factory=dict)
+    state_percentages: Dict[str, float] = Field(default_factory=dict)
+    average_transitions_per_day: Optional[float] = None
+    average_transitions_per_week: Optional[float] = None
+    average_stage_duration_days: Optional[float] = None
+
+
+class HealthAnalyticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    sample_size: int
+    health_distribution: Dict[str, int] = Field(default_factory=dict)
+    health_percentages: Dict[str, float] = Field(default_factory=dict)
+    healthy_percentage: float
+    stalled_percentage: float
+    regressing_percentage: float
+    inactive_percentage: float
+    insufficient_data_percentage: float
+
+
+class ProgressionPatternDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    sample_size: int
+    average_forward_transitions: Optional[float] = None
+    average_regressions: Optional[float] = None
+    average_reentries: Optional[float] = None
+    average_stage_changes: Optional[float] = None
+    average_journey_age_days: Optional[float] = None
+    progression_consistency_score: Optional[float] = None
+    pattern_distribution: Dict[str, int] = Field(default_factory=dict)
+    pattern_percentages: Dict[str, float] = Field(default_factory=dict)
+
+
+class ObservedStageOutcomeDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    stage: str
+    outcome: str
+    success_count: int
+    failure_count: int
+    sample_size: int
+    observed_rate: Optional[float] = None
+    observation_window_days: int
+    minimum_sample_met: bool
+    confidence_interval_lower: Optional[float] = None
+    confidence_interval_upper: Optional[float] = None
+    confidence_level: float
+    calculation_method: str
+    limitations: List[str] = Field(default_factory=list)
+    data_status: str
+
+
+class TrendPointDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    timestamp: datetime
+    period_label: str
+    metric: str
+    value: float
+    sample_size: int
+
+
+class TrendAnalyticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    granularity: str
+    metrics: List[str]
+    data_points: List[TrendPointDTO]
+    total_periods: int
+
+
+class AnalyticsDiagnosticsDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    total_execution_time_ms: float
+    journeys_processed: int
+    transitions_processed: int
+    maturity_results_processed: int
+    metrics_calculated: List[str]
+    warnings: List[str]
+    validation_errors: List[str]
+    empty_dataset: bool
+    partial_dataset: bool
+    insufficient_data_metrics: List[str]
+
+
+class AnalyticsProvenanceDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    analytics_id: str
+    workspace_id: str
+    generated_at: datetime
+    engine_version: str
+    pipeline_version: str
+    configuration_version: str
+    source_journey_count: int
+    source_transition_count: int
+    source_maturity_count: int
+    calculation_methods: List[str]
+    statistical_methods: List[str]
+
+
+class JourneyAnalyticsResultDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    analytics_id: str
+    workspace_id: str
+    journey_type: Optional[str] = None
+    definition_version: Optional[str] = None
+    observation_window: AnalyticsObservationWindowDTO
+    generated_at: datetime
+    journey_count: int
+    distribution: JourneyDistributionDTO
+    stage_analytics: Dict[str, StageAnalyticsDTO] = Field(default_factory=dict)
+    transition_metrics: TransitionSummaryDTO
+    funnel: Optional[JourneyFunnelDTO] = None
+    duration_metrics: JourneyDurationDTO
+    residency_analytics: Dict[str, StageResidencyAnalyticsDTO] = Field(default_factory=dict)
+    maturity_analytics: MaturityAnalyticsDTO
+    momentum_analytics: MomentumAnalyticsDTO
+    stability_analytics: StabilityAnalyticsDTO
+    velocity_analytics: VelocityAnalyticsDTO
+    health_analytics: HealthAnalyticsDTO
+    progression_patterns: ProgressionPatternDTO
+    outcome_analytics: Dict[str, ObservedStageOutcomeDTO] = Field(default_factory=dict)
+    trend_analytics: Optional[TrendAnalyticsDTO] = None
+    diagnostics: AnalyticsDiagnosticsDTO
+    provenance: AnalyticsProvenanceDTO
+
+
+# Analytics request models
+class CalculateAnalyticsRequest(BaseModel):
+    workspace_id: str
+    journey_type: Optional[str] = None
+    definition_version: Optional[str] = None
+    configuration_version: Optional[str] = None
+    observation_window_days: Optional[int] = None
+    use_cache: bool = True
+
+
+class CohortAnalyticsRequest(BaseModel):
+    workspace_id: str
+    cohort_name: str
+    journey_type: Optional[str] = None
+    stage: Optional[str] = None
+    journey_status: Optional[str] = None
+    observation_window_days: int = 365
+    custom_filters: Dict[str, Any] = Field(default_factory=dict)
