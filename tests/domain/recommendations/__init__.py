@@ -1,0 +1,1 @@
+# Test namespace for recommendations

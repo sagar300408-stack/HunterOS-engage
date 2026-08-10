@@ -1,0 +1,3 @@
+# Empty
+class EvidenceReference:
+    pass
