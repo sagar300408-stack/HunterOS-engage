@@ -315,6 +315,9 @@ def create_app() -> FastAPI:
     from app.domain.journey.router import router as journey_router
     app.include_router(journey_router)
 
+    from app.domain.journey.integration.router import router as journey_integration_router
+    app.include_router(journey_integration_router)
+
     @app.on_event("startup")
     async def startup_event():
         """

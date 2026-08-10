@@ -1241,15 +1241,19 @@ def get_analytics_trends(
     }
 
 
+from fastapi import Response
+
 @router.delete(
     "/analytics/cache",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
     summary="Invalidate Analytics Cache",
     description="Invalidate the analytics cache for a workspace, forcing recalculation on next request.",
 )
 def invalidate_analytics_cache(
     workspace_id: str = Query(..., description="Workspace ID"),
     journey_type: Optional[str] = Query(None),
-) -> None:
+) -> Response:
     """DELETE /api/v1/journeys/analytics/cache"""
     journey_api_v1.invalidate_analytics_cache(workspace_id, journey_type)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
