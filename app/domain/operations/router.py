@@ -1,11 +1,16 @@
+from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.domain.operations.schemas import OperationalRequest
+from app.domain.operations.schemas import (
+    OperationalRequest, CreateActionRequest, ActionDTO, TransitionActionStatusRequest
+)
 from app.domain.operations.engine import OperationsEngine
+from app.domain.operations.repository import ActionRepository
+from app.domain.operations.exceptions import ActionConflictError, ActionNotFoundError
 from app.domain.approval.engine import ApprovalEngine
 from app.domain.action.engine import ActionEngine
 from app.domain.integration.engine import IntegrationEngine
@@ -19,7 +24,13 @@ def get_operations_engine(request: Request, db: AsyncSession = Depends(get_db)) 
     integration_engine = IntegrationEngine(db, cred_provider, request.app.state.event_bus)
     action_engine = ActionEngine(session=db, event_bus=request.app.state.event_bus, integration_engine=integration_engine)
     approval_engine = ApprovalEngine(session=db, event_bus=request.app.state.event_bus)
-    return OperationsEngine(approval_engine=approval_engine, action_engine=action_engine)
+    repository = ActionRepository(db)
+    return OperationsEngine(
+        approval_engine=approval_engine, 
+        action_engine=action_engine,
+        repository=repository,
+        event_bus=request.app.state.event_bus
+    )
 
 
 @router.post("/workspace/{workspace_id}/submit")
@@ -35,6 +46,66 @@ async def submit_operational_request(
     try:
         result = await engine.submit_request(workspace_id, req)
         return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/workspace/{workspace_id}/actions", response_model=ActionDTO)
+async def create_action(
+    workspace_id: UUID,
+    request: CreateActionRequest,
+    engine: OperationsEngine = Depends(get_operations_engine)
+):
+    try:
+        action = await engine.create_action(workspace_id, request)
+        return action
+    except ActionConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/workspace/{workspace_id}/actions", response_model=List[ActionDTO])
+async def list_actions(
+    workspace_id: UUID,
+    limit: int = 50,
+    offset: int = 0,
+    engine: OperationsEngine = Depends(get_operations_engine)
+):
+    if not engine.repository:
+        raise HTTPException(status_code=500, detail="Repository not initialized")
+    actions = await engine.repository.list_actions(workspace_id, limit, offset)
+    return actions
+
+
+@router.get("/workspace/{workspace_id}/actions/{action_id}", response_model=ActionDTO)
+async def get_action(
+    workspace_id: UUID,
+    action_id: UUID,
+    engine: OperationsEngine = Depends(get_operations_engine)
+):
+    if not engine.repository:
+        raise HTTPException(status_code=500, detail="Repository not initialized")
+    action = await engine.repository.get_action(workspace_id, action_id)
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    return action
+
+
+@router.patch("/workspace/{workspace_id}/actions/{action_id}", response_model=ActionDTO)
+async def transition_action_status(
+    workspace_id: UUID,
+    action_id: UUID,
+    request: TransitionActionStatusRequest,
+    engine: OperationsEngine = Depends(get_operations_engine)
+):
+    try:
+        action = await engine.transition_status(workspace_id, action_id, request)
+        return action
+    except ActionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

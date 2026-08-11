@@ -108,3 +108,7 @@ class Customer(Base):
 
     def __repr__(self) -> str:
         return f"<Customer id={self.id} phone={self.phone} status={self.status}>"
+
+# Import at bottom to avoid circular dependencies and ensure relationships can resolve
+from app.domain.memory.models import CustomerMemory, CustomerMemoryVersion, CustomerMemoryTimelineEvent
+from app.domain.intent.models import IntentHistory
