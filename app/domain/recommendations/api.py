@@ -18,9 +18,10 @@ class RecommendationIntelligenceAPIv1:
     Public contract exposing Recommendation Intelligence engine operations.
     Exclusively uses DTOs for communication.
     """
-    def __init__(self, engine: RecommendationIntelligenceEngine, detection_engine: RecommendationDetectionEngine = None):
+    def __init__(self, engine: RecommendationIntelligenceEngine, detection_engine: RecommendationDetectionEngine = None, explanation_engine: Any = None):
         self.engine = engine
         self.detection_engine = detection_engine
+        self.explanation_engine = explanation_engine
 
     def create_recommendation(self, data: CreateRecommendationRequest) -> RecommendationDTO:
         rec = self.engine.create(data)
@@ -90,3 +91,43 @@ class RecommendationIntelligenceAPIv1:
             target_id=None,
             candidates=[]
         )
+
+    def explain_recommendation(self, recommendation_id: UUID) -> Any:
+        if self.explanation_engine:
+            return self.explanation_engine.explain_recommendation(recommendation_id)
+        return {}
+
+    def explain_prioritized_recommendation(self, prioritization_id: UUID, recommendation_id: UUID) -> Any:
+        if self.explanation_engine:
+            return self.explanation_engine.explain_prioritized_recommendation(prioritization_id, recommendation_id)
+        return {}
+
+    def get_explanation(self, explanation_id: UUID) -> Any:
+        if self.explanation_engine:
+            return self.explanation_engine.get_explanation(explanation_id)
+        return {}
+
+    def get_recommendation_explanation(self, recommendation_id: UUID) -> Any:
+        if self.explanation_engine:
+            return self.explanation_engine.get_recommendation_explanation(recommendation_id)
+        return {}
+
+    def get_executive_explanation(self, explanation_id: UUID) -> Any:
+        if self.explanation_engine:
+            return self.explanation_engine.get_executive_explanation(explanation_id)
+        return {}
+
+    def get_sales_explanation(self, explanation_id: UUID) -> Any:
+        if self.explanation_engine:
+            return self.explanation_engine.get_sales_explanation(explanation_id)
+        return {}
+
+    def get_operations_explanation(self, explanation_id: UUID) -> Any:
+        if self.explanation_engine:
+            return self.explanation_engine.get_operations_explanation(explanation_id)
+        return {}
+
+    def get_audit_explanation(self, explanation_id: UUID) -> Any:
+        if self.explanation_engine:
+            return self.explanation_engine.get_audit_explanation(explanation_id)
+        return {}

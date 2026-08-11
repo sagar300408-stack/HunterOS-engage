@@ -105,3 +105,39 @@ def prioritize_conversation_recommendations(conversation_id: UUID, api: Recommen
 @router.get('/prioritization/{result_id}')
 def get_prioritization(result_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
     pass
+
+@router.post('/explain')
+def explain_recommendation(recommendation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.explain_recommendation(recommendation_id)
+
+@router.post('/{recommendation_id}/explain')
+def explain_recommendation_by_id(recommendation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.explain_recommendation(recommendation_id)
+
+@router.post('/prioritization/{prioritization_id}/recommendations/{recommendation_id}/explain')
+def explain_prioritized_recommendation(prioritization_id: UUID, recommendation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.explain_prioritized_recommendation(prioritization_id, recommendation_id)
+
+@router.get('/explanations/{explanation_id}')
+def get_explanation(explanation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.get_explanation(explanation_id)
+
+@router.get('/{recommendation_id}/explanation')
+def get_recommendation_explanation(recommendation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.get_recommendation_explanation(recommendation_id)
+
+@router.get('/explanations/{explanation_id}/executive')
+def get_executive_explanation(explanation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.get_executive_explanation(explanation_id)
+
+@router.get('/explanations/{explanation_id}/sales')
+def get_sales_explanation(explanation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.get_sales_explanation(explanation_id)
+
+@router.get('/explanations/{explanation_id}/operations')
+def get_operations_explanation(explanation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.get_operations_explanation(explanation_id)
+
+@router.get('/explanations/{explanation_id}/audit')
+def get_audit_explanation(explanation_id: UUID, api: RecommendationIntelligenceAPIv1 = Depends(get_api)):
+    return api.get_audit_explanation(explanation_id)
