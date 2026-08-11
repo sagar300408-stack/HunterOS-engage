@@ -321,6 +321,9 @@ def create_app() -> FastAPI:
     from app.domain.recommendations.router import router as recommendation_router
     app.include_router(recommendation_router)
 
+    from app.domain.recommendations.integration.router import router as recommendation_integration_router
+    app.include_router(recommendation_integration_router)
+
     @app.on_event("startup")
     async def startup_event():
         """
