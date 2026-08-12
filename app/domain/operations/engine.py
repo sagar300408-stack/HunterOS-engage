@@ -32,35 +32,44 @@ class OperationsEngine:
         self.planning_service = planning_service
         self.event_bus = event_bus
 
-    async def submit_request(self, workspace_id: UUID, req: OperationalRequest) -> Dict[str, Any]:
+    async def evaluate_governance(self, workspace_id: UUID, action_id: UUID, correlation_id: Optional[UUID] = None) -> Dict[str, Any]:
         """
-        The central orchestrator for all operational requests.
+        The central orchestrator for Phase 3.4 Governance.
         Flow:
-        1. Parse Request
-        2. Evaluate Approval Policies
-        3. If Approval Required -> Submit to ApprovalEngine and Pause
-        4. If No Approval Required -> Submit to ActionEngine directly
+        1. Ensure Action is READY.
+        2. Evaluate Approval Policies.
+        3. If Approval Required -> Transition Action to PENDING_APPROVAL.
+        4. If No Approval Required -> Transition Action to APPROVED.
         """
-        # Create a placeholder action ID for tracking
-        action_id = uuid.uuid4()
-        
-        # Determine approval context
-        context = req.approval_context or ApprovalContext(
-            action_type=req.action_type,
-            target_system=req.target_system
-        )
-        
+        if not self.repository:
+            raise RuntimeError("OperationsEngine not initialized with a repository")
+            
+        # Reconstruct SubmitApprovalRequest for backwards compatibility with ApprovalEngine
+        action = await self.repository.get_action(workspace_id, action_id)
+        if not action:
+            raise ActionNotFoundError(f"Action {action_id} not found")
+            
         approval_req = SubmitApprovalRequest(
             action_id=action_id,
-            context=context,
-            requested_by=req.requested_by,
-            correlation_id=req.correlation_id
+            context=ApprovalContext(
+                action_type=action.action_type,
+                target_system=action.target,
+                risk_level=getattr(action, "priority", "NORMAL"),
+                action_summary=f"Approval for {action.action_type}"
+            ),
+            requested_by=action.owner,
+            correlation_id=correlation_id
         )
         
-        needs_approval, approval = await self.approval_engine.evaluate_action(workspace_id, approval_req)
+        needs_approval, approval = await self.approval_engine.evaluate_action(workspace_id, approval_req, self.repository)
         
         if needs_approval and approval:
-            # Paused for approval
+            # Transition to PENDING_APPROVAL
+            await self.transition_status(workspace_id, action_id, TransitionActionStatusRequest(
+                target_status=ActionStatus.PENDING_APPROVAL,
+                expected_revision_id=action.revision_id,
+                reason="Governance policy matched, approval required."
+            ))
             return {
                 "status": "awaiting_approval",
                 "approval_id": approval.id,
@@ -68,31 +77,42 @@ class OperationsEngine:
                 "message": "Action requires approval before execution."
             }
             
-        # No approval required, execute immediately
-        # We need to map the generated action_id somehow. Let's just submit the action.
-        action_req = req.to_submit_action_request()
-        action = await self.action_engine.submit_action(workspace_id, action_req)
-        
-        # Technically action.id will be newly generated in ActionEngine, which overrides our placeholder action_id.
-        # This is fine for now, we return the actual action ID.
+        # No approval required, transition to APPROVED
+        await self.transition_status(workspace_id, action_id, TransitionActionStatusRequest(
+            target_status=ActionStatus.APPROVED,
+            expected_revision_id=action.revision_id,
+            reason="Governance evaluation passed, no approval required."
+        ))
         return {
-            "status": "executing",
-            "action_id": action.id,
-            "message": "Action submitted for execution."
+            "status": "approved",
+            "action_id": action_id,
+            "message": "Action approved for execution."
         }
 
-    async def process_approval_decision(self, approval_id: UUID, req: Any) -> Dict[str, Any]:
+    async def process_approval_decision(self, approval_id: UUID, req: Any, authenticated_actor_id: str) -> Dict[str, Any]:
         """
-        Handles an approval decision. If the approval completes successfully,
-        this will forward the original request to the Action Engine.
+        Handles an approval decision.
+        Transitions the underlying Action to APPROVED or REJECTED.
         """
-        approval = await self.approval_engine.process_decision(approval_id, req)
+        approval = await self.approval_engine.process_decision(approval_id, req, authenticated_actor_id, self.repository)
         
         if approval.status == "approved":
-            # In a full system, we would serialize the original request and reconstruct it here.
-            # For Milestone 9.3, we will simulate this by assuming the request can be reconstructed.
-            # The ActionEngine would be invoked here.
-            pass
+            # Transition Action to APPROVED
+            action = await self.repository.get_action(approval.workspace_id, approval.action_id)
+            if action:
+                await self.transition_status(approval.workspace_id, action.id, TransitionActionStatusRequest(
+                    target_status=ActionStatus.APPROVED,
+                    expected_revision_id=action.revision_id,
+                    reason=f"Approved by {authenticated_actor_id}"
+                ))
+        elif approval.status == "rejected":
+            action = await self.repository.get_action(approval.workspace_id, approval.action_id)
+            if action:
+                await self.transition_status(approval.workspace_id, action.id, TransitionActionStatusRequest(
+                    target_status=ActionStatus.REJECTED,
+                    expected_revision_id=action.revision_id,
+                    reason=f"Rejected by {authenticated_actor_id}"
+                ))
             
         return {
             "approval_id": approval.id,

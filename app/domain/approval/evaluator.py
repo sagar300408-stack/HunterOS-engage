@@ -39,3 +39,37 @@ class PolicyEvaluator:
             # Can be expanded for IN, CONTAINS, etc.
             
         return True
+
+    @staticmethod
+    def evaluate_policies(policies: List[ApprovalPolicy], action: Any, context_data: Dict[str, Any]) -> "GovernanceEvaluationResult":
+        """
+        Evaluates an action against a list of policies and returns a structured GovernanceEvaluationResult.
+        """
+        from app.domain.approval.schemas import GovernanceEvaluationResult
+        from datetime import datetime
+        
+        matching_policy = None
+        for policy in policies:
+            if PolicyEvaluator.evaluate(policy, context_data):
+                matching_policy = policy
+                break
+                
+        if not matching_policy:
+            return GovernanceEvaluationResult(
+                action_id=action.id,
+                approval_required=False,
+                reason="No approval policy matched the context.",
+                evaluated_at=datetime.now(),
+                action_version=getattr(action, 'revision_id', None),
+                readiness_state=action.status
+            )
+            
+        return GovernanceEvaluationResult(
+            action_id=action.id,
+            approval_required=True,
+            policy_id=matching_policy.id,
+            reason=f"Matched policy: {matching_policy.name}",
+            evaluated_at=datetime.now(),
+            action_version=getattr(action, 'revision_id', None),
+            readiness_state=action.status
+        )

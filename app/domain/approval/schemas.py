@@ -25,6 +25,18 @@ class SubmitApprovalRequest(BaseModel):
     correlation_id: Optional[UUID] = None
 
 
+class GovernanceEvaluationResult(BaseModel):
+    action_id: UUID
+    approval_required: bool
+    policy_id: Optional[UUID] = None
+    policy_version: Optional[str] = None
+    reason: Optional[str] = None
+    evaluated_at: datetime = datetime.now()
+    action_version: Optional[int] = None
+    readiness_state: Optional[str] = None
+
+
+
 class MakeDecisionRequest(BaseModel):
     approver_id: str
     decision: str  # APPROVED or REJECTED

@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 from uuid import UUID
 from datetime import datetime, timezone
 
@@ -20,12 +20,19 @@ class ApprovalEngine:
         self.repo = ApprovalRepository(session)
         self.event_bus = event_bus
 
-    async def evaluate_action(self, workspace_id: UUID, req: SubmitApprovalRequest) -> Tuple[bool, Optional[ApprovalRequest]]:
+    async def evaluate_action(self, workspace_id: UUID, req: SubmitApprovalRequest, action_repo: Any) -> Tuple[bool, Optional[ApprovalRequest]]:
         """
         Evaluates an action against policies.
         Returns (needs_approval, approval_request).
         If needs_approval is False, the action can proceed immediately.
         """
+        action = await action_repo.get_action(workspace_id, req.action_id)
+        if not action:
+            raise ValueError(f"Action {req.action_id} not found in workspace {workspace_id}")
+
+        if action.status not in ("READY", "PLANNED"):
+            raise ValueError(f"Cannot evaluate governance for action in state {action.status}")
+
         policies = await self.repo.get_all_active_policies(workspace_id)
         
         context_data = {
@@ -36,20 +43,16 @@ class ApprovalEngine:
             **req.context.business_context
         }
         
-        matching_policy = None
-        for policy in policies:
-            if PolicyEvaluator.evaluate(policy, context_data):
-                matching_policy = policy
-                break
+        eval_result = PolicyEvaluator.evaluate_policies(policies, action, context_data)
                 
-        if not matching_policy:
+        if not eval_result.approval_required:
             return False, None
             
         # Create Approval Request
         approval_req = ApprovalRequest(
             workspace_id=workspace_id,
             action_id=req.action_id,
-            policy_id=matching_policy.id,
+            policy_id=eval_result.policy_id,
             correlation_id=req.correlation_id,
             status=ApprovalStatus.PENDING.value,
             current_stage_index=0,
@@ -73,7 +76,7 @@ class ApprovalEngine:
         
         return True, approval_req
 
-    async def process_decision(self, approval_id: UUID, req: MakeDecisionRequest) -> ApprovalRequest:
+    async def process_decision(self, approval_id: UUID, req: MakeDecisionRequest, authenticated_actor_id: str, action_repo: Any = None) -> ApprovalRequest:
         approval_req = await self.repo.get_request(approval_id)
         if not approval_req:
             raise ValueError(f"Approval {approval_id} not found.")
@@ -81,17 +84,35 @@ class ApprovalEngine:
         if approval_req.status != ApprovalStatus.UNDER_REVIEW.value:
             raise ValueError(f"Approval is in {approval_req.status} state, cannot process decision.")
             
+        # Authorization validation
+        # The approver identity MUST be derived from the authenticated execution context.
+        # If the client provided an approver_id, we validate that it matches the authenticated context.
+        if req.approver_id and req.approver_id != authenticated_actor_id:
+            raise PermissionError(f"Authenticated actor {authenticated_actor_id} is not authorized to act as {req.approver_id}")
+            
+        # Segregation of duties: The requester cannot approve their own request if policy prohibits it.
+        # For V1, we simply record it. If there was a strict policy check, it would happen here.
+        if approval_req.requested_by == authenticated_actor_id:
+            # Note: A real strict policy check could be added here if defined in ApprovalPolicy
+            pass
+
         policy = await self.repo.get_policy(approval_req.policy_id)
         if not policy:
             raise ValueError("Policy not found.")
             
+        # Stage validation - check if the actor is in the authorized approvers list for the current stage
+        stage_config = policy.stages[approval_req.current_stage_index]
+        allowed_approvers = stage_config.get("approver_ids", [])
+        if allowed_approvers and authenticated_actor_id not in allowed_approvers:
+             raise PermissionError(f"Actor {authenticated_actor_id} is not authorized to approve stage {approval_req.current_stage_index}")
+
         if approval_req.time_to_first_review_ms is None:
             approval_req.time_to_first_review_ms = int((datetime.now(timezone.utc) - approval_req.requested_at).total_seconds() * 1000)
             
         decision = ApprovalDecision(
             approval_request_id=approval_req.id,
             stage_index=approval_req.current_stage_index,
-            approver_id=req.approver_id,
+            approver_id=authenticated_actor_id,
             delegated_from_id=req.delegated_from_id,
             decision=req.decision,
             comments=req.comments

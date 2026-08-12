@@ -27,8 +27,7 @@ class RecommendationEventHandler:
         """
         try:
             # Note: We must ensure this fetch doesn't mutate or bypass security boundaries.
-            # Assuming the recommendation_engine provides a safe read for the given workspace_id.
-            recommendation = self.recommendation_engine.get(event.recommendation_id)
+            recommendation = await self.recommendation_engine.get(event.recommendation_id)
             
             # Security & Isolation: Enforce workspace matching
             if recommendation.workspace_id != event.workspace_id:

@@ -25,7 +25,11 @@ async def test_workspace_isolation_blocks_mismatched_workspaces():
         workspace_id=event_workspace,
         recommendation_id=rec_id,
         recommendation_type="FOLLOW_UP",
-        status="PROPOSED"
+        status="CANDIDATE",
+        actor_type="system",
+        source_subsystem="recommendation",
+        category="ACTION",
+        event_name="recommendation.created"
     )
 
     # Return a recommendation that belongs to a DIFFERENT workspace
@@ -33,10 +37,10 @@ async def test_workspace_isolation_blocks_mismatched_workspaces():
         id=rec_id,
         workspace_id=malicious_workspace,
         type=RecommendationType.FOLLOW_UP,
-        status=RecommendationStatus.PROPOSED,
+        status=RecommendationStatus.CANDIDATE,
         source=RecommendationSource.SYSTEM,
         scope=RecommendationScope.CUSTOMER,
-        priority=RecommendationPriority.NORMAL,
+        priority=RecommendationPriority.MEDIUM,
         confidence=RecommendationConfidence(value=1.0),
         title="Test",
         description="Test"

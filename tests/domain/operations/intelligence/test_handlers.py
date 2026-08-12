@@ -24,17 +24,21 @@ async def test_handler_successful_processing():
         workspace_id=workspace_id,
         recommendation_id=rec_id,
         recommendation_type="FOLLOW_UP",
-        status="PROPOSED"
+        status="CANDIDATE",
+        actor_type="system",
+        source_subsystem="recommendation",
+        category="ACTION",
+        event_name="recommendation.created"
     )
 
     mock_rec = Recommendation(
         id=rec_id,
         workspace_id=workspace_id,
         type=RecommendationType.FOLLOW_UP,
-        status=RecommendationStatus.PROPOSED,
+        status=RecommendationStatus.CANDIDATE,
         source=RecommendationSource.SYSTEM,
         scope=RecommendationScope.CUSTOMER,
-        priority=RecommendationPriority.NORMAL,
+        priority=RecommendationPriority.MEDIUM,
         confidence=RecommendationConfidence(value=1.0),
         title="Test",
         description="Test"
