@@ -56,3 +56,13 @@ class ActionRepository:
                     raise ActionConflictError("Action with this idempotency key already exists with different properties.")
         self.session.add(action)
         return action
+
+    async def get_action_basics(self, action_id: uuid.UUID) -> Optional[Action]:
+        """Returns the Action without loading relationships."""
+        stmt = select(Action).where(Action.id == action_id)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def save(self) -> None:
+        """Commits the current transaction, following the established OperationsEngine convention."""
+        await self.session.commit()

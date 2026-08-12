@@ -15,17 +15,21 @@ from app.events.model.operations_events import (
     ActionCreatedEvent, ActionStatusChangedEvent, ActionDependencyAddedEvent
 )
 
+from app.domain.operations.planning.service import ActionPlanningService
+
 class OperationsEngine:
     def __init__(
         self, 
         approval_engine: ApprovalEngine, 
         action_engine: ActionEngine,
         repository: ActionRepository = None,
+        planning_service: ActionPlanningService = None,
         event_bus: Any = None
     ):
         self.approval_engine = approval_engine
         self.action_engine = action_engine
         self.repository = repository
+        self.planning_service = planning_service
         self.event_bus = event_bus
 
     async def submit_request(self, workspace_id: UUID, req: OperationalRequest) -> Dict[str, Any]:
@@ -114,13 +118,14 @@ class OperationsEngine:
             status=ActionStatus.DETECTED
         )
         
-        # Add dependencies
-        for dep_id in request.dependency_action_ids:
-            dep = ActionDependency(depends_on_action_id=dep_id)
-            action.dependencies.append(dep)
-            
+        # Do NOT add dependencies directly to avoid bypassing planning rules
         action = await self.repository.create_action(action)
         await self.repository.save()
+        
+        # Add dependencies properly using the planning service
+        if self.planning_service:
+            for dep_id in request.dependency_action_ids:
+                await self.planning_service.add_dependency(workspace_id, action.id, dep_id)
         
         if self.event_bus:
             event = ActionCreatedEvent(
@@ -186,29 +191,46 @@ class OperationsEngine:
         return action
 
     async def add_dependency(self, workspace_id: UUID, action_id: UUID, depends_on_action_id: UUID) -> Action:
-        if not self.repository:
-            raise RuntimeError("OperationsEngine not initialized with a repository")
+        if not self.planning_service:
+            raise RuntimeError("OperationsEngine not initialized with a planning service")
             
-        action = await self.repository.get_action(workspace_id, action_id)
-        if not action:
-            raise ActionNotFoundError(f"Action {action_id} not found")
-            
-        # check if dependency exists
-        for dep in action.dependencies:
-            if dep.depends_on_action_id == depends_on_action_id:
-                return action
-                
-        new_dep = ActionDependency(depends_on_action_id=depends_on_action_id)
-        action.dependencies.append(new_dep)
-        action.advance_revision()
-        await self.repository.save()
+        await self.planning_service.add_dependency(workspace_id, action_id, depends_on_action_id)
         
         if self.event_bus:
             event = ActionDependencyAddedEvent(
                 workspace_id=workspace_id,
-                action_id=action.id,
+                action_id=action_id,
                 depends_on_action_id=depends_on_action_id
             )
             await self.event_bus.publish(event)
             
-        return action
+        return await self.repository.get_action(workspace_id, action_id)
+
+    async def remove_dependency(self, workspace_id: UUID, action_id: UUID, depends_on_action_id: UUID) -> Action:
+        if not self.planning_service:
+            raise RuntimeError("OperationsEngine not initialized with a planning service")
+            
+        await self.planning_service.remove_dependency(workspace_id, action_id, depends_on_action_id)
+        
+        # Publish ActionDependencyRemovedEvent
+        if self.event_bus:
+            from app.events.model.operations_events import ActionDependencyRemovedEvent
+            event = ActionDependencyRemovedEvent(
+                workspace_id=workspace_id,
+                action_id=action_id,
+                depends_on_action_id=depends_on_action_id
+            )
+            await self.event_bus.publish(event)
+            
+        return await self.repository.get_action(workspace_id, action_id)
+
+    async def get_blockers(self, workspace_id: UUID, action_id: UUID) -> List[UUID]:
+        if not self.planning_service:
+            raise RuntimeError("OperationsEngine not initialized with a planning service")
+        readiness = await self.planning_service.evaluate_readiness(workspace_id, action_id)
+        return readiness.blockers
+
+    async def get_readiness(self, workspace_id: UUID, action_id: UUID):
+        if not self.planning_service:
+            raise RuntimeError("OperationsEngine not initialized with a planning service")
+        return await self.planning_service.evaluate_readiness(workspace_id, action_id)

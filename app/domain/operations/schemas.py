@@ -104,3 +104,13 @@ class OperationalRequest(BaseModel):
             priority=self.priority,
             requested_by=self.requested_by
         )
+
+class ActionReadiness(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    action_id: UUID
+    state: str  # "READY" or "BLOCKED"
+    blockers: List[UUID]
+    satisfied_dependencies: List[UUID]
+    action_version: int
+    evaluated_at: str

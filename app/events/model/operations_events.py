@@ -34,3 +34,10 @@ class ActionDependencyAddedEvent(UniversalBaseEvent):
     
     action_id: UUID
     depends_on_action_id: UUID
+
+class ActionDependencyRemovedEvent(UniversalBaseEvent):
+    category: EventCategory = Field(default=EventCategory.ACTION)
+    event_name: str = Field(default="action.dependency.removed")
+    
+    action_id: UUID
+    depends_on_action_id: UUID

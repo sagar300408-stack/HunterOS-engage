@@ -8,7 +8,8 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
-    CheckConstraint
+    CheckConstraint,
+    UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -81,6 +82,7 @@ class ActionDependency(Base):
             "action_id != depends_on_action_id",
             name="check_no_self_dependency"
         ),
+        UniqueConstraint("action_id", "depends_on_action_id", name="uq_action_dependency"),
     )
 
 
