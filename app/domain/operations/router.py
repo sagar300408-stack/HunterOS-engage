@@ -18,11 +18,18 @@ from app.domain.integration.credentials import JsonCredentialProvider
 from app.domain.operations.planning.service import ActionPlanningService
 from app.domain.operations.orchestration.engine import ActionOrchestrationEngine
 from app.domain.operations.orchestration.port import NoopExecutionPort
-from app.domain.operations.orchestration.schemas import OrchestrateActionRequest, OrchestrationResultDTO
+from app.domain.operations.orchestration.schemas import (
+    OrchestrateActionRequest, 
+    OrchestrationRunDTO,
+    RetryOrchestrationRequest,
+    CancelOrchestrationRequest
+)
 from app.domain.operations.orchestration.exceptions import (
     OrchestrationError,
     OrchestrationBlockedError,
     StalePinnedVersionError,
+    RetryLimitExceededError,
+    InvalidOrchestrationStateError
 )
 
 router = APIRouter(prefix="/operations", tags=["operations"])
@@ -132,7 +139,7 @@ async def transition_action_status(
 
 @router.post(
     "/workspace/{workspace_id}/actions/{action_id}/orchestrate",
-    response_model=OrchestrationResultDTO,
+    response_model=OrchestrationRunDTO,
 )
 async def orchestrate_action(
     workspace_id: UUID,
@@ -142,17 +149,11 @@ async def orchestrate_action(
 ):
     """
     Phase 3.5 — Orchestrate an APPROVED Action.
-
-    Drives the Action through the APPROVED → READY → EXECUTING corridor and
-    hands it off to the configured ExecutionPort (Phase 3.6 boundary).
-
-    The `pinned_revision_id` in the request body must be the Action's
-    `revision_id` captured immediately after the governance approval step.
-    Any revision drift detected between governance and this call will result
-    in a 409 Conflict response.
     """
     try:
-        return await engine.orchestrate_approved_action(workspace_id, action_id, req)
+        if not engine.orchestration_engine:
+            raise RuntimeError("OperationsEngine not initialized with orchestration_engine")
+        return await engine.orchestration_engine.orchestrate(workspace_id, action_id, req)
     except ActionNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except StalePinnedVersionError as e:
@@ -165,3 +166,52 @@ async def orchestrate_action(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/workspace/{workspace_id}/actions/{action_id}/runs/{run_id}/retry",
+    response_model=OrchestrationRunDTO,
+)
+async def retry_orchestration(
+    workspace_id: UUID,
+    action_id: UUID,
+    run_id: UUID,
+    req: RetryOrchestrationRequest,
+    engine: OperationsEngine = Depends(get_operations_engine),
+):
+    try:
+        if not engine.orchestration_engine:
+            raise RuntimeError("OperationsEngine not initialized with orchestration_engine")
+        return await engine.orchestration_engine.retry(workspace_id, action_id, run_id, req)
+    except ActionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except (StalePinnedVersionError, InvalidOrchestrationStateError, RetryLimitExceededError) as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except OrchestrationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/workspace/{workspace_id}/actions/{action_id}/runs/{run_id}/cancel",
+    response_model=OrchestrationRunDTO,
+)
+async def cancel_orchestration(
+    workspace_id: UUID,
+    action_id: UUID,
+    run_id: UUID,
+    req: CancelOrchestrationRequest,
+    engine: OperationsEngine = Depends(get_operations_engine),
+):
+    try:
+        if not engine.orchestration_engine:
+            raise RuntimeError("OperationsEngine not initialized with orchestration_engine")
+        return await engine.orchestration_engine.cancel(workspace_id, action_id, run_id, req)
+    except ActionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except OrchestrationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

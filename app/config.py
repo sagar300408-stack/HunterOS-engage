@@ -48,6 +48,11 @@ class Settings(BaseSettings):
         default="change-me-in-production-32-chars-min",
         alias="DASHBOARD_SECRET_KEY",
     )
+
+    # ── Phase 3.5: Orchestration ────────────────────────────────────────────────
+    orchestration_max_retries: int = Field(default=3, alias="ORCHESTRATION_MAX_RETRIES")
+
+
     # Comma-separated CORS origins for the React dashboard dev server.
     # Example: "http://localhost:5173,https://dashboard.hunteros.ai"
     dashboard_cors_origins: str = Field(

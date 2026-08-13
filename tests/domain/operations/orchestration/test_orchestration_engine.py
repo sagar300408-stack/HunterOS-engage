@@ -28,9 +28,9 @@ from app.domain.operations.orchestration.exceptions import (
     OrchestrationBlockedError,
     StalePinnedVersionError,
 )
-from app.domain.operations.orchestration.models import OrchestrationOutcome
 from app.domain.operations.orchestration.port import NoopExecutionPort
 from app.domain.operations.orchestration.schemas import OrchestrateActionRequest
+from app.domain.operations.orchestration.models import OrchestrationRunState
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -87,12 +87,11 @@ async def test_happy_path_transitions_to_executing(
     ])
 
     result = await orch_engine.orchestrate(workspace_id, action_id, orchestrate_req)
-
-    assert result.status == OrchestrationOutcome.HANDED_OFF
-    assert result.execution_handle == "handle-001"
+    assert result.state == OrchestrationRunState.EXECUTING.value
+    assert result.attempts[-1].execution_handle == "handle-001"
     assert result.action_id == action_id
     assert result.workspace_id == workspace_id
-    assert result.reason is None
+    assert result.failure_reason is None
     mock_execution_port.submit.assert_awaited_once()
     mock_event_bus.publish.assert_awaited()
 
@@ -125,17 +124,18 @@ async def test_wrong_status_raises_orchestration_error(
 async def test_stale_revision_raises_stale_error(
     orch_engine, workspace_id, action_id, mock_repository,
 ):
-    """revision_id has drifted since governance pinned it → StalePinnedVersionError."""
+    """action_version has drifted since governance pinned it → StalePinnedVersionError."""
     action = make_action(workspace_id, action_id, ActionStatus.APPROVED, revision_id="rev-DRIFTED")
+    action.version_number = 3
     mock_repository.get_action = AsyncMock(return_value=action)
 
-    req = OrchestrateActionRequest(pinned_revision_id="rev-ORIGINAL")
+    req = OrchestrateActionRequest(pinned_action_version=99)
 
     with pytest.raises(StalePinnedVersionError) as exc_info:
         await orch_engine.orchestrate(workspace_id, action_id, req)
 
-    assert "rev-ORIGINAL" in str(exc_info.value)
-    assert "rev-DRIFTED" in str(exc_info.value)
+    assert "99" in str(exc_info.value)
+    assert "3" in str(exc_info.value)
     mock_repository.save.assert_not_awaited()
 
 
@@ -144,7 +144,7 @@ async def test_stale_revision_raises_stale_error(
 # ──────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_permanently_blocked_dep_raises_blocked_error(
+async def test_permanently_blocked_dep_raises_blocked_error(mock_session, 
     workspace_id, action_id, mock_repository, mock_execution_port, mock_event_bus,
     approved_action, orchestrate_req,
 ):
@@ -162,6 +162,7 @@ async def test_permanently_blocked_dep_raises_blocked_error(
 
     # Simulate the blocker query returning FAILED status
     mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
     failed_row = MagicMock()
     failed_row.id = dep_id
     failed_row.status = ActionStatus.FAILED
@@ -172,6 +173,7 @@ async def test_permanently_blocked_dep_raises_blocked_error(
     blocked_planning.evaluate_readiness = AsyncMock(return_value=blocked_readiness)
 
     engine = ActionOrchestrationEngine(
+        session=mock_session,
         repository=mock_repository,
         planning_service=blocked_planning,
         execution_port=mock_execution_port,
@@ -190,7 +192,7 @@ async def test_permanently_blocked_dep_raises_blocked_error(
 # ──────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_transient_block_raises_orchestration_error(
+async def test_transient_block_raises_orchestration_error(mock_session, 
     workspace_id, action_id, mock_repository, mock_execution_port, mock_event_bus,
     approved_action, orchestrate_req,
 ):
@@ -208,6 +210,7 @@ async def test_transient_block_raises_orchestration_error(
 
     # Blocker is EXECUTING — transient, not permanently failed
     mock_result = MagicMock()
+    mock_result.scalar_one_or_none.return_value = None
     executing_row = MagicMock()
     executing_row.id = dep_id
     executing_row.status = ActionStatus.EXECUTING
@@ -218,6 +221,7 @@ async def test_transient_block_raises_orchestration_error(
     transient_planning.evaluate_readiness = AsyncMock(return_value=blocked_readiness)
 
     engine = ActionOrchestrationEngine(
+        session=mock_session,
         repository=mock_repository,
         planning_service=transient_planning,
         execution_port=mock_execution_port,
@@ -237,7 +241,7 @@ async def test_transient_block_raises_orchestration_error(
 # ──────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_execution_port_failure_transitions_to_failed(
+async def test_execution_port_failure_transitions_to_failed(mock_session, 
     workspace_id, action_id, mock_repository, mock_planning_service,
     mock_event_bus, approved_action, orchestrate_req,
 ):
@@ -257,21 +261,24 @@ async def test_execution_port_failure_transitions_to_failed(
     failing_port.submit = AsyncMock(side_effect=RuntimeError("Simulated connector failure"))
 
     engine = ActionOrchestrationEngine(
+        session=mock_session,
         repository=mock_repository,
         planning_service=mock_planning_service,
         execution_port=failing_port,
         event_bus=mock_event_bus,
     )
 
-    with pytest.raises(RuntimeError, match="Simulated connector failure"):
-        await engine.orchestrate(workspace_id, action_id, orchestrate_req)
+    await engine.orchestrate(workspace_id, action_id, orchestrate_req)
+    
+    # Verify action status remains EXECUTING since it's a retryable failure (attempt 1 of 4)
+    assert executing_action.status == ActionStatus.EXECUTING
 
     # Verify the failed event was published
     published_event_names = [
         call_args.args[0].event_name if call_args.args else None
         for call_args in mock_event_bus.publish.call_args_list
     ]
-    assert "action.orchestration.failed" in published_event_names
+    assert "action.orchestration.run.failed" in published_event_names
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -279,7 +286,7 @@ async def test_execution_port_failure_transitions_to_failed(
 # ──────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_version_guard_between_ready_and_executing(
+async def test_version_guard_between_ready_and_executing(mock_session, 
     workspace_id, action_id, mock_planning_service, mock_execution_port,
     mock_event_bus, approved_action, orchestrate_req,
 ):
@@ -293,6 +300,7 @@ async def test_version_guard_between_ready_and_executing(
     ready_action_drifted = make_action(
         workspace_id, action_id, ActionStatus.READY, "rev-CONCURRENT-EDIT"
     )
+    ready_action_drifted.version_number = 3
 
     drifting_repo = AsyncMock()
     drifting_repo.session = AsyncMock()
@@ -306,6 +314,7 @@ async def test_version_guard_between_ready_and_executing(
     ])
 
     engine = ActionOrchestrationEngine(
+        session=mock_session,
         repository=drifting_repo,
         planning_service=mock_planning_service,
         execution_port=mock_execution_port,
@@ -324,7 +333,7 @@ async def test_version_guard_between_ready_and_executing(
 # ──────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_event_sequence(
+async def test_event_sequence(mock_session, 
     workspace_id, action_id, mock_planning_service, mock_execution_port,
     mock_event_bus, approved_action, orchestrate_req,
 ):
@@ -346,6 +355,7 @@ async def test_event_sequence(
     ])
 
     engine = ActionOrchestrationEngine(
+        session=mock_session,
         repository=seq_repo,
         planning_service=mock_planning_service,
         execution_port=mock_execution_port,
@@ -359,12 +369,16 @@ async def test_event_sequence(
         for call_args in mock_event_bus.publish.call_args_list
         if call_args.args
     ]
-    assert "action.orchestration.started" in event_names
-    assert "action.orchestration.handed_off" in event_names
-    started_idx = event_names.index("action.orchestration.started")
-    handed_off_idx = event_names.index("action.orchestration.handed_off")
-    assert started_idx < handed_off_idx, (
-        "action.orchestration.started must be published before action.orchestration.handed_off"
+    
+    assert "action.orchestration.run.started" in event_names
+    
+    # handed_off_idx could be the second status changed event since it changed from APPROVED->READY then READY->EXECUTING
+    started_idx = event_names.index("action.orchestration.run.started")
+    handed_off_indices = [i for i, name in enumerate(event_names) if name == "action.status.changed"]
+    # The READY->EXECUTING status change should be AFTER the run.started event, or before it depending on the swap we did.
+    # We swapped it so run.started is first. So the LAST status.changed event should be after started_idx.
+    assert started_idx < handed_off_indices[-1], (
+        "action.orchestration.run.started must be published before action.status.changed to EXECUTING"
     )
 
 

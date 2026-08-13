@@ -13,11 +13,18 @@ Rules:
 
 from __future__ import annotations
 
+import enum
 from abc import ABC, abstractmethod
 from typing import Optional
 from uuid import UUID
 
 from app.domain.operations.models import Action
+
+
+class CancellationResult(str, enum.Enum):
+    SUPPORTED_ACCEPTED = "SUPPORTED_ACCEPTED"
+    SUPPORTED_REJECTED = "SUPPORTED_REJECTED"
+    CANCELLATION_UNSUPPORTED = "CANCELLATION_UNSUPPORTED"
 
 
 class ExecutionPort(ABC):
@@ -51,14 +58,20 @@ class ExecutionPort(ABC):
         Returns:
             execution_handle: An opaque, workspace-scoped string token
                 (e.g. a Celery task ID, a job queue ID, a run UUID)
-                that Phase 3.5 stores in action.execution_metadata["execution_handle"]
+                that Phase 3.5 stores in attempt.execution_handle
                 for downstream tracing by Phase 3.6+.
+        """
+        ...
 
-        Raises:
-            Any exception raised here is treated as a Phase 3.5 execution-port
-            failure. The ActionOrchestrationEngine will transition the Action
-            to FAILED and publish ActionOrchestrationFailedEvent before
-            propagating the exception to the caller.
+    @abstractmethod
+    async def cancel(
+        self,
+        workspace_id: UUID,
+        execution_handle: str,
+        correlation_id: Optional[UUID] = None,
+    ) -> CancellationResult:
+        """
+        Request cancellation of an executing external operation.
         """
         ...
 
@@ -66,13 +79,6 @@ class ExecutionPort(ABC):
 class NoopExecutionPort(ExecutionPort):
     """
     Stub implementation of ExecutionPort used until Phase 3.6 is available.
-
-    Behaviour:
-      - Does NOT perform any I/O, connector calls, or external communication.
-      - Returns a deterministic, human-readable handle that encodes the action ID.
-      - Safe to use in tests, local development, and CI environments.
-
-    Replace this with a concrete Phase 3.6 adapter before production deployment.
     """
 
     async def submit(
@@ -82,3 +88,12 @@ class NoopExecutionPort(ExecutionPort):
         correlation_id: Optional[UUID] = None,
     ) -> str:
         return f"noop-handle-{action.id}"
+
+    async def cancel(
+        self,
+        workspace_id: UUID,
+        execution_handle: str,
+        correlation_id: Optional[UUID] = None,
+    ) -> CancellationResult:
+        # Stub implementation doesn't support actual cancellation
+        return CancellationResult.CANCELLATION_UNSUPPORTED

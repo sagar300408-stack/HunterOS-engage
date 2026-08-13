@@ -69,15 +69,30 @@ def approved_action(workspace_id, action_id, pinned_revision_id):
 # ──────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def mock_repository(approved_action):
+def mock_session():
+    mock_sess = AsyncMock()
+    def mock_add(obj):
+        import uuid
+        from datetime import datetime, timezone
+        if not getattr(obj, "id", None): obj.id = uuid.uuid4()
+        if hasattr(obj, "run") and getattr(obj, "run", None): obj.run_id = obj.run.id
+        if hasattr(obj, "started_at") and not getattr(obj, "started_at", None): obj.started_at = datetime.now(timezone.utc)
+        if hasattr(obj, "created_at") and not getattr(obj, "created_at", None): obj.created_at = datetime.now(timezone.utc)
+        if hasattr(obj, "updated_at") and not getattr(obj, "updated_at", None): obj.updated_at = datetime.now(timezone.utc)
+    mock_sess.add = MagicMock(side_effect=mock_add)
+    mock_sess.commit = AsyncMock()
+    mock_result = MagicMock()
+    mock_result.all.return_value = []
+    mock_result.scalar_one_or_none.return_value = None
+    mock_sess.execute = AsyncMock(return_value=mock_result)
+    return mock_sess
+
+@pytest.fixture
+def mock_repository(approved_action, mock_session):
     repo = AsyncMock()
     repo.get_action = AsyncMock(return_value=approved_action)
     repo.save = AsyncMock()
     # Expose a mock session for blocker-status queries inside _assert_readiness
-    mock_session = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.all.return_value = []
-    mock_session.execute = AsyncMock(return_value=mock_result)
     repo.session = mock_session
     return repo
 
@@ -127,8 +142,9 @@ def mock_event_bus():
 # ──────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def orch_engine(mock_repository, mock_planning_service, mock_execution_port, mock_event_bus):
+def orch_engine(mock_session, mock_repository, mock_planning_service, mock_execution_port, mock_event_bus):
     return ActionOrchestrationEngine(
+        session=mock_session,
         repository=mock_repository,
         planning_service=mock_planning_service,
         execution_port=mock_execution_port,
@@ -142,4 +158,4 @@ def orch_engine(mock_repository, mock_planning_service, mock_execution_port, moc
 
 @pytest.fixture
 def orchestrate_req(pinned_revision_id):
-    return OrchestrateActionRequest(pinned_revision_id=pinned_revision_id)
+    return OrchestrateActionRequest(pinned_revision_id=pinned_revision_id, pinned_action_version=2)

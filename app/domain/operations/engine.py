@@ -17,8 +17,6 @@ from app.events.model.operations_events import (
 
 from app.domain.operations.planning.service import ActionPlanningService
 from app.domain.operations.orchestration.engine import ActionOrchestrationEngine
-from app.domain.operations.orchestration.schemas import OrchestrateActionRequest, OrchestrationResultDTO
-from app.domain.operations.orchestration.models import OrchestrationOutcome
 
 class OperationsEngine:
     def __init__(
@@ -264,31 +262,4 @@ class OperationsEngine:
             raise RuntimeError("OperationsEngine not initialized with a planning service")
         return await self.planning_service.evaluate_readiness(workspace_id, action_id)
 
-    async def orchestrate_approved_action(
-        self,
-        workspace_id: UUID,
-        action_id: UUID,
-        req: OrchestrateActionRequest,
-    ) -> OrchestrationResultDTO:
-        """
-        Phase 3.5 entry point: drives an APPROVED Action through the
-        APPROVED → READY → EXECUTING corridor and hands it off to the ExecutionPort.
 
-        The pinned_revision_id in `req` must be captured from action.revision_id
-        immediately after evaluate_governance() transitions the Action to APPROVED.
-        Any revision drift between that moment and this call will abort orchestration.
-        """
-        if not self.orchestration_engine:
-            raise RuntimeError(
-                "OperationsEngine not initialized with an orchestration_engine. "
-                "Wire ActionOrchestrationEngine before calling orchestrate_approved_action()."
-            )
-        result = await self.orchestration_engine.orchestrate(workspace_id, action_id, req)
-        return OrchestrationResultDTO(
-            action_id=result.action_id,
-            workspace_id=result.workspace_id,
-            status=result.status.value,
-            execution_handle=result.execution_handle,
-            reason=result.reason,
-            completed_at=result.completed_at.isoformat(),
-        )

@@ -1,50 +1,104 @@
 import enum
-from dataclasses import dataclass
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
-from uuid import UUID
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Boolean,
+    Index,
+    text
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.domain.conversations.models import Base
 
 
-class OrchestrationOutcome(str, enum.Enum):
-    """Terminal outcomes for a single orchestration attempt."""
-    HANDED_OFF = "HANDED_OFF"   # ExecutionPort.submit() returned successfully
-    BLOCKED    = "BLOCKED"      # Permanently-failed dependency — cannot proceed
-    STALE      = "STALE"        # revision_id drifted since governance approval
-    FAILED     = "FAILED"       # Unexpected error during orchestration steps
+class OrchestrationRunState(str, enum.Enum):
+    """Lifecycle states of an OrchestrationRun."""
+    CREATED = "CREATED"
+    READY = "READY"
+    STARTING = "STARTING"
+    EXECUTING = "EXECUTING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    TIMED_OUT = "TIMED_OUT"
+    CANCELLED = "CANCELLED"
 
 
-@dataclass(frozen=True)
-class OrchestrationPlan:
+class OrchestrationAttemptState(str, enum.Enum):
+    """Lifecycle states of a single execution Attempt."""
+    STARTING = "STARTING"
+    EXECUTING = "EXECUTING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    TIMED_OUT = "TIMED_OUT"
+    CANCELLED = "CANCELLED"
+
+
+class OrchestrationRun(Base):
     """
-    Immutable record capturing the orchestration intent at the moment
-    governance (Phase 3.4) transitions the Action to APPROVED.
-
-    The pinned_revision_id is the authoritative concurrency token:
-    if the Action's revision_id diverges from this value by the time
-    Phase 3.5 picks it up, orchestration MUST abort with StalePinnedVersionError.
+    Represents the overall orchestration lifecycle for a single authorized
+    Action version. Orchestration runs manage multiple attempts (retries),
+    timeouts, and cancellation semantics, independent of the business Action state.
     """
-    action_id: UUID
-    workspace_id: UUID
-    pinned_revision_id: str        # action.revision_id immediately after APPROVED transition
-    pinned_version_number: int     # action.version_number at that same moment
-    created_at: datetime
+    __tablename__ = "orchestration_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    action_id = Column(UUID(as_uuid=True), ForeignKey("actions.id", ondelete="CASCADE"), nullable=False, index=True)
+    action_version = Column(Integer, nullable=False)
+    state = Column(Enum(OrchestrationRunState, name="orchestration_run_state"), nullable=False, default=OrchestrationRunState.CREATED)
+    
+    max_attempts = Column(Integer, nullable=False, default=1)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    
+    failure_reason = Column(String, nullable=True)
+    
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationship to attempts
+    attempts = relationship("OrchestrationAttempt", back_populates="run", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        # Guarantee strictly one active run per Action at any given time.
+        Index(
+            "ix_orchestration_runs_active_unique",
+            "workspace_id", "action_id",
+            unique=True,
+            postgresql_where=text("state IN ('CREATED', 'READY', 'STARTING', 'EXECUTING')")
+        ),
+    )
 
 
-@dataclass(frozen=True)
-class OrchestrationResult:
+class OrchestrationAttempt(Base):
     """
-    Immutable result produced by ActionOrchestrationEngine.orchestrate().
-    Stored in the caller for observability; not persisted as its own DB record.
-    Key data points (e.g. execution_handle) ARE written into Action.execution_metadata.
+    Represents a single physical handoff attempt to the ExecutionPort.
     """
-    action_id: UUID
-    workspace_id: UUID
-    status: OrchestrationOutcome
-    execution_handle: Optional[str]     # Opaque handle returned by ExecutionPort (e.g. Celery task ID)
-    reason: Optional[str]               # Human-readable explanation for non-HANDED_OFF outcomes
-    completed_at: datetime
+    __tablename__ = "orchestration_attempts"
 
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id = Column(UUID(as_uuid=True), ForeignKey("orchestration_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    attempt_number = Column(Integer, nullable=False)
+    
+    state = Column(Enum(OrchestrationAttemptState, name="orchestration_attempt_state"), nullable=False, default=OrchestrationAttemptState.STARTING)
+    
+    execution_handle = Column(String, nullable=True)
+    correlation_id = Column(UUID(as_uuid=True), nullable=True)
+    
+    outcome = Column(String, nullable=True)
+    failure_type = Column(String, nullable=True)
+    failure_reason = Column(String, nullable=True)
+    retryable = Column(Boolean, nullable=True)
+    
+    started_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime, nullable=True)
 
-def now_utc() -> datetime:
-    """Utility: current UTC timestamp with timezone info."""
-    return datetime.now(timezone.utc)
+    # Relationship back to run
+    run = relationship("OrchestrationRun", back_populates="attempts")

@@ -54,48 +54,58 @@ class ActionDependencyRemovedEvent(UniversalBaseEvent):
 
 # ── Phase 3.5 Orchestration Events ──────────────────────────────────────────
 
-class ActionOrchestrationStartedEvent(UniversalBaseEvent):
-    """
-    Emitted immediately after the Action is transitioned APPROVED → READY.
-    Signals that orchestration has passed all pre-flight checks and the
-    readiness corridor has officially begun.
-    """
+class ActionOrchestrationRunStartedEvent(UniversalBaseEvent):
     category: EventCategory = Field(default=EventCategory.ACTION)
-    event_name: str = Field(default="action.orchestration.started")
+    event_name: str = Field(default="action.orchestration.run.started")
     source_subsystem: str = Field(default="orchestration_engine")
     actor_type: ActorType = Field(default=ActorType.SYSTEM)
 
     action_id: UUID
-    pinned_revision_id: str
+    run_id: UUID
+    action_version: int
 
 
-class ActionOrchestrationHandedOffEvent(UniversalBaseEvent):
-    """
-    Emitted after ExecutionPort.submit() returns successfully.
-    The execution_handle is the opaque token (e.g. Celery task ID)
-    stored in action.execution_metadata["execution_handle"].
-    """
+class ActionOrchestrationRunCompletedEvent(UniversalBaseEvent):
     category: EventCategory = Field(default=EventCategory.ACTION)
-    event_name: str = Field(default="action.orchestration.handed_off")
+    event_name: str = Field(default="action.orchestration.run.completed")
     source_subsystem: str = Field(default="orchestration_engine")
     actor_type: ActorType = Field(default=ActorType.SYSTEM)
 
     action_id: UUID
-    execution_handle: str
+    run_id: UUID
+    action_version: int
 
 
-class ActionOrchestrationFailedEvent(UniversalBaseEvent):
-    """
-    Emitted when the orchestration corridor errors out after the Action
-    has already been transitioned to READY or EXECUTING.
-    The failed_at_status records which state the Action was in when the
-    failure occurred, for observability and retry decisions.
-    """
+class ActionOrchestrationRunFailedEvent(UniversalBaseEvent):
     category: EventCategory = Field(default=EventCategory.ACTION)
-    event_name: str = Field(default="action.orchestration.failed")
+    event_name: str = Field(default="action.orchestration.run.failed")
     source_subsystem: str = Field(default="orchestration_engine")
     actor_type: ActorType = Field(default=ActorType.SYSTEM)
 
     action_id: UUID
-    failure_reason: str
-    failed_at_status: ActionStatus
+    run_id: UUID
+    action_version: int
+    failure_reason: Optional[str] = None
+
+
+class ActionOrchestrationRunTimedOutEvent(UniversalBaseEvent):
+    category: EventCategory = Field(default=EventCategory.ACTION)
+    event_name: str = Field(default="action.orchestration.run.timed_out")
+    source_subsystem: str = Field(default="orchestration_engine")
+    actor_type: ActorType = Field(default=ActorType.SYSTEM)
+
+    action_id: UUID
+    run_id: UUID
+    action_version: int
+
+
+class ActionOrchestrationRunCancelledEvent(UniversalBaseEvent):
+    category: EventCategory = Field(default=EventCategory.ACTION)
+    event_name: str = Field(default="action.orchestration.run.cancelled")
+    source_subsystem: str = Field(default="orchestration_engine")
+    actor_type: ActorType = Field(default=ActorType.SYSTEM)
+
+    action_id: UUID
+    run_id: UUID
+    action_version: int
+
