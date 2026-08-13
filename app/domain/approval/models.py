@@ -56,6 +56,7 @@ class ApprovalRequest(Base):
     
     # The action that requires approval
     action_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    action_version = Column(Integer, nullable=False)
     policy_id = Column(UUID(as_uuid=True), ForeignKey("approval_policies.id"), nullable=False)
     correlation_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     

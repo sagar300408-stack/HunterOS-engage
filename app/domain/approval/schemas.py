@@ -20,6 +20,7 @@ class ApprovalContext(BaseModel):
 
 class SubmitApprovalRequest(BaseModel):
     action_id: UUID
+    action_version: int
     context: ApprovalContext
     requested_by: str
     correlation_id: Optional[UUID] = None
@@ -70,6 +71,7 @@ class ApprovalRequestResponse(BaseModel):
     id: UUID
     workspace_id: UUID
     action_id: UUID
+    action_version: int
     policy_id: UUID
     correlation_id: Optional[UUID] = None
     

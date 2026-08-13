@@ -52,6 +52,7 @@ class ApprovalEngine:
         approval_req = ApprovalRequest(
             workspace_id=workspace_id,
             action_id=req.action_id,
+            action_version=req.action_version,
             policy_id=eval_result.policy_id,
             correlation_id=req.correlation_id,
             status=ApprovalStatus.PENDING.value,
@@ -83,6 +84,16 @@ class ApprovalEngine:
             
         if approval_req.status != ApprovalStatus.UNDER_REVIEW.value:
             raise ValueError(f"Approval is in {approval_req.status} state, cannot process decision.")
+
+        # Version Pinning check
+        if action_repo:
+            action = await action_repo.get_action_basics(approval_req.action_id)
+            if action and action.version_number != approval_req.action_version:
+                # Stale Approval Request
+                approval_req.status = ApprovalStatus.CANCELLED.value
+                approval_req = await self.repo.update_request(approval_req)
+                await self._publish_event(approval_req, "approval.stale")
+                raise ValueError("Stale approval request: Action has been modified since this request was created.")
             
         # Authorization validation
         # The approver identity MUST be derived from the authenticated execution context.

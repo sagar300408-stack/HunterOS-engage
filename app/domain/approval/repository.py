@@ -26,19 +26,19 @@ class ApprovalRepository:
 
     async def save_policy(self, policy: ApprovalPolicy) -> ApprovalPolicy:
         self.session.add(policy)
-        await self.session.commit()
+        await self.session.flush()
         await self.session.refresh(policy)
         return policy
 
     async def save_request(self, req: ApprovalRequest) -> ApprovalRequest:
         self.session.add(req)
-        await self.session.commit()
+        await self.session.flush()
         await self.session.refresh(req)
         return req
 
     async def update_request(self, req: ApprovalRequest) -> ApprovalRequest:
         self.session.add(req)
-        await self.session.commit()
+        await self.session.flush()
         await self.session.refresh(req)
         return req
 
@@ -49,7 +49,7 @@ class ApprovalRepository:
 
     async def save_decision(self, decision: ApprovalDecision) -> ApprovalDecision:
         self.session.add(decision)
-        await self.session.commit()
+        await self.session.flush()
         await self.session.refresh(decision)
         return decision
 

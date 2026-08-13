@@ -19,10 +19,11 @@ async def test_operations_engine_evaluate_governance_requires_approval():
     
     mock_action = AsyncMock()
     mock_action.action_type = "create_lead"
-    mock_action.target = "crm"
+    mock_action.target = {"target_system": "crm"}
     mock_action.priority = "HIGH"
-    mock_action.owner = "test_user"
+    mock_action.owner = {"id": "test_user"}
     mock_action.revision_id = "1"
+    mock_action.version_number = 1
     mock_repository.get_action.return_value = mock_action
     
     engine.transition_status = AsyncMock()
@@ -53,10 +54,11 @@ async def test_operations_engine_evaluate_governance_no_approval_required():
     
     mock_action = AsyncMock()
     mock_action.action_type = "create_lead"
-    mock_action.target = "crm"
+    mock_action.target = {"target_system": "crm"}
     mock_action.priority = "LOW"
-    mock_action.owner = "test_user"
+    mock_action.owner = {"id": "test_user"}
     mock_action.revision_id = "1"
+    mock_action.version_number = 1
     mock_repository.get_action.return_value = mock_action
     
     engine.transition_status = AsyncMock()

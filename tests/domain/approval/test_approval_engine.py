@@ -85,6 +85,7 @@ async def test_approval_engine_evaluate():
     
     req = SubmitApprovalRequest(
         action_id=mock_action.id,
+        action_version=1,
         context=ApprovalContext(
             action_type="send_email",
             target_system="email",
@@ -173,6 +174,7 @@ async def test_action_readiness_prerequisite():
     
     req = SubmitApprovalRequest(
         action_id=mock_action.id,
+        action_version=1,
         context=ApprovalContext(
             action_type="send_email",
             target_system="email",
@@ -203,6 +205,7 @@ async def test_workspace_isolation():
     
     req = SubmitApprovalRequest(
         action_id=mock_action.id,
+        action_version=1,
         context=ApprovalContext(
             action_type="send_email",
             target_system="email",

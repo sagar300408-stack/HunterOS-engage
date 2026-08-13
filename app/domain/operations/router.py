@@ -15,6 +15,15 @@ from app.domain.approval.engine import ApprovalEngine
 from app.domain.action.engine import ActionEngine
 from app.domain.integration.engine import IntegrationEngine
 from app.domain.integration.credentials import JsonCredentialProvider
+from app.domain.operations.planning.service import ActionPlanningService
+from app.domain.operations.orchestration.engine import ActionOrchestrationEngine
+from app.domain.operations.orchestration.port import NoopExecutionPort
+from app.domain.operations.orchestration.schemas import OrchestrateActionRequest, OrchestrationResultDTO
+from app.domain.operations.orchestration.exceptions import (
+    OrchestrationError,
+    OrchestrationBlockedError,
+    StalePinnedVersionError,
+)
 
 router = APIRouter(prefix="/operations", tags=["operations"])
 
@@ -25,10 +34,19 @@ def get_operations_engine(request: Request, db: AsyncSession = Depends(get_db)) 
     action_engine = ActionEngine(session=db, event_bus=request.app.state.event_bus, integration_engine=integration_engine)
     approval_engine = ApprovalEngine(session=db, event_bus=request.app.state.event_bus)
     repository = ActionRepository(db)
+    planning_service = ActionPlanningService(session=db, repository=repository)
+    orchestration_engine = ActionOrchestrationEngine(
+        repository=repository,
+        planning_service=planning_service,
+        execution_port=NoopExecutionPort(),
+        event_bus=request.app.state.event_bus,
+    )
     return OperationsEngine(
-        approval_engine=approval_engine, 
+        approval_engine=approval_engine,
         action_engine=action_engine,
         repository=repository,
+        planning_service=planning_service,
+        orchestration_engine=orchestration_engine,
         event_bus=request.app.state.event_bus
     )
 
@@ -108,5 +126,42 @@ async def transition_action_status(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/workspace/{workspace_id}/actions/{action_id}/orchestrate",
+    response_model=OrchestrationResultDTO,
+)
+async def orchestrate_action(
+    workspace_id: UUID,
+    action_id: UUID,
+    req: OrchestrateActionRequest,
+    engine: OperationsEngine = Depends(get_operations_engine),
+):
+    """
+    Phase 3.5 — Orchestrate an APPROVED Action.
+
+    Drives the Action through the APPROVED → READY → EXECUTING corridor and
+    hands it off to the configured ExecutionPort (Phase 3.6 boundary).
+
+    The `pinned_revision_id` in the request body must be the Action's
+    `revision_id` captured immediately after the governance approval step.
+    Any revision drift detected between governance and this call will result
+    in a 409 Conflict response.
+    """
+    try:
+        return await engine.orchestrate_approved_action(workspace_id, action_id, req)
+    except ActionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except StalePinnedVersionError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except OrchestrationBlockedError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except OrchestrationError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

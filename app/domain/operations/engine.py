@@ -16,6 +16,9 @@ from app.events.model.operations_events import (
 )
 
 from app.domain.operations.planning.service import ActionPlanningService
+from app.domain.operations.orchestration.engine import ActionOrchestrationEngine
+from app.domain.operations.orchestration.schemas import OrchestrateActionRequest, OrchestrationResultDTO
+from app.domain.operations.orchestration.models import OrchestrationOutcome
 
 class OperationsEngine:
     def __init__(
@@ -24,12 +27,14 @@ class OperationsEngine:
         action_engine: ActionEngine,
         repository: ActionRepository = None,
         planning_service: ActionPlanningService = None,
+        orchestration_engine: Optional[ActionOrchestrationEngine] = None,
         event_bus: Any = None
     ):
         self.approval_engine = approval_engine
         self.action_engine = action_engine
         self.repository = repository
         self.planning_service = planning_service
+        self.orchestration_engine = orchestration_engine
         self.event_bus = event_bus
 
     async def evaluate_governance(self, workspace_id: UUID, action_id: UUID, correlation_id: Optional[UUID] = None) -> Dict[str, Any]:
@@ -51,13 +56,14 @@ class OperationsEngine:
             
         approval_req = SubmitApprovalRequest(
             action_id=action_id,
+            action_version=action.version_number,
             context=ApprovalContext(
                 action_type=action.action_type,
-                target_system=action.target,
+                target_system=action.target.get("target_system", "unknown"),
                 risk_level=getattr(action, "priority", "NORMAL"),
                 action_summary=f"Approval for {action.action_type}"
             ),
-            requested_by=action.owner,
+            requested_by=action.owner.get("id", "system"),
             correlation_id=correlation_id
         )
         
@@ -113,6 +119,9 @@ class OperationsEngine:
                     expected_revision_id=action.revision_id,
                     reason=f"Rejected by {authenticated_actor_id}"
                 ))
+        
+        # Ensure the atomic transaction boundary is committed
+        await self.repository.save()
             
         return {
             "approval_id": approval.id,
@@ -254,3 +263,32 @@ class OperationsEngine:
         if not self.planning_service:
             raise RuntimeError("OperationsEngine not initialized with a planning service")
         return await self.planning_service.evaluate_readiness(workspace_id, action_id)
+
+    async def orchestrate_approved_action(
+        self,
+        workspace_id: UUID,
+        action_id: UUID,
+        req: OrchestrateActionRequest,
+    ) -> OrchestrationResultDTO:
+        """
+        Phase 3.5 entry point: drives an APPROVED Action through the
+        APPROVED → READY → EXECUTING corridor and hands it off to the ExecutionPort.
+
+        The pinned_revision_id in `req` must be captured from action.revision_id
+        immediately after evaluate_governance() transitions the Action to APPROVED.
+        Any revision drift between that moment and this call will abort orchestration.
+        """
+        if not self.orchestration_engine:
+            raise RuntimeError(
+                "OperationsEngine not initialized with an orchestration_engine. "
+                "Wire ActionOrchestrationEngine before calling orchestrate_approved_action()."
+            )
+        result = await self.orchestration_engine.orchestrate(workspace_id, action_id, req)
+        return OrchestrationResultDTO(
+            action_id=result.action_id,
+            workspace_id=result.workspace_id,
+            status=result.status.value,
+            execution_handle=result.execution_handle,
+            reason=result.reason,
+            completed_at=result.completed_at.isoformat(),
+        )
