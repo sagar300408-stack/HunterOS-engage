@@ -8,6 +8,81 @@ from app.domain.action.schemas import SubmitActionRequest
 from app.domain.approval.schemas import ApprovalContext
 
 
+# ── Operational Integration DTOs (Phase 3.7) ────────────────────────────────
+
+class ActionSummaryDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    action_id: UUID
+    action_type: str
+    status: str
+    priority: str
+    version: int
+    created_at: str
+
+
+class GovernanceSummaryDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    approval_required: bool
+    approval_status: Optional[str] = None
+    approval_request_id: Optional[UUID] = None
+    stale_authorization: bool
+
+
+class OrchestrationSummaryDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    run_id: Optional[UUID] = None
+    state: Optional[str] = None
+    attempt_count: int = 0
+
+
+class ExecutionSummaryDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    execution_handle: Optional[str] = None
+    state: Optional[str] = None
+    failure_classification: Optional[str] = None
+    retryable: Optional[bool] = None
+    completed_at: Optional[str] = None
+
+
+class AttentionSignalDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    code: str
+    severity: str
+    reason: str
+    source: str
+
+
+class ActionReadiness(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    action_id: UUID
+    state: str  # "READY" or "BLOCKED"
+    blockers: List[UUID]
+    satisfied_dependencies: List[UUID]
+    action_version: int
+    evaluated_at: str
+
+
+class OperationalContextDTO(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    workspace_id: UUID
+    action: ActionSummaryDTO
+    readiness: ActionReadiness
+    governance: GovernanceSummaryDTO
+    orchestration: OrchestrationSummaryDTO
+    execution: ExecutionSummaryDTO
+    attention_signals: List[AttentionSignalDTO]
+    evaluated_at: str  # The timestamp when this cross-table context was evaluated.
+
+
+# ── Action DTOs ────────────────────────────────────────────────────────────
+
 class ActionEvidenceDTO(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -105,12 +180,4 @@ class OperationalRequest(BaseModel):
             requested_by=self.requested_by
         )
 
-class ActionReadiness(BaseModel):
-    model_config = ConfigDict(frozen=True)
 
-    action_id: UUID
-    state: str  # "READY" or "BLOCKED"
-    blockers: List[UUID]
-    satisfied_dependencies: List[UUID]
-    action_version: int
-    evaluated_at: str

@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.domain.operations.schemas import (
-    OperationalRequest, CreateActionRequest, ActionDTO, TransitionActionStatusRequest
+    OperationalRequest, CreateActionRequest, ActionDTO, TransitionActionStatusRequest,
+    OperationalContextDTO
 )
 from app.domain.operations.engine import OperationsEngine
 from app.domain.operations.repository import ActionRepository
@@ -31,6 +32,7 @@ from app.domain.operations.orchestration.exceptions import (
     RetryLimitExceededError,
     InvalidOrchestrationStateError
 )
+from app.domain.operations.query import OperationalQueryService
 
 router = APIRouter(prefix="/operations", tags=["operations"])
 
@@ -57,6 +59,10 @@ def get_operations_engine(request: Request, db: AsyncSession = Depends(get_db)) 
         event_bus=request.app.state.event_bus
     )
 
+def get_operational_query_service(db: AsyncSession = Depends(get_db)) -> OperationalQueryService:
+    repository = ActionRepository(db)
+    planning_service = ActionPlanningService(session=db, repository=repository)
+    return OperationalQueryService(session=db, planning_service=planning_service)
 
 @router.post("/workspace/{workspace_id}/submit")
 async def submit_operational_request(
@@ -212,6 +218,44 @@ async def cancel_orchestration(
         raise HTTPException(status_code=404, detail=str(e))
     except OrchestrationError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/workspace/{workspace_id}/actions/{action_id}/context", response_model=OperationalContextDTO)
+async def get_action_context(
+    workspace_id: UUID,
+    action_id: UUID,
+    query_service: OperationalQueryService = Depends(get_operational_query_service),
+):
+    try:
+        return await query_service.get_operational_context(workspace_id, action_id)
+    except ActionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/workspace/{workspace_id}/summary")
+async def get_workspace_summary(
+    workspace_id: UUID,
+    query_service: OperationalQueryService = Depends(get_operational_query_service),
+):
+    try:
+        return await query_service.get_workspace_operational_summary(workspace_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/workspace/{workspace_id}/attention", response_model=List[OperationalContextDTO])
+async def list_attention_actions(
+    workspace_id: UUID,
+    limit: int = 50,
+    offset: int = 0,
+    query_service: OperationalQueryService = Depends(get_operational_query_service),
+):
+    try:
+        return await query_service.list_attention_actions(workspace_id, limit, offset)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

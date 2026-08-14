@@ -29,6 +29,7 @@ class TimelineEntry(Base):
     customer_id: Mapped[UUID | None] = mapped_column(index=True, nullable=True)
     conversation_id: Mapped[UUID | None] = mapped_column(index=True, nullable=True)
     lead_id: Mapped[UUID | None] = mapped_column(index=True, nullable=True)
+    action_id: Mapped[UUID | None] = mapped_column(index=True, nullable=True)
     
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 

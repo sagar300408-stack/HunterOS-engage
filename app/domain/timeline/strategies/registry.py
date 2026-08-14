@@ -6,6 +6,11 @@ from app.domain.timeline.strategies.implementations import (
     DefaultProjectionStrategy,
     MeetingProjectionStrategy,
 )
+from app.domain.timeline.strategies.operations import (
+    ActionCreatedStrategy, ActionStatusChangedStrategy,
+    ApprovalRequestedStrategy, ApprovalRejectedStrategy, ApprovalApprovedStrategy,
+    OrchestrationStartedStrategy, OrchestrationFailedStrategy, ActionCompletedStrategy
+)
 from app.events.model.categories import EventCategory
 
 
@@ -23,6 +28,18 @@ class TimelineStrategyRegistry:
     def _register_defaults(self):
         self.register(EventCategory.CONVERSATION, "customer.replied", CustomerReplyProjectionStrategy())
         self.register(EventCategory.SCHEDULING, "MeetingBookedEvent", MeetingProjectionStrategy())
+        
+        # Operational Events
+        self.register(EventCategory.ACTION, "action.created", ActionCreatedStrategy)
+        self.register(EventCategory.ACTION, "action.status.changed", ActionStatusChangedStrategy)
+        self.register(EventCategory.ACTION, "action.completed", ActionCompletedStrategy)
+        
+        self.register(EventCategory.APPROVAL, "approval.requested", ApprovalRequestedStrategy)
+        self.register(EventCategory.APPROVAL, "approval.rejected", ApprovalRejectedStrategy)
+        self.register(EventCategory.APPROVAL, "approval.approved", ApprovalApprovedStrategy)
+        
+        self.register(EventCategory.ACTION, "action.orchestration.run.started", OrchestrationStartedStrategy)
+        self.register(EventCategory.ACTION, "action.orchestration.run.failed", OrchestrationFailedStrategy)
 
     def register(self, category: EventCategory, event_name: str, strategy: BaseTimelineStrategy):
         self._strategies[(category, event_name)] = strategy
