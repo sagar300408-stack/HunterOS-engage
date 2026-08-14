@@ -50,6 +50,7 @@ def make_action(
     action.revision_id = revision_id
     action.version_number = 2
     action.action_type = ActionType.CREATE_FOLLOWUP
+    action.target = {}
     action.execution_metadata = {}
     action.advance_revision = MagicMock()
     return action
@@ -408,12 +409,27 @@ async def test_workspace_isolation(
 @pytest.mark.asyncio
 async def test_noop_execution_port_returns_handle(workspace_id, action_id):
     """
-    NoopExecutionPort.submit() must return 'noop-handle-{action_id}' without
+    NoopExecutionPort.submit() must return 'noop-handle-{action_id}-{attempt_id}' without
     performing any I/O, network calls, or database access.
     """
+    from app.domain.operations.orchestration.schemas import ExecutionCommand
     port = NoopExecutionPort()
-    action = make_action(workspace_id, action_id, ActionStatus.EXECUTING, "rev-exec")
+    
+    run_id = uuid.uuid4()
+    attempt_id = uuid.uuid4()
+    
+    command = ExecutionCommand(
+        workspace_id=workspace_id,
+        action_id=action_id,
+        action_version=1,
+        action_type="test_action",
+        target={},
+        parameters={},
+        orchestration_run_id=run_id,
+        orchestration_attempt_id=attempt_id,
+        correlation_id=None
+    )
 
-    handle = await port.submit(workspace_id=workspace_id, action=action)
+    handle = await port.submit(command=command)
 
-    assert handle == f"noop-handle-{action_id}"
+    assert handle == f"noop-handle-{action_id}-{attempt_id}"

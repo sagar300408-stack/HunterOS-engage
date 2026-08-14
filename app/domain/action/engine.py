@@ -54,7 +54,8 @@ class ActionEngine:
             parameters=req.parameters,
             status=ActionStatus.PENDING.value,
             priority=req.priority,
-            requested_by=req.requested_by
+            requested_by=req.requested_by,
+            max_retries=0 if req.is_orchestrated else 3
         )
         
         action = await self.action_repo.save_action(action)

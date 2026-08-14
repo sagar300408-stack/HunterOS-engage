@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 from uuid import UUID
 
-from app.domain.operations.models import Action
+from app.domain.operations.orchestration.schemas import ExecutionCommand
 
 
 class CancellationResult(str, enum.Enum):
@@ -41,19 +41,14 @@ class ExecutionPort(ABC):
     @abstractmethod
     async def submit(
         self,
-        workspace_id: UUID,
-        action: Action,
-        correlation_id: Optional[UUID] = None,
+        command: ExecutionCommand,
     ) -> str:
         """
         Submit an EXECUTING Action to the external execution layer.
 
         Args:
-            workspace_id:   Tenant identifier for multi-tenancy enforcement.
-            action:         The Action ORM instance in EXECUTING status.
-                            All fields (target, parameters in execution_metadata,
-                            owner, etc.) are available for routing decisions.
-            correlation_id: Optional trace propagation ID.
+            command:        The Explicit Execution Command holding workspace, action,
+                            run, attempt, target, and parameters.
 
         Returns:
             execution_handle: An opaque, workspace-scoped string token
@@ -83,11 +78,9 @@ class NoopExecutionPort(ExecutionPort):
 
     async def submit(
         self,
-        workspace_id: UUID,
-        action: Action,
-        correlation_id: Optional[UUID] = None,
+        command: ExecutionCommand,
     ) -> str:
-        return f"noop-handle-{action.id}"
+        return f"noop-handle-{command.action_id}-{command.orchestration_attempt_id}"
 
     async def cancel(
         self,

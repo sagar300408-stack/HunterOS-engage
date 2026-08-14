@@ -59,6 +59,7 @@ def approved_action(workspace_id, action_id, pinned_revision_id):
     action.version_number = 2
     action.priority = ActionPriority.NORMAL
     action.action_type = ActionType.CREATE_FOLLOWUP
+    action.target = {}
     action.execution_metadata = {}
     action.advance_revision = MagicMock()
     return action

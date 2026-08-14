@@ -41,7 +41,8 @@ from app.domain.operations.orchestration.schemas import (
     FailOrchestrationRequest,
     TimeoutOrchestrationRequest,
     OrchestrationRunDTO,
-    OrchestrationAttemptDTO
+    OrchestrationAttemptDTO,
+    ExecutionCommand
 )
 from app.domain.operations.exceptions import ActionNotFoundError
 from app.events.model.operations_events import (
@@ -192,8 +193,19 @@ class ActionOrchestrationEngine:
         await self.session.commit()
 
         # Step 7: Handoff to ExecutionPort
+        command = ExecutionCommand(
+            workspace_id=workspace_id,
+            action_id=action_id,
+            action_version=action.version_number,
+            action_type=action.action_type,
+            target=action.target,
+            parameters=action.execution_metadata.get("parameters", {}),
+            orchestration_run_id=run.id,
+            orchestration_attempt_id=attempt.id,
+            correlation_id=req.correlation_id
+        )
         try:
-            handle = await self.execution_port.submit(workspace_id, action, req.correlation_id)
+            handle = await self.execution_port.submit(command)
             attempt.execution_handle = handle
             self.session.add(attempt)
             await self.session.commit()
@@ -258,8 +270,19 @@ class ActionOrchestrationEngine:
         await self.session.commit()
 
         # Step 6: Handoff
+        command = ExecutionCommand(
+            workspace_id=workspace_id,
+            action_id=action_id,
+            action_version=action.version_number,
+            action_type=action.action_type,
+            target=action.target,
+            parameters=action.execution_metadata.get("parameters", {}),
+            orchestration_run_id=run.id,
+            orchestration_attempt_id=attempt.id,
+            correlation_id=req.correlation_id
+        )
         try:
-            handle = await self.execution_port.submit(workspace_id, action, req.correlation_id)
+            handle = await self.execution_port.submit(command)
             attempt.execution_handle = handle
             self.session.add(attempt)
             await self.session.commit()

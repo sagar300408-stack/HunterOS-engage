@@ -78,3 +78,19 @@ class OrchestrationRunDTO(BaseModel):
     updated_at: datetime
     attempts: List[OrchestrationAttemptDTO] = []
 
+
+class ExecutionCommand(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    
+    workspace_id: UUID
+    action_id: UUID
+    action_version: int
+    action_type: str
+    target: dict
+    parameters: dict
+    
+    orchestration_run_id: UUID
+    orchestration_attempt_id: UUID
+    
+    correlation_id: Optional[UUID] = None
+

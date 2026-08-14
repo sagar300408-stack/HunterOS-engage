@@ -26,6 +26,7 @@ class SubmitActionRequest(BaseModel):
     correlation_id: Optional[UUID] = None
     priority: str = ActionPriority.NORMAL.value
     requested_by: str
+    is_orchestrated: bool = False
 
 
 class ActionExecutionResponse(BaseModel):
