@@ -15,6 +15,7 @@ import {
   Rocket,
   RefreshCw,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../store/authStore'
 import type { NavSection } from '../../types'
 
@@ -25,6 +26,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentSection, onSelectSection }) => {
   const logout = useAuthStore((s) => s.logout)
+  const queryClient = useQueryClient()
   const role = useAuthStore((s) => s.role)
   const user = useAuthStore((s) => s.user)
 
@@ -113,7 +115,10 @@ console.log("ROLE:", role)
         </div>
 
         <button
-          onClick={logout}
+          onClick={() => {
+            queryClient.clear()
+            logout()
+          }}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-rose-400 bg-rose-500/5 hover:bg-rose-500/10 border border-rose-500/10 transition-all cursor-pointer"
         >
           <LogOut className="h-4 w-4" />

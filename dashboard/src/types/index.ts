@@ -303,6 +303,7 @@ export type NavSection =
   | 'system'
   | 'audit'
   | 'developer_tools'
+  | 'followup'
 
 // ── Phase 5: Scheduling Engine ─────────────────────────────────────────────
 
@@ -433,7 +434,7 @@ export interface FollowUpQueueSummary {
   priority: 'high' | 'normal' | 'low';
   scheduled_for: string;
   human_paused: boolean;
-  retry_count: int;
+  retry_count: number;
 }
 
 export interface FollowUpQueueDetail extends FollowUpQueueSummary {
