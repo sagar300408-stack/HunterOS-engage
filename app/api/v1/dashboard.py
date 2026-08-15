@@ -121,7 +121,7 @@ async def get_conversation_detail(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> ConversationDetail:
-    result = await dash_service.get_conversation_detail(session, conversation_id)
+    result = await dash_service.get_conversation_detail(session, conversation_id, user.workspace_id)
     if not result:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return result
@@ -164,7 +164,7 @@ async def get_customer_profile(
     session: AsyncSession = Depends(get_db),
     user: User = _view,
 ) -> CustomerProfile:
-    result = await dash_service.get_customer_profile(session, customer_id)
+    result = await dash_service.get_customer_profile(session, customer_id, user.workspace_id)
     if not result:
         raise HTTPException(status_code=404, detail="Customer not found")
     return result

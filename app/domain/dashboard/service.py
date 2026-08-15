@@ -151,16 +151,17 @@ async def get_overview_metrics(
     today_start = SystemClock.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Total customers
-    total_customers = await session.scalar(select(func.count(Customer.id)))
+    total_customers = await session.scalar(select(func.count(Customer.id)).where(Customer.workspace_id == workspace_id))
 
     # New leads today (customers created today)
     new_today = await session.scalar(
-        select(func.count(Customer.id)).where(Customer.created_at >= today_start)
+        select(func.count(Customer.id)).where(Customer.workspace_id == workspace_id, Customer.created_at >= today_start)
     )
 
     # Qualified leads (buying_stage not null and not Research)
     qualified = await session.scalar(
         select(func.count(Customer.id)).where(
+            Customer.workspace_id == workspace_id,
             Customer.buying_stage.notin_(["Research", None])
         )
     )
@@ -168,6 +169,7 @@ async def get_overview_metrics(
     # Purchase ready
     purchase_ready = await session.scalar(
         select(func.count(Customer.id)).where(
+            Customer.workspace_id == workspace_id,
             Customer.buying_stage == "Purchase Ready"
         )
     )
@@ -175,28 +177,49 @@ async def get_overview_metrics(
     # Active conversations (those with messages in last 24h)
     cutoff = SystemClock.now() - timedelta(hours=24)
     active_convos = await session.scalar(
-        select(func.count(func.distinct(Message.conversation_id))).where(
+        select(func.count(func.distinct(Message.conversation_id)))
+        .join(Conversation, Message.conversation_id == Conversation.id)
+        .where(
+            Conversation.workspace_id == workspace_id,
             Message.timestamp >= cutoff
         )
     )
 
     # Avg response time (from ai_metadata latency)
     avg_latency = await session.scalar(
-        select(func.avg(AIMetadata.latency_ms)).where(
+        select(func.avg(AIMetadata.latency_ms))
+        .join(Message, AIMetadata.message_id == Message.id)
+        .join(Conversation, Message.conversation_id == Conversation.id)
+        .where(
+            Conversation.workspace_id == workspace_id,
             AIMetadata.latency_ms.isnot(None)
         )
     )
 
     # AI success rate (rows with finish_reason = "stop")
-    total_ai = await session.scalar(select(func.count(AIMetadata.id)))
+    total_ai = await session.scalar(
+        select(func.count(AIMetadata.id))
+        .join(Message, AIMetadata.message_id == Message.id)
+        .join(Conversation, Message.conversation_id == Conversation.id)
+        .where(Conversation.workspace_id == workspace_id)
+    )
     success_ai = await session.scalar(
-        select(func.count(AIMetadata.id)).where(AIMetadata.finish_reason == "stop")
+        select(func.count(AIMetadata.id))
+        .join(Message, AIMetadata.message_id == Message.id)
+        .join(Conversation, Message.conversation_id == Conversation.id)
+        .where(
+            Conversation.workspace_id == workspace_id,
+            AIMetadata.finish_reason == "stop"
+        )
     )
     success_rate = round((success_ai / total_ai * 100) if total_ai else 100.0, 1)
 
     # Memory updates today
     mem_updates = await session.scalar(
-        select(func.count(CustomerMemoryEvent.id)).where(
+        select(func.count(CustomerMemoryEvent.id))
+        .join(Customer, CustomerMemoryEvent.customer_id == Customer.id)
+        .where(
+            Customer.workspace_id == workspace_id,
             CustomerMemoryEvent.created_at >= today_start,
             CustomerMemoryEvent.event_type == "memory_summarized",
         )
@@ -206,20 +229,29 @@ async def get_overview_metrics(
     cost_today = await session.scalar(
         select(func.sum(AIMetadata.estimated_cost_usd)).join(
             Message, AIMetadata.message_id == Message.id
-        ).where(Message.timestamp >= today_start)
+        ).join(Conversation, Message.conversation_id == Conversation.id).where(
+            Conversation.workspace_id == workspace_id,
+            Message.timestamp >= today_start
+        )
     )
 
     # Scheduling Metrics (Phase 5)
     try:
         from app.domain.scheduling.models import ScheduledEvent
         upcoming_events = await session.scalar(
-            select(func.count(ScheduledEvent.id)).where(
+            select(func.count(ScheduledEvent.id))
+            .join(Customer, ScheduledEvent.customer_id == Customer.id)
+            .where(
+                Customer.workspace_id == workspace_id,
                 ScheduledEvent.status.in_(["pending", "confirmed"]),
                 ScheduledEvent.scheduled_for >= today_start
             )
         )
         pending_callbacks = await session.scalar(
-            select(func.count(ScheduledEvent.id)).where(
+            select(func.count(ScheduledEvent.id))
+            .join(Customer, ScheduledEvent.customer_id == Customer.id)
+            .where(
+                Customer.workspace_id == workspace_id,
                 ScheduledEvent.status == "pending",
                 ScheduledEvent.event_type == "callback"
             )
@@ -232,7 +264,10 @@ async def get_overview_metrics(
     try:
         from app.domain.followup.models import FollowUpQueue
         pending_followups = await session.scalar(
-            select(func.count(FollowUpQueue.id)).where(
+            select(func.count(FollowUpQueue.id))
+            .join(Customer, FollowUpQueue.customer_id == Customer.id)
+            .where(
+                Customer.workspace_id == workspace_id,
                 FollowUpQueue.status.in_(["scheduled", "executing"])
             )
         )
@@ -277,6 +312,7 @@ async def get_conversations(
     base_q = (
         select(Conversation)
         .options(selectinload(Conversation.messages), selectinload(Conversation.customer))
+        .where(Conversation.workspace_id == workspace_id)
         .order_by(Conversation.created_at.desc())
     )
 
@@ -335,10 +371,11 @@ async def get_conversations(
 async def get_conversation_detail(
     session: AsyncSession,
     conversation_id: UUID,
+    workspace_id: UUID,
 ) -> Optional[ConversationDetail]:
     result = await session.execute(
         select(Conversation)
-        .where(Conversation.id == conversation_id)
+        .where(Conversation.id == conversation_id, Conversation.workspace_id == workspace_id)
         .options(
             selectinload(Conversation.messages).selectinload(Message.ai_metadata),
             selectinload(Conversation.messages).selectinload(Message.intent_history),
@@ -420,7 +457,7 @@ async def get_customers(
     page: int = 1,
     page_size: int = 20,
 ) -> CustomerPage:
-    q = select(Customer).order_by(Customer.created_at.desc())
+    q = select(Customer).where(Customer.workspace_id == workspace_id).order_by(Customer.created_at.desc())
 
     if search:
         q = q.where(or_(
@@ -465,10 +502,11 @@ async def get_customers(
 async def get_customer_profile(
     session: AsyncSession,
     customer_id: UUID,
+    workspace_id: UUID,
 ) -> Optional[CustomerProfile]:
     result = await session.execute(
         select(Customer)
-        .where(Customer.id == customer_id)
+        .where(Customer.id == customer_id, Customer.workspace_id == workspace_id)
         .options(selectinload(Customer.memory))
     )
     customer = result.scalar_one_or_none()
@@ -551,7 +589,7 @@ async def update_customer(
     ip_address: Optional[str] = None,
     workspace_id: Optional[UUID] = None,
 ) -> None:
-    result = await session.execute(select(Customer).where(Customer.id == customer_id))
+    result = await session.execute(select(Customer).where(Customer.id == customer_id, Customer.workspace_id == workspace_id))
     customer = result.scalar_one_or_none()
     if not customer:
         return
@@ -592,7 +630,7 @@ async def get_lead_pipeline(
     workspace_id: Optional[UUID] = None,
 ) -> LeadPipeline:
     result = await session.execute(
-        select(Customer).where(Customer.buying_stage.isnot(None))
+        select(Customer).where(Customer.workspace_id == workspace_id, Customer.buying_stage.isnot(None))
     )
     customers = result.scalars().all()
 
@@ -640,7 +678,7 @@ async def update_lead_stage(
     ip_address: Optional[str] = None,
     workspace_id: Optional[UUID] = None,
 ) -> None:
-    result = await session.execute(select(Customer).where(Customer.id == customer_id))
+    result = await session.execute(select(Customer).where(Customer.id == customer_id, Customer.workspace_id == workspace_id))
     customer = result.scalar_one_or_none()
     if not customer:
         return
@@ -685,7 +723,7 @@ async def get_analytics(
             func.date(Conversation.created_at).label("day"),
             func.count(Conversation.id).label("cnt"),
         )
-        .where(Conversation.created_at.between(from_dt, to_dt))
+        .where(Conversation.workspace_id == workspace_id, Conversation.created_at.between(from_dt, to_dt))
         .group_by(text("day"))
         .order_by(text("day"))
     )
@@ -700,7 +738,7 @@ async def get_analytics(
             func.date(Customer.created_at).label("day"),
             func.count(Customer.id).label("cnt"),
         )
-        .where(Customer.created_at.between(from_dt, to_dt))
+        .where(Customer.workspace_id == workspace_id, Customer.created_at.between(from_dt, to_dt))
         .group_by(text("day"))
         .order_by(text("day"))
     )
@@ -715,14 +753,14 @@ async def get_analytics(
             IntentHistory.detected_intent,
             func.count(IntentHistory.id).label("cnt"),
         )
-        .where(IntentHistory.created_at.between(from_dt, to_dt))
+        .where(IntentHistory.workspace_id == workspace_id, IntentHistory.created_at.between(from_dt, to_dt))
         .group_by(IntentHistory.detected_intent)
         .order_by(func.count(IntentHistory.id).desc())
     )
     total_intents = sum(r.cnt for r in intent_rows.all()) or 1
     intent_rows = await session.execute(
         select(IntentHistory.detected_intent, func.count(IntentHistory.id).label("cnt"))
-        .where(IntentHistory.created_at.between(from_dt, to_dt))
+        .where(IntentHistory.workspace_id == workspace_id, IntentHistory.created_at.between(from_dt, to_dt))
         .group_by(IntentHistory.detected_intent)
         .order_by(func.count(IntentHistory.id).desc())
     )
@@ -742,7 +780,8 @@ async def get_analytics(
             func.avg(AIMetadata.latency_ms).label("avg_ms"),
         )
         .join(AIMetadata, AIMetadata.message_id == Message.id)
-        .where(Message.timestamp.between(from_dt, to_dt))
+        .join(Conversation, Message.conversation_id == Conversation.id)
+        .where(Conversation.workspace_id == workspace_id, Message.timestamp.between(from_dt, to_dt))
         .group_by(text("day"))
         .order_by(text("day"))
     )
@@ -761,16 +800,18 @@ async def get_analytics(
             func.count(AIMetadata.id).label("total_calls"),
         )
         .join(Message, AIMetadata.message_id == Message.id)
-        .where(Message.timestamp.between(from_dt, to_dt))
+        .join(Conversation, Message.conversation_id == Conversation.id)
+        .where(Conversation.workspace_id == workspace_id, Message.timestamp.between(from_dt, to_dt))
     )
     cost_row = cost_agg.first()
     total_cost  = float(cost_row.total_cost or 0)
     total_calls = cost_row.total_calls or 1
     total_customers_period = await session.scalar(
-        select(func.count(Customer.id)).where(Customer.created_at.between(from_dt, to_dt))
+        select(func.count(Customer.id)).where(Customer.workspace_id == workspace_id, Customer.created_at.between(from_dt, to_dt))
     ) or 1
     qualified_period = await session.scalar(
         select(func.count(Customer.id)).where(
+            Customer.workspace_id == workspace_id,
             Customer.created_at.between(from_dt, to_dt),
             Customer.buying_stage.notin_(["Research", None]),
         )
@@ -852,6 +893,8 @@ async def get_activity_feed(
 ) -> list[ActivityEvent]:
     result = await session.execute(
         select(CustomerMemoryEvent)
+        .join(Customer, CustomerMemoryEvent.customer_id == Customer.id)
+        .where(Customer.workspace_id == workspace_id)
         .order_by(CustomerMemoryEvent.created_at.desc())
         .limit(limit)
     )
@@ -893,18 +936,19 @@ async def get_queue_status(
 ) -> QueueStatus:
     today_start = SystemClock.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    pending  = await session.scalar(select(func.count(BackgroundJob.id)).where(BackgroundJob.status == JobStatus.pending))
-    running  = await session.scalar(select(func.count(BackgroundJob.id)).where(BackgroundJob.status == JobStatus.running))
-    failed   = await session.scalar(select(func.count(BackgroundJob.id)).where(BackgroundJob.status == JobStatus.failed))
+    pending  = await session.scalar(select(func.count(BackgroundJob.id)).where(BackgroundJob.workspace_id == workspace_id, BackgroundJob.status == JobStatus.pending))
+    running  = await session.scalar(select(func.count(BackgroundJob.id)).where(BackgroundJob.workspace_id == workspace_id, BackgroundJob.status == JobStatus.running))
+    failed   = await session.scalar(select(func.count(BackgroundJob.id)).where(BackgroundJob.workspace_id == workspace_id, BackgroundJob.status == JobStatus.failed))
     done_today = await session.scalar(
         select(func.count(BackgroundJob.id)).where(
+            BackgroundJob.workspace_id == workspace_id,
             BackgroundJob.status == JobStatus.completed,
             BackgroundJob.completed_at >= today_start,
         )
     )
 
     recent_jobs_result = await session.execute(
-        select(BackgroundJob).order_by(BackgroundJob.scheduled_at.desc()).limit(20)
+        select(BackgroundJob).where(BackgroundJob.workspace_id == workspace_id).order_by(BackgroundJob.scheduled_at.desc()).limit(20)
     )
     jobs = [BackgroundJobSchema.model_validate(j) for j in recent_jobs_result.scalars().all()]
 
@@ -978,7 +1022,7 @@ async def get_audit_log(
     workspace_id: Optional[UUID] = None,
     limit: int = 100,
 ) -> list[AuditLogSchema]:
-    q = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
+    q = select(AuditLog).where(AuditLog.workspace_id == workspace_id).order_by(AuditLog.created_at.desc()).limit(limit)
     result = await session.execute(q)
     logs = result.scalars().all()
 
@@ -1023,6 +1067,7 @@ async def search_everything(
     # ── Customers ─────────────────────────────────────────────────────────────
     customer_rows = await session.execute(
         select(Customer).where(
+            Customer.workspace_id == workspace_id,
             or_(
                 Customer.name.ilike(pattern),
                 Customer.phone.ilike(pattern),
@@ -1044,7 +1089,8 @@ async def search_everything(
     # ── Messages ──────────────────────────────────────────────────────────────
     msg_rows = await session.execute(
         select(Message)
-        .where(Message.content.ilike(pattern))
+        .join(Conversation, Message.conversation_id == Conversation.id)
+        .where(Conversation.workspace_id == workspace_id, Message.content.ilike(pattern))
         .order_by(Message.timestamp.desc())
         .limit(10)
     )
@@ -1062,6 +1108,7 @@ async def search_everything(
     # ── Intent ────────────────────────────────────────────────────────────────
     intent_rows = await session.execute(
         select(IntentHistory).where(
+            IntentHistory.workspace_id == workspace_id,
             or_(
                 IntentHistory.reasoning.ilike(pattern),
                 IntentHistory.budget.ilike(pattern),
