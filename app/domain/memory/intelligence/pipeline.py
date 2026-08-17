@@ -100,46 +100,39 @@ class ContextPipeline:
             else:
                 try:
                     uid = uuid.UUID(str(entity_id))
-                except Exception:
-                    uid = None
+                except ValueError:
+                    pass
 
         if ContextBlockType.MEMORY in requested_blocks and entity_id:
             try:
                 mem_dto = None
                 if self._query_facade and uid:
-                    try:
-                        # Pass workspace_id so the query/repository boundary enforces
-                        # tenant isolation before data enters the pipeline.
-                        mem_dto = await self._query_facade.get_customer_memory(
-                            customer_id=uid,
-                            session=None,
-                        )
-                    except Exception:
-                        pass
+                    mem_dto = await self._query_facade.get_customer_memory(
+                        customer_id=uid,
+                        session=None,
+                    )
                 if mem_dto is None and self._read_repo:
-                    try:
-                        # Explicit workspace predicate at the repository level.
-                        mem_dto = await self._read_repo.get_by_customer_id(
-                            customer_id=uid or entity_id,
-                            workspace_id=workspace_id,
-                        )
-                    except Exception:
-                        pass
-                raw_blocks[ContextBlockType.MEMORY] = mem_dto
+                    # Explicit workspace predicate at the repository level.
+                    mem_dto = await self._read_repo.get_by_customer_id(
+                        customer_id=uid or entity_id,
+                        workspace_id=workspace_id,
+                    )
+                if mem_dto is not None:
+                    raw_blocks[ContextBlockType.MEMORY] = mem_dto
             except Exception as e:
-                errors[ContextBlockType.MEMORY] = str(e)
+                errors[ContextBlockType.MEMORY] = f"Retrieval failure: {str(e)}"
 
         if ContextBlockType.RELATIONSHIPS in requested_blocks and entity_id and self._graph_facade:
             try:
                 node_type = custom_entity_type or scope.value
                 edges = await self._graph_facade.queries.get_direct_relationships(
                     entity_type=node_type,
-                    entity_id=entity_id,
+                    entity_id=str(entity_id),
                     workspace_id=workspace_id,
                 )
                 raw_blocks[ContextBlockType.RELATIONSHIPS] = edges
             except Exception as e:
-                errors[ContextBlockType.RELATIONSHIPS] = str(e)
+                errors[ContextBlockType.RELATIONSHIPS] = f"Graph retrieval failure: {str(e)}"
 
         if ContextBlockType.TIMELINE in requested_blocks and entity_id and self._read_repo:
             try:
@@ -152,9 +145,10 @@ class ContextPipeline:
                         customer_id=uid or entity_id,
                         workspace_id=workspace_id,
                     )
-                raw_blocks[ContextBlockType.TIMELINE] = events
+                if events is not None:
+                    raw_blocks[ContextBlockType.TIMELINE] = events
             except Exception as e:
-                errors[ContextBlockType.TIMELINE] = str(e)
+                errors[ContextBlockType.TIMELINE] = f"Retrieval failure: {str(e)}"
 
         if ContextBlockType.VERSIONS in requested_blocks and entity_id and self._read_repo:
             try:
@@ -167,18 +161,20 @@ class ContextPipeline:
                         customer_id=uid or entity_id,
                         workspace_id=workspace_id,
                     )
-                raw_blocks[ContextBlockType.VERSIONS] = vers
+                if vers is not None:
+                    raw_blocks[ContextBlockType.VERSIONS] = vers
             except Exception as e:
-                errors[ContextBlockType.VERSIONS] = str(e)
+                errors[ContextBlockType.VERSIONS] = f"Retrieval failure: {str(e)}"
 
         if ContextBlockType.STATISTICS in requested_blocks and self._graph_facade:
             try:
-                stats = await self._graph_facade.queries.get_workspace_statistics(
+                stats = await self._graph_facade.queries.get_statistics(
                     workspace_id=workspace_id,
+                    session=None,
                 )
                 raw_blocks[ContextBlockType.STATISTICS] = stats
             except Exception as e:
-                errors[ContextBlockType.STATISTICS] = str(e)
+                errors[ContextBlockType.STATISTICS] = f"Graph retrieval failure: {str(e)}"
 
         # ── Step 2: NORMALIZE ─────────────────────────────────────────────────
         # Support both legacy .to_dict() objects and Pydantic V2 models
@@ -202,35 +198,20 @@ class ContextPipeline:
                 normalized_blocks[b_type] = _normalize_item(data)
 
         # ── Step 3: VALIDATE ──────────────────────────────────────────────────
-        # Fail-closed: any cross-workspace violation purges the offending block
-        # from normalized_blocks so foreign data cannot reach the composer,
-        # projector, or export engine.
+        # Fail-closed: any cross-workspace violation MUST raise CrossWorkspaceContextError.
+        # This prevents the context from proceeding to composer, projector, or export engine.
+        from app.domain.memory.intelligence.validation import CrossWorkspaceContextError
+        
         try:
             violations = self._validator.validate_workspace_isolation(
                 workspace_id=workspace_id,
                 memory_data=normalized_blocks.get(ContextBlockType.MEMORY),
                 relationships_data=normalized_blocks.get(ContextBlockType.RELATIONSHIPS),
-                strict=False,  # collect all violations without raising
+                strict=True,  # STRICT MODE: raises CrossWorkspaceContextError on violation
             )
-            if violations:
-                # Purge every block that contains foreign-workspace data.
-                mem_data = normalized_blocks.get(ContextBlockType.MEMORY, {})
-                if isinstance(mem_data, dict):
-                    mem_ws = str(mem_data.get("workspace_id", ""))
-                    if workspace_id and mem_ws and mem_ws != str(workspace_id):
-                        normalized_blocks.pop(ContextBlockType.MEMORY, None)
-                        errors[ContextBlockType.MEMORY] = (
-                            f"Cross-workspace isolation violation: "
-                            f"memory workspace {mem_ws} != requested {workspace_id}"
-                        )
-                # Purge relationship entries that belong to another workspace.
-                rel_data = normalized_blocks.get(ContextBlockType.RELATIONSHIPS)
-                if isinstance(rel_data, list) and workspace_id:
-                    ws_str = str(workspace_id)
-                    clean = [r for r in rel_data
-                             if not (isinstance(r, dict) and r.get("workspace_id")
-                                     and str(r["workspace_id"]) != ws_str)]
-                    normalized_blocks[ContextBlockType.RELATIONSHIPS] = clean
+        except CrossWorkspaceContextError as e:
+            # We explicitly catch and re-raise to guarantee fail-closed security boundary.
+            raise e
         except Exception as e:
             errors[ContextBlockType.AUDIT] = f"Workspace isolation validation error: {str(e)}"
 
@@ -240,19 +221,20 @@ class ContextPipeline:
             try:
                 start_ref = EntityReference(
                     entity_type=GraphNodeType(custom_entity_type or scope.value),
-                    entity_id=entity_id,
+                    entity_id=str(entity_id),
                     workspace_id=workspace_id,
                 )
-                traversal = await self._graph_facade.queries.traverse_graph(
-                    start_node=start_ref,
-                    strategy="BFS",
+                traversal = await self._graph_facade.queries.traverse_neighbors(
+                    workspace_id=workspace_id,
+                    start_entity_type=start_ref.entity_type,
+                    start_entity_id=start_ref.entity_id,
                     max_depth=max_depth,
-                    workspace_id=workspace_id,
+                    strategy_name="bfs",
                 )
-                if traversal and traversal.visited_nodes:
+                if traversal and traversal.nodes:
                     projections_applied.append(f"MultiHopExpansion(depth={max_depth})")
-            except Exception:
-                pass
+            except Exception as e:
+                errors[ContextBlockType.RELATIONSHIPS] = f"Graph traversal failure: {str(e)}"
 
         # ── Step 5: COMPOSE ───────────────────────────────────────────────────
         composed = self._composer.compose(
@@ -272,9 +254,9 @@ class ContextPipeline:
             try:
                 proj_data: Optional[Dict[str, Any]] = None
                 if scope == ContextScope.CUSTOMER:
-                    proj = await self._graph_facade.queries.get_customer_360_projection(
-                        customer_id=entity_id,
+                    proj = await self._graph_facade.queries.project_customer_360(
                         workspace_id=workspace_id,
+                        customer_id=str(entity_id),
                     )
                     projections_applied.append("Customer360Projection")
                     if proj and hasattr(proj, "to_dict"):
@@ -282,9 +264,9 @@ class ContextPipeline:
                     elif isinstance(proj, dict):
                         proj_data = proj
                 elif scope == ContextScope.ORGANIZATION:
-                    proj = await self._graph_facade.queries.get_organization_projection(
-                        company_id=entity_id,
+                    proj = await self._graph_facade.queries.project_organization(
                         workspace_id=workspace_id,
+                        company_id=str(entity_id),
                     )
                     projections_applied.append("OrganizationProjection")
                     if proj and hasattr(proj, "to_dict"):
@@ -292,9 +274,9 @@ class ContextPipeline:
                     elif isinstance(proj, dict):
                         proj_data = proj
                 elif scope == ContextScope.PROPERTY:
-                    proj = await self._graph_facade.queries.get_property_network_projection(
-                        property_id=entity_id,
+                    proj = await self._graph_facade.queries.project_property_network(
                         workspace_id=workspace_id,
+                        property_id=str(entity_id),
                     )
                     projections_applied.append("PropertyNetworkProjection")
                     if proj and hasattr(proj, "to_dict"):
@@ -302,9 +284,9 @@ class ContextPipeline:
                     elif isinstance(proj, dict):
                         proj_data = proj
                 elif scope == ContextScope.OPPORTUNITY:
-                    proj = await self._graph_facade.queries.get_opportunity_network_projection(
-                        opportunity_id=entity_id,
+                    proj = await self._graph_facade.queries.project_opportunity_network(
                         workspace_id=workspace_id,
+                        opportunity_id=str(entity_id),
                     )
                     projections_applied.append("OpportunityNetworkProjection")
                     if proj and hasattr(proj, "to_dict"):
@@ -319,8 +301,8 @@ class ContextPipeline:
                         data=proj_data,
                         loaded=True,
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                errors[ContextBlockType.PROJECTIONS] = f"Projection failure: {str(e)}"
 
         # ── Step 7: SERIALIZE ─────────────────────────────────────────────────
         target_fmt = options.format if options and options.format else ExportTargetFormat.STANDARD_API

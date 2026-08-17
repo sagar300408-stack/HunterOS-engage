@@ -36,7 +36,7 @@ router = APIRouter(prefix="/context", tags=["Memory Context & Intelligence Gatew
 
 @router.get("/customer/{customer_id}")
 async def get_customer_context(
-    customer_id: str,
+    customer_id: uuid.UUID,
     workspace_id: Optional[uuid.UUID] = Query(None),
     max_depth: int = Query(2, ge=1, le=5),
     include_timeline: bool = Query(True),
@@ -65,7 +65,7 @@ async def get_customer_context(
 
 @router.get("/organization/{org_id}")
 async def get_organization_context(
-    org_id: str,
+    org_id: uuid.UUID,
     workspace_id: Optional[uuid.UUID] = Query(None),
     max_depth: int = Query(2, ge=1, le=5),
     format: Optional[ExportTargetFormat] = Query(None),
@@ -86,7 +86,7 @@ async def get_organization_context(
 
 @router.get("/opportunity/{opp_id}")
 async def get_opportunity_context(
-    opp_id: str,
+    opp_id: uuid.UUID,
     workspace_id: Optional[uuid.UUID] = Query(None),
     max_depth: int = Query(2, ge=1, le=5),
     format: Optional[ExportTargetFormat] = Query(None),
@@ -107,7 +107,7 @@ async def get_opportunity_context(
 
 @router.get("/property/{prop_id}")
 async def get_property_context(
-    prop_id: str,
+    prop_id: uuid.UUID,
     workspace_id: Optional[uuid.UUID] = Query(None),
     max_depth: int = Query(2, ge=1, le=5),
     format: Optional[ExportTargetFormat] = Query(None),

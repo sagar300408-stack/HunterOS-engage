@@ -195,26 +195,16 @@ async def test_workspace_a_cannot_retrieve_workspace_b_memory(db_session: AsyncS
 
     pipeline = _make_pipeline(db_session)
 
+    from app.domain.memory.intelligence.validation import CrossWorkspaceContextError
+
     # Workspace A requests B's customer_id
-    result = await pipeline.execute(
-        scope=ContextScope.CUSTOMER,
-        entity_id=str(cust_b_id),
-        workspace_id=ws_a,  # caller is A
-        options=ContextRequestOptions(format=ExportTargetFormat.STANDARD_API),
-    )
-
-    # Serialize the entire result as a string to catch any leakage path
-    result_str = str(result)
-    assert "ForeignSecret_MustNotLeak" not in result_str, (
-        "Cross-workspace data leak: Workspace B's secret reached Workspace A's serialized context"
-    )
-
-    # The MEMORY block must not carry B's data
-    blocks = result.get("blocks", {})
-    mem_data = blocks.get("MEMORY", {}).get("data", {})
-    assert "ForeignSecret_MustNotLeak" not in str(mem_data), (
-        "Foreign secret must not appear in MEMORY block data"
-    )
+    with pytest.raises(CrossWorkspaceContextError):
+        await pipeline.execute(
+            scope=ContextScope.CUSTOMER,
+            entity_id=str(cust_b_id),
+            workspace_id=ws_a,  # caller is A
+            options=ContextRequestOptions(format=ExportTargetFormat.STANDARD_API),
+        )
 
 
 # ── B4-5: Pydantic V2 DTOs produce structured dicts, not stringified repr ───
