@@ -20,6 +20,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.domain.conversations.models
 from app.domain.memory.graph.export import GraphExportEngine
 from app.domain.memory.graph.facade import KnowledgeGraphFacade
 from app.domain.memory.graph.models import (

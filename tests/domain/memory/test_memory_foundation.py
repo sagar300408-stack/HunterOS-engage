@@ -1,3 +1,7 @@
+import uuid
+from app.api.v1.auth_deps import get_current_user
+from app.domain.security.models import User, UserRole
+
 """
 HunterOS Engage — Core Memory Foundation Test Suite (Refinement Phase 2.1.1)
 
@@ -18,7 +22,6 @@ Tests:
 
 import hashlib
 import json
-import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator
 
@@ -538,8 +541,9 @@ async def test_bulk_memory_operations(async_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_rest_api_endpoints_integration(async_session: AsyncSession):
     """Test REST API routes using FastAPI test client."""
+    workspace_id = uuid.uuid4()
     customer_id = uuid.uuid4()
-    customer = Customer(id=customer_id, phone="+919777788888", name="API Test Customer")
+    customer = Customer(id=customer_id, phone="+919777788888", name="API Test Customer", workspace_id=workspace_id)
     async_session.add(customer)
     await async_session.commit()
 
@@ -548,8 +552,12 @@ async def test_rest_api_endpoints_integration(async_session: AsyncSession):
     # Override get_db dependency to use our isolated test async_session
     async def override_get_db():
         yield async_session
+        
+    async def override_get_current_user():
+        return User(id=uuid.uuid4(), email="test@test.com", workspace_id=workspace_id, role=UserRole.admin)
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

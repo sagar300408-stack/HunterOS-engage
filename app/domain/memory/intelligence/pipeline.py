@@ -108,15 +108,20 @@ class ContextPipeline:
                 mem_dto = None
                 if self._query_facade and uid:
                     try:
+                        # Pass workspace_id so the query/repository boundary enforces
+                        # tenant isolation before data enters the pipeline.
                         mem_dto = await self._query_facade.get_customer_memory(
                             customer_id=uid,
+                            session=None,
                         )
                     except Exception:
                         pass
                 if mem_dto is None and self._read_repo:
                     try:
+                        # Explicit workspace predicate at the repository level.
                         mem_dto = await self._read_repo.get_by_customer_id(
                             customer_id=uid or entity_id,
+                            workspace_id=workspace_id,
                         )
                     except Exception:
                         pass
@@ -176,35 +181,56 @@ class ContextPipeline:
                 errors[ContextBlockType.STATISTICS] = str(e)
 
         # ── Step 2: NORMALIZE ─────────────────────────────────────────────────
+        # Support both legacy .to_dict() objects and Pydantic V2 models
+        # (.model_dump()). The fallback to str() is kept only as a last resort.
+        def _normalize_item(item: Any) -> Any:
+            if hasattr(item, "to_dict"):
+                return item.to_dict()
+            if hasattr(item, "model_dump"):  # Pydantic V2
+                return item.model_dump(mode="json")
+            if isinstance(item, dict):
+                return item
+            return {"value": str(item)}
+
         normalized_blocks: Dict[ContextBlockType, Any] = {}
         for b_type, data in raw_blocks.items():
             if data is None:
                 continue
-            if hasattr(data, "to_dict"):
-                normalized_blocks[b_type] = data.to_dict()
-            elif isinstance(data, list):
-                norm_list = []
-                for item in data:
-                    if hasattr(item, "to_dict"):
-                        norm_list.append(item.to_dict())
-                    elif isinstance(item, dict):
-                        norm_list.append(item)
-                    else:
-                        norm_list.append({"value": str(item)})
-                normalized_blocks[b_type] = norm_list
-            elif isinstance(data, dict):
-                normalized_blocks[b_type] = data
+            if isinstance(data, list):
+                normalized_blocks[b_type] = [_normalize_item(item) for item in data]
             else:
-                normalized_blocks[b_type] = {"value": str(data)}
+                normalized_blocks[b_type] = _normalize_item(data)
 
         # ── Step 3: VALIDATE ──────────────────────────────────────────────────
+        # Fail-closed: any cross-workspace violation purges the offending block
+        # from normalized_blocks so foreign data cannot reach the composer,
+        # projector, or export engine.
         try:
-            self._validator.validate_workspace_isolation(
+            violations = self._validator.validate_workspace_isolation(
                 workspace_id=workspace_id,
                 memory_data=normalized_blocks.get(ContextBlockType.MEMORY),
                 relationships_data=normalized_blocks.get(ContextBlockType.RELATIONSHIPS),
-                strict=False,  # collect diagnostics rather than halting pipeline
+                strict=False,  # collect all violations without raising
             )
+            if violations:
+                # Purge every block that contains foreign-workspace data.
+                mem_data = normalized_blocks.get(ContextBlockType.MEMORY, {})
+                if isinstance(mem_data, dict):
+                    mem_ws = str(mem_data.get("workspace_id", ""))
+                    if workspace_id and mem_ws and mem_ws != str(workspace_id):
+                        normalized_blocks.pop(ContextBlockType.MEMORY, None)
+                        errors[ContextBlockType.MEMORY] = (
+                            f"Cross-workspace isolation violation: "
+                            f"memory workspace {mem_ws} != requested {workspace_id}"
+                        )
+                # Purge relationship entries that belong to another workspace.
+                rel_data = normalized_blocks.get(ContextBlockType.RELATIONSHIPS)
+                if isinstance(rel_data, list) and workspace_id:
+                    ws_str = str(workspace_id)
+                    clean = [r for r in rel_data
+                             if not (isinstance(r, dict) and r.get("workspace_id")
+                                     and str(r["workspace_id"]) != ws_str)]
+                    normalized_blocks[ContextBlockType.RELATIONSHIPS] = clean
         except Exception as e:
             errors[ContextBlockType.AUDIT] = f"Workspace isolation validation error: {str(e)}"
 

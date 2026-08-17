@@ -65,6 +65,7 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         session: Optional[AsyncSession] = kwargs.get("session")
         customer_id: Optional[UUID] = kwargs.get("customer_id")
         include_deleted: bool = kwargs.get("include_deleted", False)
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
 
         if args:
             if isinstance(args[0], AsyncSession):
@@ -86,6 +87,8 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         sess, is_temp = await self._resolve_session(session)
         try:
             stmt = select(CustomerMemory).where(CustomerMemory.customer_id == customer_id)
+            if workspace_id:
+                stmt = stmt.where(CustomerMemory.workspace_id == workspace_id)
             if not include_deleted:
                 stmt = stmt.where(CustomerMemory.is_deleted == False)  # noqa: E712
             res = await sess.execute(stmt)
@@ -102,6 +105,8 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         session: Optional[AsyncSession] = kwargs.get("session")
         memory_id: Optional[UUID] = kwargs.get("memory_id")
         include_deleted: bool = kwargs.get("include_deleted", False)
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
 
         if args:
             if isinstance(args[0], AsyncSession):
@@ -123,6 +128,10 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         sess, is_temp = await self._resolve_session(session)
         try:
             stmt = select(CustomerMemory).where(CustomerMemory.id == memory_id)
+            if workspace_id:
+                stmt = stmt.where(CustomerMemory.workspace_id == workspace_id)
+            if workspace_id:
+                stmt = stmt.where(CustomerMemory.workspace_id == workspace_id)
             if not include_deleted:
                 stmt = stmt.where(CustomerMemory.is_deleted == False)  # noqa: E712
             res = await sess.execute(stmt)
@@ -139,6 +148,7 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         session: Optional[AsyncSession] = kwargs.get("session")
         customer_ids: List[UUID] = kwargs.get("customer_ids", [])
         include_deleted: bool = kwargs.get("include_deleted", False)
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
 
         if args:
             if isinstance(args[0], AsyncSession):
@@ -162,6 +172,8 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         sess, is_temp = await self._resolve_session(session)
         try:
             stmt = select(CustomerMemory).where(CustomerMemory.customer_id.in_(customer_ids))
+            if workspace_id:
+                stmt = stmt.where(CustomerMemory.workspace_id == workspace_id)
             if not include_deleted:
                 stmt = stmt.where(CustomerMemory.is_deleted == False)  # noqa: E712
             res = await sess.execute(stmt)
@@ -440,6 +452,9 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         end_time: Optional[datetime] = kwargs.get("end_time")
         page: int = kwargs.get("page", 1)
         page_size: int = kwargs.get("page_size", 50)
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
 
         if args:
             if isinstance(args[0], AsyncSession):
@@ -454,6 +469,8 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
             stmt = select(CustomerMemoryTimelineEvent).where(
                 CustomerMemoryTimelineEvent.customer_id == customer_id
             )
+            if workspace_id:
+                stmt = stmt.join(CustomerMemory, CustomerMemory.customer_id == CustomerMemoryTimelineEvent.customer_id).where(CustomerMemory.workspace_id == workspace_id)
             if category:
                 stmt = stmt.where(CustomerMemoryTimelineEvent.category == category)
             if event_type:
@@ -485,6 +502,9 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         customer_id: Optional[UUID] = kwargs.get("customer_id")
         page: int = kwargs.get("page", 1)
         page_size: int = kwargs.get("page_size", 50)
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
 
         if args:
             if isinstance(args[0], AsyncSession):
@@ -497,6 +517,8 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         sess, is_temp = await self._resolve_session(session)
         try:
             stmt = select(CustomerMemoryVersion).where(CustomerMemoryVersion.customer_id == customer_id)
+            if workspace_id:
+                stmt = stmt.join(CustomerMemory, CustomerMemory.customer_id == CustomerMemoryVersion.customer_id).where(CustomerMemory.workspace_id == workspace_id)
             count_stmt = select(func.count()).select_from(stmt.subquery())
             count_res = await sess.execute(count_stmt)
             total = count_res.scalar_one()
@@ -516,6 +538,7 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         session: Optional[AsyncSession] = kwargs.get("session")
         customer_id: Optional[UUID] = kwargs.get("customer_id")
         version_number: Optional[int] = kwargs.get("version_number")
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
 
         if args:
             if isinstance(args[0], AsyncSession):
@@ -535,6 +558,8 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
                 CustomerMemoryVersion.customer_id == customer_id,
                 CustomerMemoryVersion.version_number == version_number,
             )
+            if workspace_id:
+                stmt = stmt.join(CustomerMemory, CustomerMemory.customer_id == CustomerMemoryVersion.customer_id).where(CustomerMemory.workspace_id == workspace_id)
             res = await sess.execute(stmt)
             return res.scalar_one_or_none()
         finally:
@@ -549,6 +574,7 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         session: Optional[AsyncSession] = kwargs.get("session")
         customer_id: Optional[UUID] = kwargs.get("customer_id")
         version_number: Optional[int] = kwargs.get("version_number")
+        workspace_id: Optional[UUID] = kwargs.get("workspace_id")
         field_path: Optional[str] = kwargs.get("field_path")
         page: int = kwargs.get("page", 1)
         page_size: int = kwargs.get("page_size", 100)
@@ -572,6 +598,8 @@ class SqlAlchemyMemoryReadRepository(AbstractMemoryReadRepository):
         sess, is_temp = await self._resolve_session(session)
         try:
             stmt = select(MemoryChangeLog).where(MemoryChangeLog.customer_id == customer_id)
+            if workspace_id:
+                stmt = stmt.join(CustomerMemory, CustomerMemory.customer_id == MemoryChangeLog.customer_id).where(CustomerMemory.workspace_id == workspace_id)
             if version_number is not None:
                 stmt = stmt.where(MemoryChangeLog.version_number == version_number)
             if field_path is not None:

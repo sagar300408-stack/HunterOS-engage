@@ -316,12 +316,13 @@ class MemoryService(AbstractMemoryService):
         customer_id: UUID,
         include_deleted: bool = False,
         session: AsyncSession = None,
+        workspace_id: Optional[UUID] = None,
     ) -> Optional[CustomerMemory]:
         """Retrieve customer memory record."""
         if not session:
             raise ValueError("AsyncSession is required")
         return await self._read_repo.get_by_customer_id(
-            session, customer_id, include_deleted=include_deleted
+            session, customer_id, include_deleted=include_deleted, workspace_id=workspace_id
         )
 
     async def bulk_get_memories(
@@ -329,10 +330,11 @@ class MemoryService(AbstractMemoryService):
         customer_ids: List[UUID],
         include_deleted: bool = False,
         session: AsyncSession = None,
+        workspace_id: Optional[UUID] = None,
     ) -> List[CustomerMemory]:
         """Bulk retrieve customer memories."""
         return await self._read_repo.bulk_get(
-            session, customer_ids, include_deleted=include_deleted
+            session, customer_ids, include_deleted=include_deleted, workspace_id=workspace_id
         )
 
     async def get_timeline(
@@ -346,10 +348,10 @@ class MemoryService(AbstractMemoryService):
         page: int = 1,
         page_size: int = 50,
         session: AsyncSession = None,
+        workspace_id: Optional[UUID] = None,
     ) -> Tuple[List[CustomerMemoryTimelineEvent], int]:
         """Retrieve paginated timeline events."""
         return await self._read_repo.get_timeline(
-            session=session,
             customer_id=customer_id,
             category=category,
             event_type=event_type,
@@ -358,6 +360,8 @@ class MemoryService(AbstractMemoryService):
             end_time=end_time,
             page=page,
             page_size=page_size,
+            session=session,
+            workspace_id=workspace_id,
         )
 
     async def get_versions(
@@ -366,6 +370,7 @@ class MemoryService(AbstractMemoryService):
         page: int = 1,
         page_size: int = 50,
         session: AsyncSession = None,
+        workspace_id: Optional[UUID] = None,
     ) -> Tuple[List[CustomerMemoryVersion], int]:
         """Retrieve paginated version history."""
         return await self._read_repo.get_versions(
@@ -373,16 +378,18 @@ class MemoryService(AbstractMemoryService):
             customer_id=customer_id,
             page=page,
             page_size=page_size,
+            workspace_id=workspace_id,
         )
 
     async def get_version_by_number(
-        self, customer_id: UUID, version_number: int, session: AsyncSession = None
+        self, customer_id: UUID, version_number: int, session: AsyncSession = None, workspace_id: Optional[UUID] = None
     ) -> Optional[CustomerMemoryVersion]:
         """Retrieve specific historical version snapshot."""
         return await self._read_repo.get_version_by_number(
             session=session,
             customer_id=customer_id,
             version_number=version_number,
+            workspace_id=workspace_id,
         )
 
     async def get_change_logs(
@@ -393,6 +400,7 @@ class MemoryService(AbstractMemoryService):
         page: int = 1,
         page_size: int = 100,
         session: AsyncSession = None,
+        workspace_id: Optional[UUID] = None,
     ) -> Tuple[List[MemoryChangeLog], int]:
         """Retrieve granular field-level change history."""
         return await self._read_repo.get_change_logs(
@@ -402,19 +410,20 @@ class MemoryService(AbstractMemoryService):
             field_path=field_path,
             page=page,
             page_size=page_size,
+            workspace_id=workspace_id,
         )
 
     async def get_customer_memory_history(
-        self, customer_id: UUID, session: AsyncSession = None
+        self, customer_id: UUID, session: AsyncSession = None, workspace_id: Optional[UUID] = None
     ) -> CustomerMemoryHistoryResponse:
         """
         Unified history query returning current memory state, timeline,
         versions, and change logs in a single payload.
         """
-        memory = await self._read_repo.get_by_customer_id(session, customer_id, include_deleted=True)
-        timeline_events, _ = await self._read_repo.get_timeline(session, customer_id=customer_id, page=1, page_size=50)
-        versions, _ = await self._read_repo.get_versions(session, customer_id=customer_id, page=1, page_size=50)
-        change_logs, _ = await self._read_repo.get_change_logs(session, customer_id=customer_id, page=1, page_size=100)
+        memory = await self._read_repo.get_by_customer_id(session, customer_id, include_deleted=True, workspace_id=workspace_id)
+        timeline_events, _ = await self._read_repo.get_timeline(session, customer_id=customer_id, page=1, page_size=50, workspace_id=workspace_id)
+        versions, _ = await self._read_repo.get_versions(session, customer_id=customer_id, page=1, page_size=50, workspace_id=workspace_id)
+        change_logs, _ = await self._read_repo.get_change_logs(session, customer_id=customer_id, page=1, page_size=100, workspace_id=workspace_id)
 
         mem_resp = CustomerMemoryResponse.model_validate(memory) if memory else None
         timeline_resps = [CustomerMemoryTimelineEventResponse.model_validate(e) for e in timeline_events]

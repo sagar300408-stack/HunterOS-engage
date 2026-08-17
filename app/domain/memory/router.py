@@ -10,6 +10,12 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.domain.security.models import User
+else:
+    User = Any
+from app.api.v1.auth_deps import get_current_user
 from fastapi import (
     APIRouter,
     Depends,
@@ -100,9 +106,12 @@ async def create_memory(
     request: CustomerMemoryCreateRequest,
     response: Response,
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     if idempotency_key:
         request.idempotency_key = idempotency_key
 
@@ -134,10 +143,11 @@ async def get_memory(
     customer_id: UUID,
     response: Response,
     include_deleted: bool = Query(False, description="Whether to include soft-deleted memory"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
-    memory = await service.get_customer_memory(customer_id, include_deleted=include_deleted, session=db)
+    memory = await service.get_customer_memory(customer_id, include_deleted=include_deleted, session=db, workspace_id=current_user.workspace_id)
     if not memory:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -161,9 +171,12 @@ async def update_memory(
     response: Response,
     if_match: Optional[str] = Header(None, alias="If-Match"),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     if if_match and not request.expected_revision_id:
         request.expected_revision_id = _clean_etag(if_match)
     if idempotency_key and not request.idempotency_key:
@@ -205,9 +218,12 @@ async def replace_memory(
     response: Response,
     if_match: Optional[str] = Header(None, alias="If-Match"),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     if if_match and not request.expected_revision_id:
         request.expected_revision_id = _clean_etag(if_match)
     if idempotency_key and not request.idempotency_key:
@@ -247,6 +263,7 @@ async def soft_delete_memory(
     customer_id: UUID,
     reason: Optional[str] = Query(None, description="Reason for deletion"),
     changed_by: Optional[str] = Query("API", description="Actor performing deletion"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
@@ -270,6 +287,7 @@ async def soft_delete_memory(
 async def restore_memory(
     customer_id: UUID,
     changed_by: Optional[str] = Query("API", description="Actor performing restoration"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
@@ -291,9 +309,12 @@ async def restore_memory(
 async def change_status(
     customer_id: UUID,
     request: CustomerMemoryStatusChangeRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     try:
         memory = await service.change_lifecycle_status(
             customer_id=customer_id,
@@ -321,6 +342,7 @@ async def lock_memory(
     customer_id: UUID,
     reason: Optional[str] = Query("Administrative lock", description="Reason for lock"),
     changed_by: Optional[str] = Query("API", description="Actor performing lock"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
@@ -341,6 +363,7 @@ async def unlock_memory(
     customer_id: UUID,
     reason: Optional[str] = Query("Administrative unlock", description="Reason for unlock"),
     changed_by: Optional[str] = Query("API", description="Actor performing unlock"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
@@ -361,6 +384,7 @@ async def archive_memory(
     customer_id: UUID,
     reason: Optional[str] = Query("Archival transition", description="Reason for archiving"),
     changed_by: Optional[str] = Query("API", description="Actor performing archival"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryResponse:
@@ -388,6 +412,7 @@ async def get_timeline(
     end_time: Optional[datetime] = Query(None, description="Filter events before end_time"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryTimelineListResponse:
@@ -401,6 +426,7 @@ async def get_timeline(
         page=page,
         page_size=page_size,
         session=db,
+        workspace_id=current_user.workspace_id,
     )
     res_items = [CustomerMemoryTimelineEventResponse.model_validate(e) for e in items]
     return MemoryTimelineListResponse(items=res_items, total=total, page=page, page_size=page_size)
@@ -416,10 +442,11 @@ async def get_versions(
     customer_id: UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> List[CustomerMemoryVersionResponse]:
-    versions, _ = await service.get_versions(customer_id, page=page, page_size=page_size, session=db)
+    versions, _ = await service.get_versions(customer_id, page=page, page_size=page_size, session=db, workspace_id=current_user.workspace_id)
     return [CustomerMemoryVersionResponse.model_validate(v) for v in versions]
 
 
@@ -432,10 +459,11 @@ async def get_versions(
 async def get_version_detail(
     customer_id: UUID,
     version_number: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryVersionDetailResponse:
-    version = await service.get_version_by_number(customer_id, version_number, session=db)
+    version = await service.get_version_by_number(customer_id, version_number, session=db, workspace_id=current_user.workspace_id)
     if not version:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -456,6 +484,7 @@ async def get_changelog(
     field_path: Optional[str] = Query(None, description="Filter by field path pattern"),
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryChangeLogListResponse:
@@ -479,10 +508,11 @@ async def get_changelog(
 )
 async def get_customer_memory_history(
     customer_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemoryHistoryResponse:
-    return await service.get_customer_memory_history(customer_id, session=db)
+    return await service.get_customer_memory_history(customer_id, session=db, workspace_id=current_user.workspace_id)
 
 
 # ── Search & Bulk Endpoints ───────────────────────────────────────────────────
@@ -495,9 +525,12 @@ async def get_customer_memory_history(
 )
 async def search_memories(
     request: MemorySearchRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> CustomerMemorySearchResponse:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     return await service.search_memory(request, session=db)
 
 
@@ -510,9 +543,12 @@ async def search_memories(
 )
 async def bulk_create_memories(
     request: CustomerMemoryBulkCreateRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> List[CustomerMemoryResponse]:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     try:
         memories = await service.bulk_create_memories(request.items, session=db)
         return [CustomerMemoryResponse.model_validate(m) for m in memories]
@@ -528,9 +564,12 @@ async def bulk_create_memories(
 )
 async def bulk_get_memories(
     request: CustomerMemoryBulkGetRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> List[CustomerMemoryResponse]:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     memories = await service.bulk_get_memories(
         request.customer_ids, include_deleted=request.include_deleted, session=db
     )
@@ -545,9 +584,12 @@ async def bulk_get_memories(
 )
 async def bulk_update_memories(
     request: CustomerMemoryBulkUpdateRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> List[CustomerMemoryResponse]:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     try:
         memories = await service.bulk_update_memories(request.items, session=db)
         return [CustomerMemoryResponse.model_validate(m) for m in memories]
@@ -565,9 +607,12 @@ async def bulk_update_memories(
 )
 async def search_memories_cursor(
     request: MemoryCursorSearchRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryCursorSearchResponse:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     result = await service.query_facade.search_memories_cursor(
         workspace_id=request.workspace_id,
         cursor=request.cursor,
@@ -605,9 +650,12 @@ async def search_memories_cursor(
 async def get_memory_projection(
     customer_id: UUID,
     request: MemoryProjectionRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> Any:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     projected = await service.query_facade.get_projection(
         customer_id=customer_id,
         view_name=request.view_name,
@@ -633,6 +681,7 @@ async def get_memory_projection(
 async def get_memory_statistics(
     workspace_id: Optional[UUID] = Query(None, description="Optional workspace scope"),
     bypass_cache: bool = Query(False, description="Bypass cache for real-time calculation"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryStatisticsDTO:
@@ -651,9 +700,12 @@ async def get_memory_statistics(
 )
 async def preview_memory_export(
     request: MemoryExportPreviewRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryExportDTO:
+    if hasattr(request, "workspace_id"):
+        request.workspace_id = current_user.workspace_id
     return await service.query_facade.preview_export(
         workspace_id=request.workspace_id,
         export_format=request.export_format,

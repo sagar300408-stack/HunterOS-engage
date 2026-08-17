@@ -1,3 +1,7 @@
+import uuid
+from app.api.v1.auth_deps import get_current_user
+from app.domain.security.models import User, UserRole
+
 """
 HunterOS Engage — Memory Query & Retrieval Intelligence Test Suite (Refinement Phase 2.1.3)
 
@@ -497,8 +501,12 @@ async def test_rest_api_query_endpoints(async_engine, db_session, seed_data):
     """Verify REST API query routes for projections, cursor search, stats, and export."""
     async def override_get_db():
         yield db_session
+        
+    async def override_get_current_user():
+        return User(id=uuid.uuid4(), email="test@test.com", workspace_id=seed_data["workspace_a"], role=UserRole.admin)
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
     try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -508,8 +516,8 @@ async def test_rest_api_query_endpoints(async_engine, db_session, seed_data):
 
             # 1. POST /memory/{customer_id}/projection (EXECUTIVE View)
             proj_resp = await client.post(
-                f"/api/v1/memory/{cid}/projection",
-                json={"view_name": "EXECUTIVE", "projection_version": "1.0.0"},
+            f"/api/v1/memory/{cid}/projection",
+            json={"view_name": "EXECUTIVE", "projection_version": "1.0.0"},
             )
             assert proj_resp.status_code == 200
             proj_data = proj_resp.json()
@@ -518,8 +526,8 @@ async def test_rest_api_query_endpoints(async_engine, db_session, seed_data):
 
             # 2. POST /memory/search/cursor
             cursor_resp = await client.post(
-                "/api/v1/memory/search/cursor",
-                json={"workspace_id": wid, "limit": 2},
+            "/api/v1/memory/search/cursor",
+            json={"workspace_id": wid, "limit": 2},
             )
             assert cursor_resp.status_code == 200
             cursor_data = cursor_resp.json()
@@ -536,8 +544,8 @@ async def test_rest_api_query_endpoints(async_engine, db_session, seed_data):
 
             # 4. POST /memory/export/preview
             export_resp = await client.post(
-                "/api/v1/memory/export/preview",
-                json={"workspace_id": wid, "export_format": "CSV", "max_rows": 5},
+            "/api/v1/memory/export/preview",
+            json={"workspace_id": wid, "export_format": "CSV", "max_rows": 5},
             )
             assert export_resp.status_code == 200
             export_data = export_resp.json()

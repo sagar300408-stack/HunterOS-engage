@@ -1,3 +1,7 @@
+import uuid
+from app.api.v1.auth_deps import get_current_user
+from app.domain.security.models import User, UserRole
+
 """
 HunterOS Engage — Memory Intelligence: Memory Operations & Lifecycle Management Test Suite (Phase 2.1.2)
 
@@ -12,7 +16,6 @@ Comprehensive test coverage for:
   8. REST API Endpoints (POST, PATCH, PUT, DELETE, POST /restore, POST /status)
 """
 
-import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator
 from uuid import UUID, uuid4
@@ -466,15 +469,20 @@ async def test_rest_api_lifecycle_and_concurrency_endpoints(async_session: Async
     """Test full HTTP API lifecycle operations including PUT, PATCH, ETag If-Match, 412, and 423 status codes."""
     app = create_app()
 
+    workspace_id = uuid.uuid4()
     async def override_get_db():
         yield async_session
+        
+    async def override_get_current_user():
+        return User(id=uuid.uuid4(), email="test@test.com", workspace_id=workspace_id, role=UserRole.admin)
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        customer_id = uuid4()
-        customer = Customer(id=customer_id, phone="+919876543299", name="REST API User")
+        customer_id = uuid.uuid4()
+        customer = Customer(id=customer_id, phone="+919876543299", name="REST API User", workspace_id=workspace_id)
         async_session.add(customer)
         await async_session.commit()
 

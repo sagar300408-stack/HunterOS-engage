@@ -89,7 +89,7 @@ from app.domain.memory.models import (
 from app.domain.memory.repositories.read_repository import SqlAlchemyMemoryReadRepository
 from app.domain.memory.repositories.write_repository import SqlAlchemyMemoryWriteRepository
 from app.domain.memory.repository import MemoryRepository
-from app.domain.memory.router import router as memory_router
+# router is intentionally omitted to avoid circular dependencies
 from app.domain.memory.schemas import (
     BehavioralAttributesBlock,
     CommunicationPreferencesBlock,
@@ -256,7 +256,7 @@ __all__ = [
     # Service & Router
     "AbstractMemoryService",
     "MemoryService",
-    "memory_router",
+
     # Schemas
     "LocationInfo",
     "IdentityBlock",

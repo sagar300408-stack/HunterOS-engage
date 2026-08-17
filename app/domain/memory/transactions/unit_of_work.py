@@ -19,6 +19,8 @@ from app.domain.memory.events.publisher import (
     AbstractMemoryEventPublisher,
     get_memory_event_publisher,
 )
+from app.domain.memory.models import MemoryConcurrencyConflictError
+from sqlalchemy.orm.exc import StaleDataError
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +96,16 @@ class MemoryUnitOfWork(AbstractMemoryUnitOfWork):
         """Flushes and commits the active database transaction and publishes queued domain events."""
         if self._committed:
             return
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except StaleDataError:
+            await self.session.rollback()
+            raise MemoryConcurrencyConflictError(
+                message="Concurrent update detected. The memory record was modified by another transaction.",
+                memory_id="unknown", # We don't have the memory ID easily accessible here, but the exception will handle it.
+                expected_revision="unknown",
+                actual_revision="unknown"
+            )
         self._committed = True
 
         # Dispatch buffered domain events post-commit

@@ -191,6 +191,12 @@ class CustomerMemory(Base):
         default=lambda: str(uuid.uuid4()),
         index=True,
     )
+
+    __mapper_args__ = {
+        "version_id_col": revision_id,
+        "version_id_generator": False,
+    }
+
     lifecycle_status = Column(
         Enum(LifecycleStatus, name="memory_lifecycle_status"),
         nullable=False,
