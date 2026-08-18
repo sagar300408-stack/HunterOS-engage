@@ -26,12 +26,9 @@ class ResponseConsumer(EventConsumer):
             return
 
         async with get_session() as session:
-            # We don't have to_phone directly on AIResponded for simplicity
-            # but we can look it up or just use a dummy context for the alignment
-            
-            # Since AIResponded is part of a flow, we'd normally have correlation
-            to_phone = "1234567890" # Stub
-            conversation_id = "00000000-0000-0000-0000-000000000000" # Stub
+            # We have to_phone directly on AIResponded
+            to_phone = event.to_phone
+            conversation_id = event.conversation_id
             
             ai_result = {
                 "content": event.response_content,
@@ -45,6 +42,9 @@ class ResponseConsumer(EventConsumer):
                 "prompt_version": "v1"
             }
             
+            # send_response persists the outbound message. It needs the customer id too?
+            # actually we don't have to change send_response unless it requires it, 
+            # let's assume send_response works with just conversation_id.
             await send_response(
                 to_phone=to_phone,
                 conversation_id=conversation_id,
@@ -56,7 +56,12 @@ class ResponseConsumer(EventConsumer):
             ready_event = MessageReadyToSendEvent(
                 to_phone=to_phone,
                 content=event.response_content,
-                conversation_id=conversation_id
+                conversation_id=str(conversation_id),
+                workspace_id=event.workspace_id,
+                customer_id=event.customer_id,
+                actor_type=event.actor_type,
+                correlation_id=event.correlation_id,
+                causation_id=event.source_message_id, # causation is the inbound message
             )
             
             from app.events.store.service import EventStoreService

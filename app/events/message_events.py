@@ -37,9 +37,11 @@ class MessageReceived(UniversalBaseEvent):
     
     wa_message_id: str = ""
     from_phone: str = ""
+    to_phone: str = ""
     content: str = ""
     timestamp: Optional[datetime] = None
     contact_name: str = ""
+    message_id: Optional[UUID] = None
 
 
 class MessageStored(UniversalBaseEvent):
@@ -59,7 +61,9 @@ class AIRequested(UniversalBaseEvent):
     source_subsystem: str = Field(default="pipeline_ai")
     
     from_phone: str = ""
+    to_phone: str = ""
     user_content: str = ""
+    message_id: Optional[UUID] = None
 
 
 class AIResponded(UniversalBaseEvent):
@@ -73,6 +77,9 @@ class AIResponded(UniversalBaseEvent):
     total_tokens: int = 0
     latency_ms: int = 0
     estimated_cost_usd: float = 0.0
+    source_message_id: Optional[UUID] = None
+    response_message_id: Optional[UUID] = None
+    to_phone: str = ""
 
 
 class MessageReadyToSendEvent(UniversalBaseEvent):

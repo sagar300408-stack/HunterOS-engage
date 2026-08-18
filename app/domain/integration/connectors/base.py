@@ -27,7 +27,7 @@ class BaseConnector(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def execute_action(self, action_name: str, payload: Dict[str, Any], credentials: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_action(self, action_name: str, payload: Dict[str, Any], credentials: Dict[str, Any], settings: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Executes a supported action. (To be fully utilized in Milestone 9.2).
         """

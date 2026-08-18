@@ -20,6 +20,8 @@ from typing import Awaitable, Callable, Dict, List, Optional
 from uuid import UUID
 
 from app.utils.logger import get_logger
+from app.events.bus.event_bus import EventBus
+from app.events.message_events import MessageReadyToSendEvent
 
 logger = get_logger(__name__)
 
@@ -103,3 +105,38 @@ class NotificationBus:
 
 # Global bus instance shared by the scheduling service and all subscribers.
 notification_bus = NotificationBus()
+
+
+# ── O4: Appointment Notifications ──────────────────────────────────────────────
+
+async def dispatch_whatsapp_notification(notification: NotificationEvent) -> None:
+    """
+    O4: Appointment Notifications
+    Intercept scheduling state changes and map them directly to a MessageReadyToSendEvent.
+    """
+    if not notification.customer_id:
+        logger.warning("notification_bus_dispatch_skipped_no_customer", event_id=str(notification.scheduled_event_id))
+        return
+        
+    # Standard format based on the payload (which contains scheduled_for, etc.)
+    time_str = notification.payload.get('scheduled_for', 'a scheduled time')
+    message_text = f"Your appointment has been {notification.event_type.split('_')[-1]} for {time_str}."
+    
+    event = MessageReadyToSendEvent(
+        workspace_id=notification.workspace_id,
+        customer_id=notification.customer_id,
+        to_phone=notification.customer_phone or "unknown",
+        message_text=message_text,
+        correlation_id=UUID(notification.payload.get('correlation_id')) if notification.payload.get('correlation_id') else notification.scheduled_event_id,
+        causation_id=notification.scheduled_event_id,
+    )
+    
+    bus = EventBus()
+    await bus.publish(event)
+    logger.info("notification_bus_whatsapp_dispatched", event_id=str(notification.scheduled_event_id))
+
+
+# Subscribe the WhatsApp dispatcher to confirmed and rescheduled events
+notification_bus.subscribe("event_confirmed", dispatch_whatsapp_notification)
+notification_bus.subscribe("event_rescheduled", dispatch_whatsapp_notification)
+

@@ -88,6 +88,8 @@ class EventStoreService:
         resolved_priority = PriorityResolver.resolve_priority(event)
         metadata_dict["priority"] = resolved_priority.value
 
+        metadata_payload = json.loads(json.dumps(metadata_dict, default=str))
+
         record = EventRecord(
             event_id=event.event_id,
             schema_version=event.schema_version,
@@ -104,7 +106,7 @@ class EventStoreService:
             category=event.category.value if hasattr(event.category, "value") else event.category,
             event_name=getattr(event, "event_name", "unknown"),
             payload=payload_json,
-            metadata_payload=metadata_dict,
+            metadata_payload=metadata_payload,
             trace_id=trace_id,
             partition_key=partition_key,
             priority=PriorityResolver.get_rank(resolved_priority),

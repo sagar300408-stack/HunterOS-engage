@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, desc, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -147,6 +147,24 @@ async def create_event(
 
     # Apply assignment if specified
     if req.assigned_to:
+        # O5: Resource Lock
+        # Postgres advisory lock (transaction level) on assigned_to
+        # Prevents concurrent requests from assigning events to the same staff member
+        # at the same time, ensuring conflict checks are serialized safely.
+        lock_id = (req.assigned_to.int >> 64) - (1 << 63) # Convert 128-bit UUID to 64-bit signed int
+        await session.execute(text("SELECT pg_advisory_xact_lock(:id)"), {"id": lock_id})
+
+        if req.scheduled_for:
+            conflict_result = await check_conflicts(
+                session=session,
+                assigned_to=req.assigned_to,
+                scheduled_for=req.scheduled_for,
+                duration_minutes=req.duration_minutes or 60,
+                workspace_id=workspace,
+            )
+            if conflict_result.has_conflict:
+                raise ValueError("Double booking detected. Resource is not available at the scheduled time.")
+
         strategy = get_assignment_strategy("manual", user_id=req.assigned_to)
         assigned_uid = await strategy.assign(session, event, workspace)
         event.assigned_to = assigned_uid
@@ -780,7 +798,7 @@ async def promote_candidate(
     Raises:
         ValueError: If not ready or not found.
     """
-    q = select(SchedulingCandidate).where(SchedulingCandidate.id == candidate_id)
+    q = select(SchedulingCandidate).where(SchedulingCandidate.id == candidate_id).with_for_update()
     if workspace_id:
         q = q.where(SchedulingCandidate.workspace_id == workspace_id)
 
@@ -789,6 +807,9 @@ async def promote_candidate(
 
     if not candidate:
         raise ValueError(f"SchedulingCandidate {candidate_id} not found")
+        
+    if candidate.promoted_event_id:
+        raise ValueError(f"SchedulingCandidate {candidate_id} has already been promoted")
 
     if candidate.status != "ready":
         raise ValueError(

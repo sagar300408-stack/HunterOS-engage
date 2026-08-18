@@ -59,6 +59,12 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         alias="DASHBOARD_CORS_ORIGINS",
     )
+    
+    # ── External Integrations (OAuth) ──────────────────────────────────────────
+    google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
+    microsoft_client_id: str | None = Field(default=None, alias="MICROSOFT_CLIENT_ID")
+    microsoft_client_secret: str | None = Field(default=None, alias="MICROSOFT_CLIENT_SECRET")
     # Default workspace UUID for single-tenant bootstrapping.
     # Existing rows without workspace_id are treated as belonging to this workspace.
     default_workspace_id: str = Field(

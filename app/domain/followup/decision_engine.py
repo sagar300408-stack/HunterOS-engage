@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID
 from app.domain.followup.schemas import FollowUpDecision, FollowUpExplainability

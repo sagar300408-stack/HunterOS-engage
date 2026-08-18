@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import List, Type
+from typing import List, Optional, Type
 from enum import Enum
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.model.base_event import UniversalBaseEvent
 
@@ -89,9 +91,15 @@ class EventPublisher(ABC):
     """
 
     @abstractmethod
-    async def publish(self, event: UniversalBaseEvent) -> None:
+    async def publish(
+        self,
+        session: AsyncSession,
+        event: UniversalBaseEvent,
+        is_replay: bool = False,
+    ) -> None:
         """
-        Publish an event to all interested consumers.
-        This operation must be non-blocking from the publisher's perspective.
+        Publish an event to the transactional outbox within the given session.
+        The session must be active — the caller controls commit/rollback.
+        This operation is non-blocking from the publisher's perspective.
         """
         pass

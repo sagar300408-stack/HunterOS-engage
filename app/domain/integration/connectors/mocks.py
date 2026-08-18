@@ -28,7 +28,7 @@ class MockCRMConnector(BaseConnector):
             return ConnectionStatus.DEGRADED.value, "API rate limits nearing capacity."
         return ConnectionStatus.ERROR.value, "Invalid API key provided."
 
-    async def execute_action(self, action_name: str, payload: Dict[str, Any], credentials: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_action(self, action_name: str, payload: Dict[str, Any], credentials: Dict[str, Any], settings: Dict[str, Any] = None) -> Dict[str, Any]:
         return {"status": "success", "mock_action": action_name, "id": "mock_123"}
 
     async def sync_events(self, credentials: Dict[str, Any], last_sync: Any) -> list:
@@ -59,7 +59,7 @@ class MockEmailConnector(BaseConnector):
             return ConnectionStatus.CONNECTED.value, None
         return ConnectionStatus.ERROR.value, "Missing access token."
 
-    async def execute_action(self, action_name: str, payload: Dict[str, Any], credentials: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_action(self, action_name: str, payload: Dict[str, Any], credentials: Dict[str, Any], settings: Dict[str, Any] = None) -> Dict[str, Any]:
         return {"status": "success", "message_id": "mock_msg_456"}
 
     async def sync_events(self, credentials: Dict[str, Any], last_sync: Any) -> list:
@@ -90,7 +90,7 @@ class MockSlackConnector(BaseConnector):
             return ConnectionStatus.CONNECTED.value, None
         return ConnectionStatus.ERROR.value, "Missing bot token."
 
-    async def execute_action(self, action_name: str, payload: Dict[str, Any], credentials: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_action(self, action_name: str, payload: Dict[str, Any], credentials: Dict[str, Any], settings: Dict[str, Any] = None) -> Dict[str, Any]:
         return {"status": "success", "channel_id": "mock_chan_789"}
 
     async def sync_events(self, credentials: Dict[str, Any], last_sync: Any) -> list:

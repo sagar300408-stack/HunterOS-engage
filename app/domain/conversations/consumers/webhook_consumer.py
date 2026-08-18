@@ -6,6 +6,7 @@ from typing import List, Type
 
 from app.events.bus.interfaces import EventConsumer, ExecutionPolicy
 from app.events.model.base_event import UniversalBaseEvent
+from app.events.model.actor_types import ActorType
 from app.events.message_events import RawWebhookEvent, MessageReceived
 from app.pipeline.receive import receive
 from app.integrations.postgres.database import get_session
@@ -55,9 +56,16 @@ class WebhookReceiveConsumer(EventConsumer):
                     msg_event = MessageReceived(
                         wa_message_id=message_data["wa_message_id"],
                         from_phone=message_data["from_phone"],
+                        to_phone="", # system phone is usually not in payload directly or not needed here
                         content=message_data["content"],
                         timestamp=message_data["timestamp"],
                         contact_name=message_data["contact_name"],
+                        message_id=message.id,
+                        workspace_id=customer.workspace_id,
+                        customer_id=customer.id,
+                        conversation_id=conversation.id,
+                        actor_type=ActorType.CUSTOMER,
+                        correlation_id=message.id,
                     )
                     
                     # To publish it properly via EventBus, we need the EventBus instance.

@@ -63,6 +63,8 @@ class IdempotencyEngine:
 
         # 2. Check Replay Bypass
         if is_replay:
+            import uuid
+            salted_key = f"{key}::replay::{uuid.uuid4().hex[:8]}"
             event_metrics.increment("replay_bypasses")
             event_metrics.increment("idempotency_keys_generated")
             logger.info(
@@ -70,12 +72,12 @@ class IdempotencyEngine:
                 event_name=event_name,
                 event_id=event_id,
                 workspace_id=workspace_id,
-                idempotency_key=key,
+                idempotency_key=salted_key,
                 is_replay=True,
             )
             return IdempotencyDecision(
                 action=IdempotencyAction.REPLAY_BYPASS,
-                key=key,
+                key=salted_key,
                 reason="Replay operation intentionally bypassed duplicate suppression",
             )
 

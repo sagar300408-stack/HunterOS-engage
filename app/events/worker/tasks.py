@@ -84,7 +84,8 @@ async def _dispatch_async(
                 event_class = UniversalBaseEvent
 
                 for known_class in registry._subscriptions.keys():
-                    if known_class.__name__ == record.event_name:
+                    event_name_field = known_class.model_fields.get("event_name")
+                    if event_name_field and event_name_field.default == record.event_name:
                         event_class = known_class
                         break
 
