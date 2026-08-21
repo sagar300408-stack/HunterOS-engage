@@ -68,8 +68,8 @@ async def test_executive_briefing_engine_ceo_template():
     engine = ExecutiveBriefingEngine(mock_session)
     engine.composer.insight_repo.get_latest_insights = AsyncMock(return_value=[mock_insight])
     engine.composer.recommendation_repo.get_latest_recommendations = AsyncMock(return_value=[mock_rec])
-    engine.composer.health_repo.get_latest_health = AsyncMock(return_value=[mock_health])
-    engine.composer.kpi_repo.get_latest_kpis = AsyncMock(return_value=[mock_kpi])
+    engine.composer.health_repo.get_latest_snapshots = AsyncMock(return_value=[mock_health])
+    engine.composer.kpi_repo.get_latest_snapshots = AsyncMock(return_value=[mock_kpi])
     
     async def mock_save(briefing):
         return briefing

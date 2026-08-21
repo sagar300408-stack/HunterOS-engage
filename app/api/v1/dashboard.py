@@ -191,11 +191,6 @@ async def update_customer(
         ip_address=request.client.host if request.client else None,
         workspace_id=user.workspace_id,
     )
-    # Broadcast update to live dashboard clients
-    await ws_manager.broadcast({
-        "event": "customer_updated",
-        "data": {"customer_id": str(customer_id)},
-    })
 
 
 # ── Analytics ─────────────────────────────────────────────────────────────────
@@ -286,13 +281,6 @@ async def update_lead_stage(
         ip_address=request.client.host if request.client else None,
         workspace_id=user.workspace_id,
     )
-    await ws_manager.broadcast({
-        "event": "lead_stage_changed",
-        "data": {
-            "customer_id": str(customer_id),
-            "new_stage": body.buying_stage,
-        },
-    })
 
 
 # ── Queue Monitor ─────────────────────────────────────────────────────────────
@@ -379,8 +367,8 @@ async def websocket_dashboard(
         await websocket.close(code=4003, reason="Invalid token")
         return
 
-    await ws_manager.connect(websocket)
-    logger.info("ws_dashboard_connected", user_email=user.email)
+    await ws_manager.connect(websocket, workspace_id=user.workspace_id)
+    logger.info("ws_dashboard_connected", user_email=user.email, workspace_id=str(user.workspace_id))
 
     # Send initial connection confirmation
     await ws_manager.send_to(websocket, {

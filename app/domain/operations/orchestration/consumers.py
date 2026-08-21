@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 from uuid import UUID
 
 from app.events.bus.event_bus import EventBus
+from app.events.bus.interfaces import EventConsumer
 from app.events.model.base_event import UniversalBaseEvent
 from app.domain.operations.orchestration.engine import ActionOrchestrationEngine
 from app.domain.operations.orchestration.schemas import (
@@ -20,7 +21,7 @@ from app.domain.operations.orchestration.schemas import (
 logger = logging.getLogger(__name__)
 
 
-class ActionExecutionResultConsumer:
+class ActionExecutionResultConsumer(EventConsumer):
     """
     Subscribes to ActionEngine events (action.completed, action.failed)
     and reports them back to the ActionOrchestrationEngine using the
@@ -31,9 +32,14 @@ class ActionExecutionResultConsumer:
         self.orchestration_engine = orchestration_engine
         self.event_bus = event_bus
 
-    async def start(self) -> None:
-        await self.event_bus.subscribe("action.completed", self.handle_action_completed)
-        await self.event_bus.subscribe("action.failed", self.handle_action_failed)
+    def get_subscriptions(self) -> list[type[UniversalBaseEvent]]:
+        return [UniversalBaseEvent]
+        
+    async def handle_event(self, event: UniversalBaseEvent) -> None:
+        if event.event_name == "action.completed":
+            await self.handle_action_completed(event)
+        elif event.event_name == "action.failed":
+            await self.handle_action_failed(event)
 
     def _parse_idempotency_key(self, idempotency_key: str) -> Optional[Tuple[UUID, UUID]]:
         """

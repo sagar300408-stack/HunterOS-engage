@@ -109,9 +109,14 @@ async def test_get_operational_context_full_chain(query_service: OperationalQuer
     
     # Return a real ActionReadiness object so Pydantic validation passes
     mock_planning.evaluate_readiness.return_value = ActionReadiness(
+        action_id=action_id,
+        action_version=2,
         state="READY",
+        blockers=[],
         blocking_dependencies=[],
-        pending_dependencies=[]
+        pending_dependencies=[],
+        satisfied_dependencies=[],
+        evaluated_at=datetime.now(timezone.utc).isoformat()
     )
     
     context = await query_service.get_operational_context(workspace_id, action_id)
@@ -162,7 +167,10 @@ async def test_stale_authorization_detection(query_service: OperationalQueryServ
         if " actions" in stmt_str:
             mock_result.scalars.return_value.first.return_value = action
         elif " approval_requests" in stmt_str:
-            mock_result.scalars.return_value.first.return_value = approval
+            if "action_version" in stmt_str:
+                mock_result.scalars.return_value.first.return_value = None
+            else:
+                mock_result.scalar.return_value = True
         else:
             mock_result.scalars.return_value.first.return_value = None
             mock_result.scalars.return_value.all.return_value = []
@@ -171,9 +179,14 @@ async def test_stale_authorization_detection(query_service: OperationalQueryServ
     mock_session.execute = mock_execute
     
     mock_planning.evaluate_readiness.return_value = ActionReadiness(
+        action_id=action_id,
+        action_version=action.version_number,
         state="READY",
+        blockers=[],
         blocking_dependencies=[],
-        pending_dependencies=[]
+        pending_dependencies=[],
+        satisfied_dependencies=[],
+        evaluated_at=datetime.now(timezone.utc).isoformat()
     )
     
     context = await query_service.get_operational_context(workspace_id, action_id)
@@ -189,21 +202,37 @@ async def test_stale_authorization_detection(query_service: OperationalQueryServ
 async def test_workspace_summary_aggregation(query_service: OperationalQueryService, mock_session):
     w1 = uuid.uuid4()
     
+    mock_call_idx = {"count": 0}
+    
     async def mock_execute(stmt):
         mock_result = MagicMock()
         
-        stmt_str = str(stmt).lower()
-        if "count" in stmt_str:
-            if "status in" in stmt_str:
-                mock_result.scalar.return_value = 2 # active
-            elif "blocked" in stmt_str:
-                mock_result.scalar.return_value = 0 # blocked
+        # Determine the order of queries based on OperationalQueryService.get_workspace_operational_summary
+        # 1. Active actions (status.in_)
+        # 2. Blocked actions (dependencies)
+        # 3. Pending approvals (approval_requests)
+        # 4. Executing (orchestration_runs)
+        # 5. Failed actions
+        # 6. Completed actions
+        
+        mock_call_idx["count"] += 1
+        idx = mock_call_idx["count"]
+        
+        if idx == 1:
+            mock_result.scalar.return_value = 2 # active
+        elif idx == 2:
+            mock_result.scalar.return_value = 0 # blocked
+        elif idx == 3:
+            mock_result.scalar.return_value = 0 # pending
+        elif idx == 4:
+            mock_result.scalar.return_value = 0 # executing
+        elif idx == 5:
+            mock_result.scalar.return_value = 1 # failed
+        elif idx == 6:
+            mock_result.scalar.return_value = 1 # completed
         else:
-            mock_result.all.return_value = [
-                (ActionStatus.DETECTED, 2),
-                (ActionStatus.FAILED, 1),
-                (ActionStatus.COMPLETED, 1)
-            ]
+            mock_result.scalar.return_value = 0
+            
         return mock_result
         
     mock_session.execute = mock_execute

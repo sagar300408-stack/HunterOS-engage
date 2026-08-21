@@ -28,8 +28,8 @@ class BriefingComposer:
         
     async def compose_briefing(self, workspace_id: UUID, template: BaseBriefingTemplate) -> BriefingCalculationResult:
         # 1. Fetch current active intelligence state
-        kpis = await self.kpi_repo.get_latest_kpis(workspace_id, limit=50)
-        health_snapshots = await self.health_repo.get_latest_health(workspace_id, limit=20)
+        kpis = await self.kpi_repo.get_latest_snapshots("workspace", workspace_id)
+        health_snapshots = await self.health_repo.get_latest_snapshots("workspace", workspace_id)
         insights = await self.insight_repo.get_latest_insights("workspace", workspace_id, limit=50)
         recommendations = await self.recommendation_repo.get_latest_recommendations("workspace", workspace_id, limit=50)
         

@@ -162,7 +162,8 @@ async def get_overview_metrics(
     qualified = await session.scalar(
         select(func.count(Customer.id)).where(
             Customer.workspace_id == workspace_id,
-            Customer.buying_stage.notin_(["Research", None])
+            Customer.buying_stage != "Research",
+            Customer.buying_stage.is_not(None)
         )
     )
 
