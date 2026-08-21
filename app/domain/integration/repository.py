@@ -25,6 +25,16 @@ class IntegrationRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_active_connection_by_connector(self, workspace_id: UUID, connector_id: str) -> Optional[IntegrationConnection]:
+        stmt = select(IntegrationConnection).where(
+            IntegrationConnection.workspace_id == workspace_id,
+            IntegrationConnection.connector_id == connector_id,
+            IntegrationConnection.status.in_(["connected", "degraded"])
+        ).order_by(IntegrationConnection.created_at.desc())
+        
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
     async def save_connection(self, connection: IntegrationConnection) -> IntegrationConnection:
         self.session.add(connection)
         await self.session.commit()

@@ -38,7 +38,8 @@ async def test_submit_action_idempotency():
         action_type="create_lead",
         parameters={"email": "test@test.com", "first_name": "John", "last_name": "Doe"},
         idempotency_key="idemp_123",
-        requested_by="test"
+        requested_by="test",
+        is_orchestrated=True
     )
     
     # Mock existing action
@@ -65,7 +66,8 @@ async def test_submit_action_and_execute():
         action_type="create_lead",
         parameters={"email": "test@test.com", "first_name": "John", "last_name": "Doe"},
         idempotency_key="idemp_123",
-        requested_by="test"
+        requested_by="test",
+        is_orchestrated=True
     )
     
     engine.action_repo.get_by_idempotency_key = AsyncMock(return_value=None)
@@ -103,20 +105,24 @@ async def test_submit_action_and_execute():
     with patch("app.domain.action.engine.connector_registry", mock_registry):
         # We also need to patch asyncio.create_task to just await it directly for testing
         with patch("asyncio.create_task") as mock_task:
-            action = await engine.submit_action(workspace_id, req)
-            
-            assert action.status == ActionStatus.PENDING.value
-            
-            # Now manually run _execute
-            await engine._execute(action.id)
-            
-            # Verify update was called setting status to COMPLETED
-            update_calls = engine.action_repo.update_action.call_args_list
-            assert len(update_calls) == 3 # VALIDATING, EXECUTING, COMPLETED
-            
-            final_action = update_calls[-1][0][0]
-            assert final_action.status == ActionStatus.COMPLETED.value
-            assert final_action.execution_result["status"] == "success"
-            
-            # Verify events
-            assert mock_event_bus.publish.call_count == 4 # submitted, validated, started, completed
+            with patch("app.domain.action.engine.IntegrationRepository") as MockIntegRepo:
+                mock_integ_repo = MockIntegRepo.return_value
+                mock_integ_repo.get_active_connection_by_connector = AsyncMock(return_value=MagicMock())
+                
+                action = await engine.submit_action(workspace_id, req)
+                
+                assert action.status == ActionStatus.PENDING.value
+                
+                # Now manually run _execute
+                await engine._execute(action.id)
+                
+                # Verify update was called setting status to COMPLETED
+                update_calls = engine.action_repo.update_action.call_args_list
+                assert len(update_calls) == 3 # VALIDATING, EXECUTING, COMPLETED
+                
+                final_action = update_calls[-1][0][0]
+                assert final_action.status == ActionStatus.COMPLETED.value
+                assert final_action.execution_result["status"] == "success"
+                
+                # Verify events
+                assert mock_event_bus.publish.call_count == 4 # submitted, validated, started, completed

@@ -16,6 +16,9 @@ from app.events.bus.event_bus import EventBus
 from app.events.model.base_event import UniversalBaseEvent
 from app.events.model.categories import EventCategory
 from app.events.model.actor_types import ActorType
+from app.domain.integration.repository import IntegrationRepository
+from app.domain.approval.repository import ApprovalRepository
+from app.domain.approval.evaluator import PolicyEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,26 @@ class ActionEngine:
             raise ValueError(f"Action {req.action_type} does not support target system {req.target_system}")
             
         definition.validate_parameters(req.parameters)
+        
+        # R6.1 Approval Bypass Protection
+        if not req.is_orchestrated:
+            app_repo = ApprovalRepository(self.session)
+            policies = await app_repo.get_all_active_policies(workspace_id)
+            
+            context_data = {
+                "action_type": req.action_type,
+                "target_system": req.target_system,
+                "risk": req.priority,
+            }
+            
+            class MockActionContext:
+                id = None
+                status = "READY"
+                
+            eval_result = PolicyEvaluator.evaluate_policies(policies, MockActionContext(), context_data)
+            
+            if eval_result.approval_required:
+                raise ValueError(f"Action '{req.action_type}' requires approval and cannot be executed directly.")
         
         # 3. Create Action Execution
         action = ActionExecution(
@@ -91,6 +114,21 @@ class ActionEngine:
                 raise ValueError(f"Connector {action.connector_id} not registered.")
                 
             action.connector_version = connector.metadata.version
+
+            # Fetch Integration Connection
+            integration_repo = IntegrationRepository(self.session)
+            connection = await integration_repo.get_active_connection_by_connector(
+                action.workspace_id, action.connector_id
+            )
+            
+            if not connection:
+                raise ValueError(f"No active connection found for connector '{action.connector_id}' in this workspace.")
+                
+            # Fetch Credentials securely
+            credentials = self.integration_engine.cred_provider.retrieve_credentials(connection)
+            
+            if not credentials:
+                raise ValueError(f"Credentials missing for connection '{connection.id}'.")
             
             # Context
             context = ExecutionContext(
@@ -102,10 +140,7 @@ class ActionEngine:
             )
             
             # Execute
-            # In a real system, we fetch credentials from integration engine here. For tests, we pass empty dict.
-            # E.g. creds = self.integration_engine.cred_provider.retrieve_credentials(conn)
-            # For Milestone 9.2 mock, we pass empty.
-            result_dict = await connector.execute_action(action.action_type, action.parameters, credentials={})
+            result_dict = await connector.execute_action(action.action_type, action.parameters, credentials=credentials)
             
             # Success
             action.completed_at = datetime.now(timezone.utc)
