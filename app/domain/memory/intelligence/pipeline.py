@@ -233,6 +233,32 @@ class ContextPipeline:
                 )
                 if traversal and traversal.nodes:
                     projections_applied.append(f"MultiHopExpansion(depth={max_depth})")
+                    
+                    # Merge multi-hop expanded edges into RELATIONSHIPS block
+                    if traversal.edges:
+                        expanded_edges = [_normalize_item(e) for e in traversal.edges]
+                        existing_edges = normalized_blocks.get(ContextBlockType.RELATIONSHIPS) or []
+                        seen_ids = {str(e.get("id")) for e in existing_edges if isinstance(e, dict) and "id" in e}
+                        for edge_dict in expanded_edges:
+                            eid = str(edge_dict.get("id")) if isinstance(edge_dict, dict) else None
+                            if not eid or eid not in seen_ids:
+                                existing_edges.append(edge_dict)
+                                if eid:
+                                    seen_ids.add(eid)
+                        normalized_blocks[ContextBlockType.RELATIONSHIPS] = existing_edges
+
+                    # Expose multi-hop traversed nodes
+                    traversed_nodes = [_normalize_item(n) for n in traversal.nodes]
+                    if ContextBlockType.PROJECTIONS in requested_blocks:
+                        proj_dict = normalized_blocks.get(ContextBlockType.PROJECTIONS) or {}
+                        if isinstance(proj_dict, dict):
+                            proj_dict["graph_traversal"] = {
+                                "depth": max_depth,
+                                "nodes": traversed_nodes,
+                                "total_nodes": len(traversed_nodes),
+                                "paths": traversal.paths,
+                            }
+                            normalized_blocks[ContextBlockType.PROJECTIONS] = proj_dict
             except Exception as e:
                 errors[ContextBlockType.RELATIONSHIPS] = f"Graph traversal failure: {str(e)}"
 

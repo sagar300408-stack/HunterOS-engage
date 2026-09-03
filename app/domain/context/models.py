@@ -28,15 +28,15 @@ class VersionedContextMixin:
     """Mixin to provide versioning for context entities."""
     version = Column(Integer, default=1, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    valid_from = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    valid_to = Column(DateTime, nullable=True)
+    valid_from = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    valid_to = Column(DateTime(timezone=True), nullable=True)
 
 @declarative_mixin
 class QualityContextMixin:
     """Mixin to provide confidence, freshness, and source tracking."""
     confidence_score = Column(Float, default=1.0, nullable=False) # 0.0 to 1.0
     source_system = Column(String, nullable=False) # e.g. "CRM", "ERP", "MANUAL"
-    last_verified_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_verified_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     stale_threshold_days = Column(Integer, default=90, nullable=False)
 
 # -----------------
@@ -126,7 +126,7 @@ class KnowledgeGraphEdge(Base):
     relationship_type = Column(String, nullable=False) # e.g., "PURCHASED", "REPORTS_TO"
     confidence_score = Column(Float, default=1.0)
     source_system = Column(String, nullable=False) # "CRM", "INFERENCE_ENGINE"
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class ContextConflict(Base):
     __tablename__ = "context_conflicts"
@@ -144,5 +144,5 @@ class ContextConflict(Base):
     value_b = Column(JSON, nullable=False)
     
     status = Column(SQLEnum(ConflictStatus), default=ConflictStatus.UNRESOLVED)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    resolved_at = Column(DateTime(timezone=True), nullable=True)

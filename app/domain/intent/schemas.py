@@ -64,6 +64,7 @@ class IntentResult(BaseModel):
     urgency:      UrgencyLevel = UrgencyLevel.unknown
     buying_stage: Optional[str] = None
     next_action:  Optional[str] = None
+    is_fallback:  bool = False
 
     # Raw payload preserved for DB storage
     raw_extraction: dict[str, Any] = Field(default_factory=dict)
@@ -121,6 +122,7 @@ class IntentHistorySchema(BaseModel):
     urgency:      str
     buying_stage: Optional[str] = None
     next_action:  Optional[str] = None
+    is_fallback:  bool = False
 
     extracted_json: Optional[dict[str, Any]] = None
     created_at: datetime

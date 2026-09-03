@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime, timezone
-from app.domain.followup.models import FollowUpQueue
+from app.domain.followup.models import FollowUpQueue, FollowUpExecution
 from app.domain.followup.schemas import FollowUpOverviewStats
 
 async def get_overview(session: AsyncSession, workspace_id: UUID) -> FollowUpOverviewStats:
@@ -33,11 +33,10 @@ async def get_overview(session: AsyncSession, workspace_id: UUID) -> FollowUpOve
     ) or 0
     
     failed_today = await session.scalar(
-        select(func.count(FollowUpQueue.id)).where(
-            FollowUpQueue.workspace_id == workspace_id,
-            FollowUpQueue.status == "cancelled",
-            FollowUpQueue.cancellation_reason.isnot(None),
-            FollowUpQueue.updated_at >= today_start
+        select(func.count(FollowUpExecution.id)).where(
+            FollowUpExecution.workspace_id == workspace_id,
+            FollowUpExecution.outcome == "failed",
+            FollowUpExecution.created_at >= today_start
         )
     ) or 0
     

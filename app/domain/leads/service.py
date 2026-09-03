@@ -24,7 +24,8 @@ logger = get_logger(__name__)
 async def qualify_lead(
     session: AsyncSession,
     customer_id: UUID,
-    conversation_id: UUID,
+    conversation_id: Optional[UUID] = None,
+    workspace_id: Optional[UUID] = None,
 ) -> Optional[dict]:
     """
     Phase 3: Evaluate the customer's current lead quality based on latest intent.
@@ -42,6 +43,7 @@ async def qualify_lead(
     Returns None if no intent history exists yet.
     """
     from app.domain.intent import service as intent_service
+    from app.domain.leads.models import LeadQualificationSnapshot
 
     latest = await intent_service.get_latest_intent(session, customer_id)
 
@@ -90,6 +92,23 @@ async def qualify_lead(
         "next_action":   latest.next_action,
         "qualified":     score >= 30,
     }
+
+    # ── Persist Qualification Snapshot ────────────────────────────────────────
+    snapshot = LeadQualificationSnapshot(
+        customer_id=customer_id,
+        workspace_id=workspace_id,
+        score=qualification["score"],
+        grade=qualification["grade"],
+        buying_stage=qualification["buying_stage"],
+        urgency=qualification["urgency"],
+        intent=qualification["intent"],
+        budget=qualification["budget"],
+        timeline=qualification["timeline"],
+        next_action=qualification["next_action"],
+        qualified=qualification["qualified"],
+    )
+    session.add(snapshot)
+    await session.flush()
 
     logger.info(
         "lead_qualified",

@@ -20,6 +20,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Enum,
@@ -117,6 +118,7 @@ class IntentHistory(Base):
     )
     buying_stage = Column(String(100), nullable=True)
     next_action  = Column(String(255), nullable=True)
+    is_fallback  = Column(Boolean, nullable=False, default=False)
 
     # ── Full extraction payload ───────────────────────────────────────────────
     extracted_json = Column(JSONB, nullable=True)

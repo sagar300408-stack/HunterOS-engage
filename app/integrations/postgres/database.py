@@ -136,6 +136,15 @@ async def create_tables() -> None:
         LeadHealthScore,
         SalesMemoryTimeline,
     )
+    from app.domain.leads.models import LeadQualificationSnapshot  # noqa: F401
+    from app.domain.escalation.models import HumanEscalation  # noqa: F401
+    from app.domain.approval.models import (  # noqa: F401
+        ApprovalPolicy,
+        ApprovalRequest,
+        ApprovalDecision,
+    )
+    from app.domain.journey.sql_models import JourneyStateModel  # noqa: F401
+    from app.domain.recommendation.models import RecommendationSnapshot  # noqa: F401
 
     engine = get_engine()
     async with engine.begin() as conn:

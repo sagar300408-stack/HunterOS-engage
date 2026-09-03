@@ -20,41 +20,39 @@ from app.domain.journey.models import (
     JourneyTimeline,
     JourneyTimelineEvent,
 )
-
-
 class JourneyReadRepository(abc.ABC):
     """Abstract read repository for Journey Intelligence (CQRS query side)."""
 
     @abc.abstractmethod
-    def get_journey(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyState]:
+    async def get_journey(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyState]:
         pass
 
     @abc.abstractmethod
-    def get_current_stage(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyStageCode]:
+    async def get_current_stage(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyStageCode]:
         pass
 
     @abc.abstractmethod
-    def get_stage_history(self, journey_instance_id: Union[uuid.UUID, str]) -> List[JourneyStageCode]:
+    async def get_stage_history(self, journey_instance_id: Union[uuid.UUID, str]) -> List[JourneyStageCode]:
         pass
 
     @abc.abstractmethod
-    def get_transitions(self, journey_instance_id: Union[uuid.UUID, str]) -> List[JourneyStageTransition]:
+    async def get_transitions(self, journey_instance_id: Union[uuid.UUID, str]) -> List[JourneyStageTransition]:
         pass
 
     @abc.abstractmethod
-    def get_timeline(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyTimeline]:
+    async def get_timeline(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyTimeline]:
         pass
 
     @abc.abstractmethod
-    def query_by_stage(self, workspace_id: Union[uuid.UUID, str], stage: JourneyStageCode) -> List[JourneyState]:
+    async def query_by_stage(self, workspace_id: Union[uuid.UUID, str], stage: JourneyStageCode) -> List[JourneyState]:
         pass
 
     @abc.abstractmethod
-    def query_by_status(self, workspace_id: Union[uuid.UUID, str], status: JourneyStatus) -> List[JourneyState]:
+    async def query_by_status(self, workspace_id: Union[uuid.UUID, str], status: JourneyStatus) -> List[JourneyState]:
         pass
 
     @abc.abstractmethod
-    def query_by_workspace(self, workspace_id: Union[uuid.UUID, str]) -> List[JourneyState]:
+    async def query_by_workspace(self, workspace_id: Union[uuid.UUID, str]) -> List[JourneyState]:
         pass
 
 
@@ -62,19 +60,19 @@ class JourneyWriteRepository(abc.ABC):
     """Abstract write repository for Journey Intelligence (CQRS command side)."""
 
     @abc.abstractmethod
-    def create_journey(self, state: JourneyState) -> None:
+    async def create_journey(self, state: JourneyState) -> None:
         pass
 
     @abc.abstractmethod
-    def save_journey_state(self, state: JourneyState) -> None:
+    async def save_journey_state(self, state: JourneyState) -> None:
         pass
 
     @abc.abstractmethod
-    def append_transition(self, journey_instance_id: Union[uuid.UUID, str], transition: JourneyStageTransition) -> None:
+    async def append_transition(self, journey_instance_id: Union[uuid.UUID, str], transition: JourneyStageTransition) -> None:
         pass
 
     @abc.abstractmethod
-    def append_timeline_event(self, journey_instance_id: Union[uuid.UUID, str], event: JourneyTimelineEvent) -> None:
+    async def append_timeline_event(self, journey_instance_id: Union[uuid.UUID, str], event: JourneyTimelineEvent) -> None:
         pass
 
 
@@ -93,37 +91,37 @@ class InMemoryJourneyRepository(JourneyReadRepository, JourneyWriteRepository):
 
     # ── Read Operations ──────────────────────────────────────────────────
 
-    def get_journey(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyState]:
+    async def get_journey(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyState]:
         with self._lock:
             return self._journeys.get(self._key(journey_instance_id))
 
-    def get_current_stage(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyStageCode]:
+    async def get_current_stage(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyStageCode]:
         with self._lock:
             journey = self._journeys.get(self._key(journey_instance_id))
             return journey.current_stage if journey else None
 
-    def get_stage_history(self, journey_instance_id: Union[uuid.UUID, str]) -> List[JourneyStageCode]:
+    async def get_stage_history(self, journey_instance_id: Union[uuid.UUID, str]) -> List[JourneyStageCode]:
         with self._lock:
             journey = self._journeys.get(self._key(journey_instance_id))
             if journey is None:
                 return []
             return list(journey.stage_history)
 
-    def get_transitions(self, journey_instance_id: Union[uuid.UUID, str]) -> List[JourneyStageTransition]:
+    async def get_transitions(self, journey_instance_id: Union[uuid.UUID, str]) -> List[JourneyStageTransition]:
         with self._lock:
             journey = self._journeys.get(self._key(journey_instance_id))
             if journey is None:
                 return []
             return list(journey.transitions)
 
-    def get_timeline(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyTimeline]:
+    async def get_timeline(self, journey_instance_id: Union[uuid.UUID, str]) -> Optional[JourneyTimeline]:
         with self._lock:
             journey = self._journeys.get(self._key(journey_instance_id))
             if journey is None:
                 return None
             return journey.timeline
 
-    def query_by_stage(self, workspace_id: Union[uuid.UUID, str], stage: JourneyStageCode) -> List[JourneyState]:
+    async def query_by_stage(self, workspace_id: Union[uuid.UUID, str], stage: JourneyStageCode) -> List[JourneyState]:
         with self._lock:
             ws = self._ws_key(workspace_id)
             return [
@@ -131,7 +129,7 @@ class InMemoryJourneyRepository(JourneyReadRepository, JourneyWriteRepository):
                 if str(j.workspace_id) == ws and j.current_stage == stage
             ]
 
-    def query_by_status(self, workspace_id: Union[uuid.UUID, str], status: JourneyStatus) -> List[JourneyState]:
+    async def query_by_status(self, workspace_id: Union[uuid.UUID, str], status: JourneyStatus) -> List[JourneyState]:
         with self._lock:
             ws = self._ws_key(workspace_id)
             return [
@@ -139,7 +137,7 @@ class InMemoryJourneyRepository(JourneyReadRepository, JourneyWriteRepository):
                 if str(j.workspace_id) == ws and j.status == status
             ]
 
-    def query_by_workspace(self, workspace_id: Union[uuid.UUID, str]) -> List[JourneyState]:
+    async def query_by_workspace(self, workspace_id: Union[uuid.UUID, str]) -> List[JourneyState]:
         with self._lock:
             ws = self._ws_key(workspace_id)
             return [
@@ -149,15 +147,15 @@ class InMemoryJourneyRepository(JourneyReadRepository, JourneyWriteRepository):
 
     # ── Write Operations ─────────────────────────────────────────────────
 
-    def create_journey(self, state: JourneyState) -> None:
+    async def create_journey(self, state: JourneyState) -> None:
         with self._lock:
             self._journeys[self._key(state.journey_instance_id)] = state
 
-    def save_journey_state(self, state: JourneyState) -> None:
+    async def save_journey_state(self, state: JourneyState) -> None:
         with self._lock:
             self._journeys[self._key(state.journey_instance_id)] = state
 
-    def append_transition(
+    async def append_transition(
         self, journey_instance_id: Union[uuid.UUID, str], transition: JourneyStageTransition,
     ) -> None:
         with self._lock:
@@ -167,7 +165,7 @@ class InMemoryJourneyRepository(JourneyReadRepository, JourneyWriteRepository):
                 if transition not in journey.transitions:
                     journey.transitions.append(transition)
 
-    def append_timeline_event(
+    async def append_timeline_event(
         self, journey_instance_id: Union[uuid.UUID, str], event: JourneyTimelineEvent,
     ) -> None:
         with self._lock:
@@ -182,6 +180,5 @@ class InMemoryJourneyRepository(JourneyReadRepository, JourneyWriteRepository):
                     workspace_id=journey.workspace_id,
                     events=current_events,
                 )
-
 
 default_journey_repository: InMemoryJourneyRepository = InMemoryJourneyRepository()

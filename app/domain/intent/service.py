@@ -126,6 +126,7 @@ async def extract_intent(
 
     # ── Recommend next action ─────────────────────────────────────────────────
     next_action = _map_intent_to_action(intent, urgency, buying_stage)
+    is_fallback = bool(raw.get("is_fallback", False) or (confidence == 0.0 and intent == IntentCategory.other))
 
     result = IntentResult(
         intent=intent,
@@ -137,6 +138,7 @@ async def extract_intent(
         urgency=urgency,
         buying_stage=buying_stage,
         next_action=next_action,
+        is_fallback=is_fallback,
         raw_extraction=raw,
     )
 
@@ -147,6 +149,7 @@ async def extract_intent(
         urgency=urgency.value,
         buying_stage=buying_stage,
         next_action=next_action,
+        is_fallback=is_fallback,
         has_budget=bool(budget.value),
         has_timeline=bool(timeline.value),
     )
@@ -185,6 +188,7 @@ async def save_intent(
         urgency=intent_result.urgency,
         buying_stage=intent_result.buying_stage,
         next_action=intent_result.next_action,
+        is_fallback=intent_result.is_fallback,
         extracted_json=intent_result.raw_extraction,
         # Phase 4 explainability fields
         reasoning=intent_result.raw_extraction.get("reasoning"),
@@ -203,6 +207,32 @@ async def save_intent(
         intent=str(intent_result.intent),
         has_reasoning=bool(row.reasoning),
     )
+
+    # ── Phase 4 B19 (BW4): Trigger Human Escalation ───────────────────────────
+    from app.domain.intent.schemas import NextAction
+    if intent_result.next_action == NextAction.ESCALATE_TO_HUMAN:
+        from app.domain.escalation.service import create_escalation
+        if workspace_id:
+            await create_escalation(
+                session=session,
+                workspace_id=workspace_id,
+                customer_id=customer_id,
+                conversation_id=conversation_id,
+                intent_history_id=row.id,
+                trigger_intent=str(intent_result.intent),
+                trigger_next_action=intent_result.next_action,
+                context_snapshot={
+                    "buying_stage": intent_result.buying_stage,
+                    "urgency": str(intent_result.urgency) if intent_result.urgency else None,
+                    "confidence": intent_result.confidence,
+                },
+            )
+        else:
+            logger.warning(
+                "escalation_skipped_no_workspace",
+                customer_id=str(customer_id),
+                intent_history_id=str(row.id),
+            )
 
     return row
 
@@ -368,6 +398,8 @@ Rules:
             "location": {"value": None, "confidence": 0.0},
             "urgency": "unknown",
             "buying_stage": None,
+            "is_fallback": True,
+            "reasoning": "Intent extraction failed; defaulted to fallback classification.",
         }
 
 

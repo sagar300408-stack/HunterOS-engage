@@ -280,7 +280,10 @@ def create_app() -> FastAPI:
 
     from app.domain.intents.router import router as intents_router
     app.include_router(intents_router)
-    
+
+    from app.domain.escalation.router import router as escalation_router
+    app.include_router(escalation_router, prefix="/api/v1")
+
     from app.api.v1.dev import router as dev_router
     app.include_router(dev_router)
     

@@ -178,7 +178,7 @@ async def schedule_followup(
         explainability_report=decision.explainability.model_dump() if decision.explainability else None,
         confidence_score=msg.confidence,
         risk_score=decision.risk_score,
-        human_paused=human_paused,
+        human_paused=is_paused,
         channel="whatsapp", # default for phase 6
     )
 

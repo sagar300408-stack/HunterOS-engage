@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, DateTime, JSON, Integer, Boolean, ForeignKey
+from sqlalchemy import Column, String, DateTime, JSON, Integer, Boolean, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.domain.conversations.models import Base
@@ -44,6 +44,9 @@ class ApprovalPolicy(Base):
     timeout_hours = Column(Integer, nullable=False, default=48)
     escalation_rule = Column(JSON, nullable=True)
 
+    # B20 — Segregation of Duties: when True, the requester cannot approve their own request
+    require_segregation_of_duties = Column(Boolean, nullable=False, default=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -59,6 +62,11 @@ class ApprovalRequest(Base):
     action_version = Column(Integer, nullable=False)
     policy_id = Column(UUID(as_uuid=True), ForeignKey("approval_policies.id"), nullable=False)
     correlation_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    
+    # B21 — Policy Version Pinning: snapshot of policy content at request creation time.
+    # This ensures the decision remains explainable even if the live policy changes later.
+    policy_snapshot = Column(JSON, nullable=True)
+    policy_version_at_request = Column(String(100), nullable=True)
     
     status = Column(String(50), nullable=False, default=ApprovalStatus.PENDING.value)
     current_stage_index = Column(Integer, nullable=False, default=0)
@@ -102,3 +110,4 @@ class ApprovalDecision(Base):
     decision = Column(String(50), nullable=False) # APPROVED or REJECTED
     comments = Column(String(2000), nullable=True)
     decision_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+

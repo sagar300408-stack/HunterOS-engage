@@ -10,12 +10,32 @@ from app.domain.journey.models import JourneyEvidence, EvidenceType
 class EvidenceCollector:
     """Collects evidence from various contexts for journey progression."""
 
-    def collect_from_intent_context(self, intent_context: Dict[str, Any]) -> List[JourneyEvidence]:
+    def collect_from_intent_context(self, intent_context: Optional[Dict[str, Any]]) -> List[JourneyEvidence]:
         """Extracts evidence from IntentIntelligence outputs."""
+        if not intent_context:
+            return []
+
         evidence_list = []
         now = datetime.now(timezone.utc)
-        
-        # Detected intents
+
+        # Support direct intent dictionary (from intent service)
+        if "detected_intent" in intent_context or "intent" in intent_context:
+            intent_val = intent_context.get("detected_intent") or intent_context.get("intent")
+            confidence = float(intent_context.get("confidence", 1.0))
+            evidence_list.append(
+                JourneyEvidence(
+                    evidence_id=uuid.uuid4(),
+                    evidence_type=EvidenceType.INTENT,
+                    source_module="intent_context",
+                    source_id=str(intent_val),
+                    description=f"Detected intent: {intent_val}",
+                    metadata={"data": intent_context},
+                    confidence=confidence,
+                    timestamp=now,
+                )
+            )
+
+        # Detected intents list
         detected_intents = intent_context.get("detected_intents", [])
         for intent in detected_intents:
             evidence_list.append(
@@ -77,8 +97,11 @@ class EvidenceCollector:
 
         return evidence_list
 
-    def collect_from_conversation_context(self, conversation_context: Dict[str, Any]) -> List[JourneyEvidence]:
+    def collect_from_conversation_context(self, conversation_context: Optional[Dict[str, Any]]) -> List[JourneyEvidence]:
         """Extracts evidence from conversation analysis, timeline events, insights."""
+        if not conversation_context:
+            return []
+
         evidence_list = []
         now = datetime.now(timezone.utc)
 

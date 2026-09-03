@@ -112,3 +112,4 @@ class Customer(Base):
 # Import at bottom to avoid circular dependencies and ensure relationships can resolve
 from app.domain.memory.models import CustomerMemory, CustomerMemoryVersion, CustomerMemoryTimelineEvent
 from app.domain.intent.models import IntentHistory
+from app.domain.leads.models import LeadQualificationSnapshot

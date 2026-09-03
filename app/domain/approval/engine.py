@@ -47,6 +47,23 @@ class ApprovalEngine:
                 
         if not eval_result.approval_required:
             return False, None
+        
+        # Fetch the matching policy to capture its snapshot (B21)
+        matching_policy = next((p for p in policies if p.id == eval_result.policy_id), None)
+        if not matching_policy:
+            matching_policy = await self.repo.get_policy(eval_result.policy_id)
+        if not matching_policy:
+            raise ValueError(f"Policy {eval_result.policy_id} disappeared during evaluation.")
+        
+        # B21 — Snapshot the policy content at request time so it remains pinned
+        policy_snapshot = {
+            "id": str(matching_policy.id),
+            "name": getattr(matching_policy, "name", "Approval Policy"),
+            "stages": getattr(matching_policy, "stages", []),
+            "timeout_hours": getattr(matching_policy, "timeout_hours", 48),
+            "require_segregation_of_duties": getattr(matching_policy, "require_segregation_of_duties", True),
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+        }
             
         # Create Approval Request
         approval_req = ApprovalRequest(
@@ -64,7 +81,9 @@ class ApprovalEngine:
             expected_impact=req.context.expected_impact,
             recommendation_id=req.context.recommendation_id,
             insight_id=req.context.insight_id,
-            health_id=req.context.health_id
+            health_id=req.context.health_id,
+            policy_snapshot=policy_snapshot,
+            policy_version_at_request=str(matching_policy.updated_at),
         )
         
         approval_req = await self.repo.save_request(approval_req)
@@ -94,25 +113,38 @@ class ApprovalEngine:
                 approval_req = await self.repo.update_request(approval_req)
                 await self._publish_event(approval_req, "approval.stale")
                 raise ValueError("Stale approval request: Action has been modified since this request was created.")
-            
-        # Authorization validation
+                   # Authorization validation
         # The approver identity MUST be derived from the authenticated execution context.
         # If the client provided an approver_id, we validate that it matches the authenticated context.
         if req.approver_id and req.approver_id != authenticated_actor_id:
             raise PermissionError(f"Authenticated actor {authenticated_actor_id} is not authorized to act as {req.approver_id}")
-            
-        # Segregation of duties: The requester cannot approve their own request if policy prohibits it.
-        # For V1, we simply record it. If there was a strict policy check, it would happen here.
-        if approval_req.requested_by == authenticated_actor_id:
-            # Note: A real strict policy check could be added here if defined in ApprovalPolicy
-            pass
 
-        policy = await self.repo.get_policy(approval_req.policy_id)
-        if not policy:
-            raise ValueError("Policy not found.")
+        # B21 — Use PINNED policy snapshot stages for all decision validation.
+        # This prevents a policy change from retroactively altering an in-flight request.
+        pinned_stages = None
+        sod_required = True  # default safe
+        if approval_req.policy_snapshot and isinstance(approval_req.policy_snapshot, dict):
+            pinned_stages = approval_req.policy_snapshot.get("stages")
+            sod_required = approval_req.policy_snapshot.get("require_segregation_of_duties", True)
             
-        # Stage validation - check if the actor is in the authorized approvers list for the current stage
-        stage_config = policy.stages[approval_req.current_stage_index]
+        # B20 — Segregation of Duties: enforce based on the PINNED policy configuration.
+        if sod_required and approval_req.requested_by == authenticated_actor_id:
+            raise PermissionError(
+                f"Segregation of duties violation: actor '{authenticated_actor_id}' requested this approval "
+                f"and cannot also approve it (policy requires separation of requester and approver)."
+            )
+
+        # Resolve stages: prefer pinned snapshot, fall back to live policy for legacy requests
+        if pinned_stages is None:
+            live_policy = await self.repo.get_policy(approval_req.policy_id)
+            if not live_policy:
+                raise ValueError("Policy not found and no pinned snapshot available.")
+            pinned_stages = live_policy.stages
+            
+        # Stage validation — use pinned stages, not live policy
+        if approval_req.current_stage_index >= len(pinned_stages):
+            raise ValueError(f"Stage index {approval_req.current_stage_index} is out of bounds for the pinned policy stages.")
+        stage_config = pinned_stages[approval_req.current_stage_index]
         allowed_approvers = stage_config.get("approver_ids", [])
         if allowed_approvers and authenticated_actor_id not in allowed_approvers:
              raise PermissionError(f"Actor {authenticated_actor_id} is not authorized to approve stage {approval_req.current_stage_index}")
@@ -137,8 +169,7 @@ class ApprovalEngine:
             await self._publish_event(approval_req, "approval.rejected")
             return approval_req
             
-        # Check if stage is complete
-        stage_config = policy.stages[approval_req.current_stage_index]
+        # Check if stage is complete — use pinned stages
         decisions = await self.repo.get_decisions_for_stage(approval_req.id, approval_req.current_stage_index)
         
         approved_count = sum(1 for d in decisions if d.decision == "APPROVED")
@@ -147,8 +178,8 @@ class ApprovalEngine:
         if approved_count >= required_count:
             await self._publish_event(approval_req, "approval.stage_completed")
             
-            # Next stage
-            if approval_req.current_stage_index + 1 < len(policy.stages):
+            # Next stage — using pinned stage count
+            if approval_req.current_stage_index + 1 < len(pinned_stages):
                 approval_req.current_stage_index += 1
                 approval_req = await self.repo.update_request(approval_req)
                 await self._publish_event(approval_req, "approval.stage_started")

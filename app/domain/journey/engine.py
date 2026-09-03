@@ -118,7 +118,7 @@ class JourneyIntelligenceEngine:
 
     # ── Journey Creation ─────────────────────────────────────────────────────
 
-    def create_journey(
+    async def create_journey(
         self,
         workspace_id: Union[uuid.UUID, str],
         entity_type: str,
@@ -213,12 +213,12 @@ class JourneyIntelligenceEngine:
             ),
         )
 
-        self._write_repo.create_journey(state)
+        await self._write_repo.create_journey(state)
         return state
 
     # ── Journey Progression ──────────────────────────────────────────────────
 
-    def progress(self, context: JourneyProgressionContext) -> JourneyProgressionResult:
+    async def progress(self, context: JourneyProgressionContext) -> JourneyProgressionResult:
         """
         Progress a journey using a JourneyProgressionContext.
         """
@@ -250,10 +250,10 @@ class JourneyIntelligenceEngine:
 
         result = self._progression_engine.progress(context)
         if result.did_progress and result.transition and context.journey_state:
-            self._apply_progression(context.journey_state, result)
+            await self._apply_progression(context.journey_state, result)
         return result
 
-    def progress_journey(
+    async def progress_journey(
         self,
         journey_instance_id: uuid.UUID,
         workspace_id: Optional[Union[uuid.UUID, str]] = None,
@@ -283,7 +283,7 @@ class JourneyIntelligenceEngine:
         self.bootstrap()
 
         # Load state
-        state = self._read_repo.get_journey(journey_instance_id)
+        state = await self._read_repo.get_journey(journey_instance_id)
         if state is None:
             raise JourneyNotFoundError(journey_id=str(journey_instance_id))
 
@@ -327,11 +327,11 @@ class JourneyIntelligenceEngine:
 
         # Apply progression if successful
         if result.did_progress and result.transition:
-            self._apply_progression(state, result)
+            await self._apply_progression(state, result)
 
         return result
 
-    def _apply_progression(
+    async def _apply_progression(
         self,
         state: JourneyState,
         result: JourneyProgressionResult,
@@ -375,12 +375,12 @@ class JourneyIntelligenceEngine:
             )
 
         # Persist
-        self._write_repo.save_journey_state(state)
-        self._write_repo.append_transition(
+        await self._write_repo.save_journey_state(state)
+        await self._write_repo.append_transition(
             state.journey_instance_id, result.transition,
         )
         if result.timeline_event:
-            self._write_repo.append_timeline_event(
+            await self._write_repo.append_timeline_event(
                 state.journey_instance_id, result.timeline_event,
             )
 
