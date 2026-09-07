@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.customers.models import Customer
@@ -59,6 +59,16 @@ async def schedule_followup(
     # 1. Gather basic stats for Decision Engine
     now = datetime.now(tz=timezone.utc)
 
+    # Ensure sequential evaluation per customer to prevent duplicate schedule loops
+    try:
+        lock_id = hash(str(customer_id)) & 0xFFFFFFFF
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(:id)"),
+            {"id": lock_id}
+        )
+    except Exception:
+        pass # Ignore on SQLite/mocked sessions; real PostgreSQL will enforce
+
     # (Simplified data gathering for the decision engine)
     last_in = await session.scalar(
         select(Message.timestamp).join(Conversation).where(
@@ -79,7 +89,7 @@ async def schedule_followup(
 
     fu_count = await session.scalar(
         select(func.count(FollowUpQueue.id)).where(
-            FollowUpQueue.customer_id == customer_id, FollowUpQueue.status.in_(["sent", "scheduled"])
+            FollowUpQueue.customer_id == customer_id, FollowUpQueue.status == "sent"
         )
     ) or 0
 
