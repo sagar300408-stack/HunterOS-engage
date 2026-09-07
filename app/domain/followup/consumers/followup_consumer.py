@@ -58,8 +58,14 @@ class FollowUpExecutedConsumer(EventConsumer):
                     session, followup_id, customer_id, channel, provider_message_id, workspace_id
                 )
                 
+                # O7 Follow-up Sequence Execution
+                # Re-evaluate the customer to schedule the NEXT follow-up in the sequence.
+                # decision_engine.evaluate will set the correct future scheduled_for date based on cadence rules.
+                from app.domain.followup.service import schedule_followup
+                await schedule_followup(session, customer_id, workspace_id=workspace_id)
+                
                 await session.commit()
             except Exception as e:
-                logger.error("followup_executed_consumer_error", error=str(e))
+                logger.error("followup_executed_consumer_error", error=str(e), exc_info=True)
                 await session.rollback()
                 raise

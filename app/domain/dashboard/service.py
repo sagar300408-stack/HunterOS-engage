@@ -237,43 +237,36 @@ async def get_overview_metrics(
     )
 
     # Scheduling Metrics (Phase 5)
-    try:
-        from app.domain.scheduling.models import ScheduledEvent
-        upcoming_events = await session.scalar(
-            select(func.count(ScheduledEvent.id))
-            .join(Customer, ScheduledEvent.customer_id == Customer.id)
-            .where(
-                Customer.workspace_id == workspace_id,
-                ScheduledEvent.status.in_(["pending", "confirmed"]),
-                ScheduledEvent.scheduled_for >= today_start
-            )
+    from app.domain.scheduling.models import ScheduledEvent
+    upcoming_events = await session.scalar(
+        select(func.count(ScheduledEvent.id))
+        .join(Customer, ScheduledEvent.customer_id == Customer.id)
+        .where(
+            Customer.workspace_id == workspace_id,
+            ScheduledEvent.status.in_(["pending", "confirmed"]),
+            ScheduledEvent.scheduled_for >= today_start
         )
-        pending_callbacks = await session.scalar(
-            select(func.count(ScheduledEvent.id))
-            .join(Customer, ScheduledEvent.customer_id == Customer.id)
-            .where(
-                Customer.workspace_id == workspace_id,
-                ScheduledEvent.status == "pending",
-                ScheduledEvent.event_type == "callback"
-            )
+    )
+    pending_callbacks = await session.scalar(
+        select(func.count(ScheduledEvent.id))
+        .join(Customer, ScheduledEvent.customer_id == Customer.id)
+        .where(
+            Customer.workspace_id == workspace_id,
+            ScheduledEvent.status == "pending",
+            ScheduledEvent.event_type == "callback"
         )
-    except Exception:
-        upcoming_events = 0
-        pending_callbacks = 0
+    )
 
     # Follow-up Metrics (Phase 6)
-    try:
-        from app.domain.followup.models import FollowUpQueue
-        pending_followups = await session.scalar(
-            select(func.count(FollowUpQueue.id))
-            .join(Customer, FollowUpQueue.customer_id == Customer.id)
-            .where(
-                Customer.workspace_id == workspace_id,
-                FollowUpQueue.status.in_(["scheduled", "executing"])
-            )
+    from app.domain.followup.models import FollowUpQueue
+    pending_followups = await session.scalar(
+        select(func.count(FollowUpQueue.id))
+        .join(Customer, FollowUpQueue.customer_id == Customer.id)
+        .where(
+            Customer.workspace_id == workspace_id,
+            FollowUpQueue.status.in_(["scheduled", "executing"])
         )
-    except Exception:
-        pending_followups = 0
+    )
 
     def card(label, value, unit=None, trend=None, direction=None) -> MetricCard:
         return MetricCard(

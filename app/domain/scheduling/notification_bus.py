@@ -129,6 +129,7 @@ async def dispatch_whatsapp_notification(notification: NotificationEvent) -> Non
         message_text=message_text,
         correlation_id=UUID(notification.payload.get('correlation_id')) if notification.payload.get('correlation_id') else notification.scheduled_event_id,
         causation_id=notification.scheduled_event_id,
+        conversation_id=notification.payload.get('conversation_id', ""),
     )
     
     bus = EventBus()
