@@ -3,49 +3,46 @@ import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.scheduling.schemas import CreateEventRequest
 from app.domain.scheduling.service import create_event
-from app.domain.scheduling.models import ScheduledEvent
-from app.main import create_app # to register mappers
+import app.domain.customers.models  # Required for SQLAlchemy relationship mapping
 
 # Requires a real database to test pg_advisory_xact_lock
-# Assuming the test suite has access to the test database specified in DATABASE_URL
 
 @pytest.mark.asyncio
-async def test_concurrent_booking_prevents_overlap():
-    from app.config import get_settings
-    settings = get_settings()
-    engine = create_async_engine(settings.database_url, echo=False)
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    
+async def test_concurrent_booking_prevents_overlap(pg_session_factory):
     workspace_id = uuid4()
     assigned_to = uuid4()
     target_time = datetime(2027, 10, 10, 14, 0, tzinfo=timezone.utc)
     
     # We will simulate two concurrent requests to create an event for the same assignee at the same time
     
-    class MockRequest:
-        def __init__(self):
-            self.workspace_id = workspace_id
-            self.customer_id = uuid4()
-            self.conversation_id = uuid4()
-            self.event_type = "meeting"
-            self.title = "Test Meeting"
-            self.description = "Test"
-            self.priority = "medium"
-            self.scheduled_for = target_time
-            self.duration_minutes = 30
-            self.assignment_strategy = "manual"
-            self.assigned_to = assigned_to
-            self.metadata = {}
+    req1 = CreateEventRequest(
+        workspace_id=workspace_id,
+        customer_id=uuid4(),
+        event_type="meeting",
+        title="Test Meeting 1",
+        scheduled_for=target_time,
+        duration_minutes=30,
+        assignment_strategy="manual",
+        assigned_to=assigned_to
+    )
     
-    req1 = MockRequest()
-    req2 = MockRequest()
+    req2 = CreateEventRequest(
+        workspace_id=workspace_id,
+        customer_id=uuid4(),
+        event_type="meeting",
+        title="Test Meeting 2",
+        scheduled_for=target_time,
+        duration_minutes=30,
+        assignment_strategy="manual",
+        assigned_to=assigned_to
+    )
     
     async def run_create(req):
-        async with async_session() as session:
+        async with pg_session_factory() as session:
             try:
                 # Need to run in a transaction for xact_lock to work
                 async with session.begin():
@@ -63,12 +60,10 @@ async def test_concurrent_booking_prevents_overlap():
     for event, err in results:
         if event:
             successes += 1
-        elif err and "Double booking detected" in str(err):
-            failures += 1
         else:
-            print("OTHER ERROR:", err)
+            print(f"Error: {repr(err)}")
+            if err and "Double booking" in str(err):
+                failures += 1
             
-    assert successes == 1
-    assert failures == 1
-    
-    await engine.dispose()
+    assert successes == 1, "Exactly one booking should succeed"
+    assert failures == 1, "Exactly one booking should fail with a double booking error"

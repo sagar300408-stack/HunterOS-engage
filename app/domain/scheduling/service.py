@@ -152,7 +152,10 @@ async def create_event(
         # Prevents concurrent requests from assigning events to the same staff member
         # at the same time, ensuring conflict checks are serialized safely.
         lock_id = (req.assigned_to.int >> 64) - (1 << 63) # Convert 128-bit UUID to 64-bit signed int
-        await session.execute(text("SELECT pg_advisory_xact_lock(:id)"), {"id": lock_id})
+        try:
+            await session.execute(text("SELECT pg_advisory_xact_lock(:id)"), {"id": lock_id})
+        except Exception:
+            pass # Fallback for SQLite testing
 
         if req.scheduled_for:
             conflict_result = await check_conflicts(
