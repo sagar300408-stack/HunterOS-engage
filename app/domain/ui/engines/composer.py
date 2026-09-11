@@ -37,7 +37,7 @@ class ComposerEngine:
             if not key:
                 continue
                 
-            data = await WidgetRegistry.resolve_widget(key, str(workspace_id))
+            data = await WidgetRegistry.resolve_widget(key, str(workspace_id), session=repo.session)
             
             resolved_widgets.append(
                 WidgetDataSchema(

@@ -260,6 +260,9 @@ def create_app() -> FastAPI:
     from app.domain.onboarding.router import router as onboarding_router
     app.include_router(onboarding_router, prefix="/api/v1")
     
+    from app.api.v1.workspaces import router as workspaces_router
+    app.include_router(workspaces_router)
+    
     from app.domain.ui.router import router as ui_router
     app.include_router(ui_router, prefix="/api/v1")
     
@@ -346,6 +349,14 @@ def create_app() -> FastAPI:
         # Verify CELERY configuration
         if not settings.CELERY_BROKER_URL:
             logger.warning("WARNING: Celery Broker URL not configured. Background tasks will fail.")
+            
+        from app.integrations.websocket.manager import ws_manager
+        await ws_manager.startup()
+
+    @app.on_event("shutdown")
+    async def shutdown_event():
+        from app.integrations.websocket.manager import ws_manager
+        await ws_manager.shutdown()
 
     if settings.enable_developer_tools:
         from app.developer_tools.middleware import LatencyMiddleware

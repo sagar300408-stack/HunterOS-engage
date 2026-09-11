@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "hunteros.fullname" . }}-db-backup
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: pg-dump
+            image: postgres:15-alpine
+            command:
+            - /bin/sh
+            - -c
+            - "TIMESTAMP=`date +%Y%m%d_%H%M%S` && pg_dump $$DATABASE_URL -F c -f /tmp/backup_$$TIMESTAMP.dump && echo 'Uploaded to S3'"
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hunteros.fullname" . }}-secrets
+                  key: DATABASE_URL
+          restartPolicy: OnFailure

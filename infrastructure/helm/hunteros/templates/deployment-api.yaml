@@ -14,6 +14,7 @@ spec:
       labels:
         app: {{ include "hunteros.name" . }}-api
     spec:
+      terminationGracePeriodSeconds: 60
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -27,11 +28,28 @@ spec:
               path: /api/v1/health/live
               port: http
             initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /api/v1/health/ready
               port: http
             initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sleep","10"]
           envFrom:
             - configMapRef:
                 name: {{ include "hunteros.fullname" . }}-config

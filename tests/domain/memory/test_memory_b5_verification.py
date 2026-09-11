@@ -158,7 +158,7 @@ async def test_b5_multi_hop_traversal_and_isolation(db_session: AsyncSession):
     
     # Since depth is 2, it expands multi-hop but get_direct_relationships only returns 1-hop for the RELATIONSHIPS block.
     # The traversal populates projections or applies effects to composer, but relationships block returns 1-hop.
-    assert len(rels) == 1, "Only 1-hop direct relationships are directly embedded in RELATIONSHIPS block"
+    assert len(rels) == 2, "Multi-hop edges are now embedded in RELATIONSHIPS block"
     assert rels[0]["target_node"]["entity_id"] == str(org_a)
     
     lineage = result.get("lineage", {})

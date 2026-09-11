@@ -19,6 +19,10 @@ from app.events.model.categories import EventCategory
 from app.integrations.websocket.manager import ws_manager
 from app.domain.ui.consumer import UIEventConsumer
 from app.events.registry import registry as global_registry
+from unittest.mock import patch
+
+from app.domain.customers.models import Customer
+from fastapi import WebSocket
 
 from tests.domain.events.conftest import _delete_event_store_rows
 
@@ -33,7 +37,8 @@ class DummyCustomerUpdatedEvent(UniversalBaseEvent):
 
 
 @pytest.mark.asyncio
-async def test_b12_websocket_delivery_via_outbox(pg_session: AsyncSession, pg_session_factory):
+@patch("app.domain.reliability.engines.caching.get_redis")
+async def test_b12_websocket_delivery_via_outbox(mock_get_redis, pg_session: AsyncSession, pg_session_factory):
     """
     B12 VERIFICATION:
     Proves that:
@@ -46,8 +51,11 @@ async def test_b12_websocket_delivery_via_outbox(pg_session: AsyncSession, pg_se
     other_ws_id = uuid.uuid4()
     customer_id = uuid.uuid4()
     
-    # 1. Setup mock websockets
-    ws_mock_auth = AsyncMock()
+    mock_redis = AsyncMock()
+    mock_get_redis.return_value = None
+    
+    # We create two distinct mock websockets
+    ws_mock_auth = AsyncMock(spec=WebSocket)
     ws_mock_auth.client = ("127.0.0.1", 12345)
     ws_mock_auth.state = type('obj', (object,), {})()
     

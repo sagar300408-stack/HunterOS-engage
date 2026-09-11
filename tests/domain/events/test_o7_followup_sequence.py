@@ -19,7 +19,8 @@ async def test_o7_followup_sequence_is_deterministic_and_idempotent(pg_session_f
     
     async with pg_session_factory() as session:
         # Create customer
-        cust = Customer(id=customer_id, workspace_id=workspace_id, name="Test Cust", phone="123")
+        import random
+        cust = Customer(id=customer_id, workspace_id=workspace_id, name="Test Cust", phone=f"+155500{random.randint(10000, 99999)}")
         session.add(cust)
         await session.commit()
         

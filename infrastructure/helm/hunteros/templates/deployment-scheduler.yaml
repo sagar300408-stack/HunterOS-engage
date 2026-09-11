@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hunteros.fullname" . }}-scheduler
+  labels:
+    app: {{ include "hunteros.name" . }}-scheduler
+spec:
+  replicas: {{ .Values.scheduler.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "hunteros.name" . }}-scheduler
+  template:
+    metadata:
+      labels:
+        app: {{ include "hunteros.name" . }}-scheduler
+    spec:
+      containers:
+        - name: scheduler
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "app.celery_app.celery_app", "beat", "--loglevel=info"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "250m"
+              memory: "512Mi"
+          envFrom:
+            - configMapRef:
+                name: {{ include "hunteros.fullname" . }}-config
+            - secretRef:
+                name: {{ include "hunteros.fullname" . }}-secrets

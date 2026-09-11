@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from app.api.v1.security import verify_internal_network
 
 router = APIRouter(
     prefix="/api/v1/dev",
-    tags=["Developer"]
+    tags=["Developer"],
+    dependencies=[Depends(verify_internal_network)]
 )
 
 class SimulateWhatsAppRequest(BaseModel):

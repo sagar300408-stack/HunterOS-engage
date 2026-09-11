@@ -50,12 +50,17 @@ async def test_kpi_intelligence_engine():
     mock_registry.get_all_calculators.return_value = [MockMeetingConversionRateCalculator()]
 
     mock_session = AsyncMock()
+    mock_session.execute.return_value.scalars.return_value.all.return_value = []
     
     with patch("app.domain.kpi.engine.kpi_registry", mock_registry):
-        engine = KpiIntelligenceEngine(mock_session)
-        
-        # Mock the repo save so we can inspect the snapshot being saved
-        engine.kpi_repo.save_snapshot = AsyncMock(side_effect=lambda x: x)
+        with patch("app.domain.kpi.engine.ImpactRepository") as MockImpactRepo:
+            mock_impact_repo = MockImpactRepo.return_value
+            mock_impact_repo.get_business_targets = AsyncMock(return_value=[])
+            
+            engine = KpiIntelligenceEngine(mock_session)
+    
+            # Mock the repo save so we can inspect the snapshot being saved
+            engine.kpi_repo.save_snapshot = AsyncMock(side_effect=lambda x: x)
         
         workspace_id = uuid.uuid4()
         

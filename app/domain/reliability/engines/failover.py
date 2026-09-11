@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.domain.reliability.models import ReliabilityEvent, EventType
-from app.domain.onboarding.models import OperationalCapabilityMatrix, DegradationMode
+from app.domain.onboarding.models import OperationalCapabilityMatrix
 
 logger = logging.getLogger("hunteros.reliability")
 

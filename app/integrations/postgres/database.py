@@ -145,6 +145,31 @@ async def create_tables() -> None:
     )
     from app.domain.journey.sql_models import JourneyStateModel  # noqa: F401
     from app.domain.recommendation.models import RecommendationSnapshot  # noqa: F401
+    from app.domain.onboarding.models import (  # noqa: F401
+        WorkspaceProvisioning,
+        OnboardingIntegrationConnection,
+        ImportJob,
+        ValidationResult,
+        GoLiveAssessment,
+        OperationalCapabilityMatrix,
+        WorkspaceMaturity,
+    )
+    from app.domain.context.models import (  # noqa: F401
+        OrganizationNode,
+        ProductService,
+        WorkflowDefinition,
+        BusinessPolicy,
+        CustomerContext,
+        TeamMemberContext,
+        KnowledgeDocument,
+        BusinessOntology,
+        KnowledgeGraphEdge,
+    )
+    from app.domain.integration.models import (  # noqa: F401
+        IntegrationConnection,
+        SyncJob,
+    )
+    from app.domain.security.models import SecurityPolicy, UserSession  # noqa: F401
 
     engine = get_engine()
     async with engine.begin() as conn:

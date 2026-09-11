@@ -103,8 +103,7 @@ async def test_submit_action_and_execute():
     mock_registry.get_connector.return_value = MockCRMConnector()
     
     with patch("app.domain.action.engine.connector_registry", mock_registry):
-        # We also need to patch asyncio.create_task to just await it directly for testing
-        with patch("asyncio.create_task") as mock_task:
+        with patch("app.domain.action.tasks.execute_action_task.apply_async") as mock_celery:
             with patch("app.domain.action.engine.IntegrationRepository") as MockIntegRepo:
                 mock_integ_repo = MockIntegRepo.return_value
                 mock_integ_repo.get_active_connection_by_connector = AsyncMock(return_value=MagicMock())
@@ -112,6 +111,7 @@ async def test_submit_action_and_execute():
                 action = await engine.submit_action(workspace_id, req)
                 
                 assert action.status == ActionStatus.PENDING.value
+                mock_celery.assert_called_once()
                 
                 # Now manually run _execute
                 await engine._execute(action.id)

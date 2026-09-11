@@ -47,3 +47,60 @@ class OnboardingDashboardSummary(BaseModel):
     deployment_confidence: float
     golive_status: GoLiveStatus
     capabilities: List[OperationalCapabilitySchema]
+
+# ── R7: Workspace Provisioning ─────────────────────────────────────────────────
+
+class WorkspaceProvisionRequest(BaseModel):
+    """Request body for POST /api/v1/workspaces — authenticated platform admin endpoint."""
+    workspace_id: Optional[uuid.UUID] = None  # If None, auto-generated
+    owner_email: str
+    owner_name: str
+    owner_password: str
+
+class WorkspaceProvisionResponse(BaseModel):
+    workspace_id: uuid.UUID
+    status: ProvisioningStatus
+    current_step: str
+    created_at: datetime
+    completed_at: Optional[datetime]
+    model_config = ConfigDict(from_attributes=True)
+
+# ── R8: Validation Results ─────────────────────────────────────────────────────
+
+class ValidationCheckResult(BaseModel):
+    check_name: str
+    status: str  # PASS / FAIL / WARNING
+    details: Dict[str, Any]
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class OnboardingStatusResponse(BaseModel):
+    workspace_id: uuid.UUID
+    provisioning_status: Optional[str]
+    current_step: Optional[str]
+    validation_checks: List[ValidationCheckResult]
+    has_failures: bool
+
+# ── R9: Readiness Report ───────────────────────────────────────────────────────
+
+class ReadinessCheckItem(BaseModel):
+    name: str
+    category: str
+    status: str  # PASS / FAIL / WARNING
+    detail: str
+    required: bool
+
+class GoLiveReadinessResponse(BaseModel):
+    """Full readiness response with explainable check results."""
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    status: GoLiveStatus
+    readiness_score: float
+    deployment_confidence: float
+    reason: Optional[str]
+    evaluated_at: datetime
+    checks: List[ReadinessCheckItem] = []
+    not_ready_reasons: List[str] = []
+    recommendations: List[str] = []
+    model_config = ConfigDict(from_attributes=True)
+

@@ -155,3 +155,31 @@ class IntentHistory(Base):
             f"<IntentHistory intent={self.detected_intent} "
             f"confidence={self.confidence} customer_id={self.customer_id}>"
         )
+
+class PromptConfig(Base):
+    """
+    Configuration for the Intent Extraction system prompt.
+    Allows dynamic updates per workspace.
+    """
+    __tablename__ = "intent_prompt_config"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    workspace_id = Column(UUID(as_uuid=True), nullable=True, unique=True)
+    prompt_text = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class IntentDLQ(Base):
+    """
+    Dead Letter Queue for terminal Intent extraction failures.
+    """
+    __tablename__ = "intent_dlq"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
+    workspace_id = Column(UUID(as_uuid=True), nullable=True)
+    customer_id = Column(UUID(as_uuid=True), nullable=False)
+    conversation_id = Column(UUID(as_uuid=True), nullable=False)
+    message_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
+    payload = Column(JSONB, nullable=False)  # original intent extraction payload
+    error_message = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)

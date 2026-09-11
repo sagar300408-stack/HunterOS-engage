@@ -104,6 +104,22 @@ async def classify_intent(
             error_type=type(exc).__name__,
             exc_info=True,
         )
+        
+        # O9: Retry extraction in background
+        try:
+            from app.domain.intent.tasks import retry_intent_extraction
+            retry_intent_extraction.apply_async(kwargs=dict(
+                customer_id_str=str(customer.id),
+                conversation_id_str=str(conversation_id),
+                message_id_str=str(message_id),
+                user_content=user_content,
+                conversation_history=conversation_history,
+                memory_summary=memory_summary,
+                workspace_id_str=str(customer.workspace_id) if hasattr(customer, "workspace_id") else None
+            ))
+        except Exception as retry_exc:
+            logger.error(f"Failed to queue intent retry: {retry_exc}")
+
         from app.domain.intent.models import IntentCategory, UrgencyLevel
         from app.domain.intent.schemas import ExtractedField
         return IntentResult(

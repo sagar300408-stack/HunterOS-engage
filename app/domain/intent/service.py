@@ -89,10 +89,16 @@ async def extract_intent(
         message_preview=user_content[:80],
     )
 
+    from app.domain.customers.models import Customer
+    customer_obj = await session.get(Customer, customer_id)
+    workspace_id_str = str(customer_obj.workspace_id) if customer_obj and customer_obj.workspace_id else None
+
     raw = await _call_intent_extraction_api(
         user_content=user_content,
         conversation_history=conversation_history,
         memory_summary=memory_summary,
+        workspace_id_str=workspace_id_str,
+        session=session
     )
 
     # ── Parse intent ──────────────────────────────────────────────────────────
@@ -290,6 +296,9 @@ async def _call_intent_extraction_api(
     user_content: str,
     conversation_history: list[dict],
     memory_summary: Optional[str] = None,
+    workspace_id_str: Optional[str] = None,
+    throw_on_error: bool = False,
+    session: Optional[AsyncSession] = None,
 ) -> dict:
     """
     Dedicated OpenAI call for intent extraction.
@@ -299,6 +308,8 @@ async def _call_intent_extraction_api(
     """
     from app.integrations.openai.client import get_openai_client
     from app.config import get_settings
+    from app.domain.intent.models import PromptConfig
+    from sqlalchemy import select
 
     settings = get_settings()
     client = get_openai_client()
@@ -311,7 +322,17 @@ async def _call_intent_extraction_api(
     )
     memory_text = f"\nCUSTOMER MEMORY SUMMARY:\n{memory_summary}" if memory_summary else ""
 
-    extraction_prompt = f"""You are a real estate sales intent classification system.
+    # Fetch custom prompt config if available
+    base_prompt = "You are a real estate sales intent classification system."
+    if session and workspace_id_str:
+        import uuid
+        prompt_config = await session.scalar(
+            select(PromptConfig).where(PromptConfig.workspace_id == uuid.UUID(workspace_id_str))
+        )
+        if prompt_config:
+            base_prompt = prompt_config.prompt_text
+
+    extraction_prompt = f"""{base_prompt}
 
 Analyse the customer's latest message and conversation context, then extract structured information.{memory_text}
 
@@ -382,25 +403,16 @@ Rules:
 
         return result
 
-    except (json.JSONDecodeError, Exception) as exc:
+    except Exception as exc:
+        if throw_on_error:
+            raise exc
         logger.error(
             "intent_extraction_api_failed",
             error=str(exc),
             error_type=type(exc).__name__,
         )
-        # Safe fallback — never crash the pipeline
-        return {
-            "intent": "Other",
-            "confidence": 0.0,
-            "budget":   {"value": None, "confidence": 0.0},
-            "timeline": {"value": None, "confidence": 0.0},
-            "interest": {"value": None, "confidence": 0.0},
-            "location": {"value": None, "confidence": 0.0},
-            "urgency": "unknown",
-            "buying_stage": None,
-            "is_fallback": True,
-            "reasoning": "Intent extraction failed; defaulted to fallback classification.",
-        }
+        # We need to raise it so the pipeline catches it and queues the retry
+        raise exc
 
 
 def _map_intent_to_action(

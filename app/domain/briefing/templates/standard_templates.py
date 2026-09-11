@@ -49,9 +49,37 @@ class CEODailyBriefing(BaseBriefingTemplate):
         avg_confidence = sum(x.confidence for x in sources_with_confidence) / len(sources_with_confidence) if sources_with_confidence else 1.0
 
         # 8. Generate Executive Summary text
-        summary_text = "Overall operations are stable."
+        summary_sentences = []
+        
+        # Analyze KPIs
+        for k in kpis:
+            if k.target is not None and k.current_value is not None:
+                diff = k.current_value - k.target
+                is_worse = (k.direction == "higher_is_better" and diff < 0) or (k.direction == "lower_is_better" and diff > 0)
+                
+                # Format KPI name for readability
+                readable_name = k.kpi_name.replace('_', ' ').title()
+                
+                if is_worse:
+                    if k.direction == "higher_is_better":
+                        summary_sentences.append(f"{readable_name} is currently {abs(diff):.1f} below the configured target of {k.target:.1f}.")
+                    else:
+                        summary_sentences.append(f"{readable_name} is currently {abs(diff):.1f} above the configured target of {k.target:.1f}.")
+                else:
+                    summary_sentences.append(f"{readable_name} is meeting or exceeding its target of {k.target:.1f}.")
+                    
+                # Add trend info if available
+                if k.percentage_change is not None and abs(k.percentage_change) > 5.0:
+                    verb = "increased" if k.percentage_change > 0 else "decreased"
+                    summary_sentences.append(f"It has {verb} by {abs(k.percentage_change):.1f}% recently.")
+                    
         if priority_recs or critical_risks:
-            summary_text = f"Attention Required: {len(critical_risks)} critical risks detected and {len(priority_recs)} urgent recommendations await approval."
+            summary_sentences.append(f"Attention Required: {len(critical_risks)} critical risks detected and {len(priority_recs)} urgent recommendations await approval.")
+        
+        if not summary_sentences:
+            summary_text = "Overall operations are stable."
+        else:
+            summary_text = " ".join(summary_sentences)
             
         return BriefingCalculationResult(
             executive_summary=summary_text,

@@ -19,9 +19,11 @@ async def test_concurrent_booking_prevents_overlap(pg_session_factory):
     
     # We will simulate two concurrent requests to create an event for the same assignee at the same time
     
+    customer_id = uuid4()
+    
     req1 = CreateEventRequest(
         workspace_id=workspace_id,
-        customer_id=uuid4(),
+        customer_id=customer_id,
         event_type="meeting",
         title="Test Meeting 1",
         scheduled_for=target_time,
@@ -32,7 +34,7 @@ async def test_concurrent_booking_prevents_overlap(pg_session_factory):
     
     req2 = CreateEventRequest(
         workspace_id=workspace_id,
-        customer_id=uuid4(),
+        customer_id=customer_id,
         event_type="meeting",
         title="Test Meeting 2",
         scheduled_for=target_time,
@@ -41,12 +43,43 @@ async def test_concurrent_booking_prevents_overlap(pg_session_factory):
         assigned_to=assigned_to
     )
     
+    async def setup_db():
+        async with pg_session_factory() as session:
+            async with session.begin():
+                from app.domain.security.models import User
+                from app.domain.customers.models import Customer
+                
+                # Create user
+                user = User(
+                    id=assigned_to,
+                    workspace_id=workspace_id,
+                    email=f"test-{uuid4()}@example.com",
+                    full_name="Test User",
+                    password_hash="test",
+                    role="sales"
+                )
+                session.add(user)
+                
+                import random
+                # Create customer
+                cust_id = req1.customer_id
+                customer = Customer(
+                    id=cust_id,
+                    workspace_id=workspace_id,
+                    email=f"cust-{uuid4()}@example.com",
+                    name="Test Customer",
+                    phone=f"{random.randint(1000000000, 9999999999)}"
+                )
+                session.add(customer)
+    
+    await setup_db()
+
     async def run_create(req):
         async with pg_session_factory() as session:
             try:
                 # Need to run in a transaction for xact_lock to work
                 async with session.begin():
-                    event = await create_event(session, req, actor_id=uuid4(), actor_type="customer", is_demo=False)
+                    event = await create_event(session, req, actor_id=assigned_to, actor_type="user", is_demo=False)
                     return event, None
             except Exception as e:
                 return None, e

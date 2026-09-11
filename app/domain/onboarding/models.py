@@ -32,8 +32,8 @@ class WorkspaceProvisioning(Base):
     workspace_id = Column(UUID(as_uuid=True), index=True, nullable=False, unique=True)
     status = Column(SQLEnum(ProvisioningStatus), default=ProvisioningStatus.PENDING)
     current_step = Column(String, default="INITIALIZATION")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime(timezone=True), nullable=True)
 
 class OnboardingIntegrationConnection(Base):
     __tablename__ = "onboarding_integrations"
@@ -55,8 +55,8 @@ class ImportJob(Base):
     rows_processed = Column(Integer, default=0)
     rows_failed = Column(Integer, default=0)
     data_quality_score = Column(Float, default=1.0) # 0.0 to 1.0 (from DataQualityEngine)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime(timezone=True), nullable=True)
 
 class ValidationResult(Base):
     __tablename__ = "onboarding_validation_results"
@@ -65,7 +65,7 @@ class ValidationResult(Base):
     check_name = Column(String, nullable=False) # e.g., "MISSING_APPROVAL_POLICIES"
     status = Column(String, nullable=False) # "PASS", "FAIL", "WARNING"
     details = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class GoLiveAssessment(Base):
     __tablename__ = "onboarding_golive_assessments"
@@ -75,7 +75,7 @@ class GoLiveAssessment(Base):
     readiness_score = Column(Float, default=0.0)
     deployment_confidence = Column(Float, default=0.0)
     reason = Column(String, nullable=True)
-    evaluated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    evaluated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class OperationalCapabilityMatrix(Base):
     """
@@ -87,7 +87,7 @@ class OperationalCapabilityMatrix(Base):
     capability_name = Column(String, nullable=False) # e.g., "LEAD_ASSIGNMENT"
     status = Column(String, default="AUTONOMOUS") # "AUTONOMOUS", "HUMAN_REVIEW", "LIMITED", "DISABLED"
     reason = Column(String, nullable=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 class WorkspaceMaturity(Base):
     __tablename__ = "onboarding_workspace_maturity"
@@ -95,4 +95,4 @@ class WorkspaceMaturity(Base):
     workspace_id = Column(UUID(as_uuid=True), index=True, nullable=False)
     level = Column(Integer, default=1) # 1: Connected, 2: Operational, 3: Intelligent, 4: Predictive, 5: Optimized
     score = Column(Float, default=0.0)
-    evaluated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    evaluated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

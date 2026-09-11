@@ -6,10 +6,11 @@ from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from app.integrations.postgres.database import get_db
 from app.domain.observability.models import Alert, Incident
 from app.api.v1.auth_deps import get_current_user, RequirePermissions
+from app.api.v1.security import verify_internal_network
 
 router = APIRouter(tags=["Observability"])
 
-@router.get("/metrics")
+@router.get("/metrics", dependencies=[Depends(verify_internal_network)])
 async def get_metrics():
     """
     Exposes Prometheus metrics for scraping.

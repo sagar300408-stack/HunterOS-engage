@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hunteros.fullname" . }}-worker
+  labels:
+    app: {{ include "hunteros.name" . }}-worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "hunteros.name" . }}-worker
+  template:
+    metadata:
+      labels:
+        app: {{ include "hunteros.name" . }}-worker
+    spec:
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "app.celery_app.celery_app", "worker", "--loglevel=info"]
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          lifecycle:
+            preStop:
+              exec:
+                # Tell celery to stop consuming and finish active tasks
+                command: ["/bin/sh", "-c", "celery multi stopwait worker1 --pidfile=/var/run/celery/%n.pid"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "hunteros.fullname" . }}-config
+            - secretRef:
+                name: {{ include "hunteros.fullname" . }}-secrets

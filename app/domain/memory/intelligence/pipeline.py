@@ -238,9 +238,9 @@ class ContextPipeline:
                     if traversal.edges:
                         expanded_edges = [_normalize_item(e) for e in traversal.edges]
                         existing_edges = normalized_blocks.get(ContextBlockType.RELATIONSHIPS) or []
-                        seen_ids = {str(e.get("id")) for e in existing_edges if isinstance(e, dict) and "id" in e}
+                        seen_ids = {str(e.get("relationship_id") or e.get("id")) for e in existing_edges if isinstance(e, dict) and (e.get("relationship_id") or e.get("id"))}
                         for edge_dict in expanded_edges:
-                            eid = str(edge_dict.get("id")) if isinstance(edge_dict, dict) else None
+                            eid = str(edge_dict.get("relationship_id") or edge_dict.get("id")) if isinstance(edge_dict, dict) else None
                             if not eid or eid not in seen_ids:
                                 existing_edges.append(edge_dict)
                                 if eid:

@@ -30,9 +30,9 @@ config:
   ENVIRONMENT: production
   DEBUG: "False"
 
-secrets:
-  SECRET_KEY: "change-this-in-production"
-  DATABASE_URL: "postgresql+asyncpg://postgres:password@postgres-service:5432/hunteros"
-  REDIS_URL: "redis://redis-service:6379/0"
-  CELERY_BROKER_URL: "redis://redis-service:6379/1"
-  CELERY_RESULT_BACKEND: "redis://redis-service:6379/2"
+externalSecrets:
+  enabled: true
+
+backup:
+  schedule: "0 2 * * *"
+  s3Bucket: "hunteros-backups-prod"

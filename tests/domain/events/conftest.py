@@ -35,32 +35,12 @@ else:
 
 # ── Engine shared for the test session ───────────────────────────────────────
 from sqlalchemy.pool import NullPool
-import app.domain.customers.models
-import app.domain.conversations.models
-import app.domain.followup.models
-import app.domain.scheduling.models
-import app.domain.integration.models
-import app.domain.dashboard.models
-import app.domain.security.models
-import app.domain.intent.models
-from app.domain.conversations.models import Base
 
 @pytest_asyncio.fixture
 async def pg_engine():
-    try:
-        engine = create_async_engine(_ASYNC_URL, echo=False, poolclass=NullPool)
-        async with engine.connect() as conn:
-            pass
-        yield engine
-        await engine.dispose()
-    except Exception:
-        # Fallback to SQLite in-memory if PG is unavailable
-        engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False, poolclass=NullPool)
-        async with engine.begin() as conn:
-            # Create schema for tests
-            await conn.run_sync(Base.metadata.create_all)
-        yield engine
-        await engine.dispose()
+    engine = create_async_engine(_ASYNC_URL, echo=False, poolclass=NullPool)
+    yield engine
+    await engine.dispose()
 
 
 @pytest.fixture

@@ -85,12 +85,13 @@ class ActionEngine:
         
         await self._publish_event(action, "action.submitted")
         
-        # Fire background task
-        asyncio.create_task(self._execute(action.id))
+        # Fire background task via Celery
+        from app.domain.action.tasks import execute_action_task
+        execute_action_task.apply_async(args=[str(action.id)])
         
         return action
 
-    async def _execute(self, action_id: UUID) -> None:
+    async def _execute(self, action_id: UUID, celery_task=None) -> None:
         action = await self.action_repo.get_by_id(action_id)
         if not action:
             return
@@ -159,6 +160,16 @@ class ActionEngine:
             await self._publish_event(action, "action.completed")
             
         except Exception as e:
+            is_transient = "timeout" in str(e).lower() or "connection" in str(e).lower() or "rate" in str(e).lower() or "transient" in str(e).lower()
+            
+            if is_transient and celery_task and celery_task.request.retries < action.max_retries:
+                # Retry via Celery
+                action.status = ActionStatus.PENDING.value
+                await self.action_repo.update_action(action)
+                # Exponential backoff
+                delay = 2 ** celery_task.request.retries * 5
+                raise celery_task.retry(exc=e, countdown=delay)
+
             action.completed_at = datetime.now(timezone.utc)
             if action.started_at:
                 action.execution_duration_ms = int((action.completed_at - action.started_at).total_seconds() * 1000)

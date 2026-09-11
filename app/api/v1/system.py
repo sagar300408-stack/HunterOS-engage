@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from app.core.config import settings
+from app.api.v1.security import verify_internal_network
 
-router = APIRouter(prefix="/system", tags=["System Information"])
+router = APIRouter(prefix="/system", tags=["System Information"], dependencies=[Depends(verify_internal_network)])
 
 @router.get("/info")
 async def system_info():

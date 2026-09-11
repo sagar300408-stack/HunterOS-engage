@@ -56,11 +56,25 @@ class KpiIntelligenceEngine:
         """
         Executes all registered KPI calculators for the given target and persists the snapshots.
         """
+        from app.domain.impact.repository import ImpactRepository
+        impact_repo = ImpactRepository(self.session)
+        custom_targets = await impact_repo.get_business_targets(workspace_id)
+        # Create a lookup map for faster access
+        target_map = {t.kpi_name: t for t in custom_targets}
+
         calculators = kpi_registry.get_all_calculators()
         snapshots = []
         
         for calculator in calculators:
+            # We copy or modify definition to respect tenant overrides
             definition = calculator.definition
+            custom = target_map.get(definition.name)
+            
+            final_target = custom.target_value if custom else definition.target
+            # For simplicity, if they provided a custom target we adjust thresholds proportionally or just use target.
+            # In a real app we might allow custom thresholds too, but for O11 target is the main requirement.
+            final_warning = definition.warning_threshold
+            final_critical = definition.critical_threshold
             
             result = await calculator.calculate(
                 self.session, 
@@ -73,6 +87,12 @@ class KpiIntelligenceEngine:
             if result.previous_value is not None:
                 trend = self._determine_trend(result.current_value, result.previous_value, definition.direction)
                 
+            # Determine status using the overridden target (we pass a dummy definition or just pass final thresholds)
+            # We'll just temporarily assign them to definition for the status calculation
+            definition.target = final_target
+            definition.warning_threshold = final_warning
+            definition.critical_threshold = final_critical
+            
             status = self._determine_status(result.current_value, definition)
             
             snapshot = KpiSnapshot(
@@ -89,9 +109,9 @@ class KpiIntelligenceEngine:
                 percentage_change=result.percentage_change,
                 trend=trend,
                 status=status,
-                target=definition.target,
-                warning_threshold=definition.warning_threshold,
-                critical_threshold=definition.critical_threshold,
+                target=final_target,
+                warning_threshold=final_warning,
+                critical_threshold=final_critical,
                 confidence=result.confidence,
                 data_source=definition.data_source,
                 refresh_strategy=definition.refresh_strategy

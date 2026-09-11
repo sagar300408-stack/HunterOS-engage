@@ -84,7 +84,7 @@ async def test_r6_approval_gate_allows_orchestrated_execution(action_engine, moc
         is_orchestrated=True # orchestrated, already approved
     )
     
-    with patch("asyncio.create_task"):
+    with patch("app.domain.action.tasks.execute_action_task.apply_async"):
         action = await action_engine.submit_action(workspace_id, req)
         assert action.status == ActionStatus.PENDING.value
 
