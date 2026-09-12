@@ -367,3 +367,4 @@ class AIMetadata(Base):
 # Import at bottom to avoid circular dependencies and ensure relationships can resolve
 from app.domain.dashboard.models import PipelineEvent
 from app.domain.intent.models import IntentHistory
+from app.domain.customers.models import Customer

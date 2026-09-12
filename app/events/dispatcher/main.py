@@ -3,7 +3,7 @@ import logging
 import signal
 import sys
 
-from app.integrations.postgres.database import async_session_maker
+from app.integrations.postgres.database import get_session_factory
 from app.celery_app import celery_app
 from app.events.dispatcher.poller import OutboxPoller
 from app.config import get_settings
@@ -18,7 +18,7 @@ async def main():
     settings = get_settings()
     
     poller = OutboxPoller(
-        session_factory=async_session_maker,
+        session_factory=get_session_factory(),
         celery_app=celery_app
     )
     
