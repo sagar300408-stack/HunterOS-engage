@@ -21,8 +21,14 @@ from app.domain.conversations import service as message_service
 from app.domain.conversations.models import Message
 from app.domain.conversations.schemas import MessageDirectionEnum, SaveMessageDTO
 from app.domain.customers import service as customer_service
-from app.domain.memory import service as memory_service
-from app.domain.memory.models import MemoryEventType
+from app.domain.memory.service import MemoryService
+from app.domain.memory.schemas import CustomerMemoryCreateRequest
+from app.domain.memory.models import (
+    MemoryEventType,
+    CustomerMemoryTimelineEvent,
+    MemoryTimelineCategory,
+    MemoryImportance,
+)
 from app.utils.helpers import extract_message_data
 from app.utils.logger import get_logger
 
@@ -86,17 +92,30 @@ async def receive(
         name=contact_name,
     )
 
-    # Emit customer_created event for new customers
-    if is_new_customer:
-        await memory_service.append_memory_event(
-            session,
-            customer.id,
-            MemoryEventType.customer_created,
-            {"phone": from_phone, "name": contact_name},
+    mem_svc = MemoryService()
+    memory = await mem_svc.get_customer_memory(customer.id, session=session, workspace_id=customer.workspace_id)
+    if not memory:
+        req = CustomerMemoryCreateRequest(
+            customer_id=customer.id,
+            workspace_id=customer.workspace_id,
+            source="webhook",
+            created_by="system",
         )
+        memory = await mem_svc.create_customer_memory(req, session)
 
-    # Ensure memory row exists for this customer
-    await memory_service.get_or_create_memory(session, customer.id)
+    if is_new_customer:
+        session.add(CustomerMemoryTimelineEvent(
+            customer_id=customer.id,
+            memory_id=memory.id,
+            category=MemoryTimelineCategory.LIFECYCLE,
+            event_type=MemoryEventType.customer_created.value,
+            title="Customer Created",
+            description="New customer detected via webhook.",
+            source="receive_pipeline",
+            importance=MemoryImportance.MEDIUM,
+            payload={"phone": from_phone, "name": contact_name},
+            version_number=memory.version_number,
+        ))
 
     # ── Conversation lookup / creation (with 24h idle rule) ───────────────────
     conversation = await message_service.get_or_create_conversation(
@@ -125,12 +144,18 @@ async def receive(
         .limit(1)
     )
     if existing_message_id is None:
-        await memory_service.append_memory_event(
-            session,
-            customer.id,
-            MemoryEventType.conversation_started,
-            {"conversation_id": str(conversation.id)},
-        )
+        session.add(CustomerMemoryTimelineEvent(
+            customer_id=customer.id,
+            memory_id=memory.id,
+            category=MemoryTimelineCategory.LIFECYCLE,
+            event_type=MemoryEventType.conversation_started.value,
+            title="Conversation Started",
+            description="A new conversation thread was started.",
+            source="receive_pipeline",
+            importance=MemoryImportance.MEDIUM,
+            payload={"conversation_id": str(conversation.id)},
+            version_number=memory.version_number,
+        ))
 
     # ── Persist incoming message ──────────────────────────────────────────────
     dto = SaveMessageDTO(
