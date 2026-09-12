@@ -46,6 +46,7 @@ async def get_or_create_customer(
     session: AsyncSession,
     phone: str,
     name: Optional[str] = None,
+    workspace_id: Optional[UUID] = None,
 ) -> Customer:
     """
     Look up or create a Customer profile by phone number.
@@ -57,6 +58,7 @@ async def get_or_create_customer(
         session: Active async database session.
         phone:   Customer's WhatsApp phone number (the natural key).
         name:    Contact name from the WhatsApp message (optional).
+        workspace_id: The tenant workspace ID (optional).
 
     Returns:
         The existing or newly created Customer ORM object.
@@ -64,12 +66,20 @@ async def get_or_create_customer(
     customer = await get_customer(session, phone)
 
     if customer:
+        updated = False
         # Update name if we now have one and didn't before
         if name and not customer.name:
             customer.name = name
+            updated = True
+        # Backfill workspace_id for older rows if missing
+        if workspace_id and not customer.workspace_id:
+            customer.workspace_id = workspace_id
+            updated = True
+            
+        if updated:
             await session.flush()
             logger.info(
-                "customer_name_updated",
+                "customer_profile_auto_updated",
                 customer_id=str(customer.id),
                 phone=phone,
                 name=name,
@@ -88,6 +98,7 @@ async def get_or_create_customer(
         name=name,
         status=CustomerStatus.new,
         is_demo=is_demo_context.get(),
+        workspace_id=workspace_id,
     )
     session.add(customer)
     await session.flush()  # get UUID before commit

@@ -37,7 +37,7 @@ class WebhookReceiveConsumer(EventConsumer):
                 
                 # To avoid circular imports and since event_bus is attached to app state,
                 # we can just publish MessageReceived from here after receive() finishes.
-                result = await receive(event.payload, session)
+                result = await receive(event.payload, session, workspace_id=event.workspace_id)
                 
                 if result:
                     conversation, message_data, customer, message = result

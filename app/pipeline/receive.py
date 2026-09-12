@@ -13,6 +13,7 @@ Returns (Conversation, message_data, Customer) on success, None if skipped.
 """
 
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,7 @@ logger = get_logger(__name__)
 async def receive(
     payload: dict,
     session: AsyncSession,
+    workspace_id: Optional[UUID] = None,
 ) -> Optional[tuple]:
     """
     Stage 1 + Stage 2: Parse, validate, dedup, identify customer, and persist.
@@ -45,6 +47,7 @@ async def receive(
     Args:
         payload: Raw Meta webhook JSON payload.
         session: Active async database session.
+        workspace_id: Tenant ID from the incoming webhook context.
 
     Returns:
         (Conversation, message_data dict, Customer) — or None if the message
@@ -90,6 +93,7 @@ async def receive(
         session,
         phone=from_phone,
         name=contact_name,
+        workspace_id=workspace_id,
     )
 
     mem_svc = MemoryService()
