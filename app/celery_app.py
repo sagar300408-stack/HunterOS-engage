@@ -25,6 +25,9 @@ celery_app.conf.update(
     task_routes={
         "app.events.worker.tasks.dispatch_event": {"queue": "event_dispatch"},
     },
+    imports=[
+        "app.domain.intent.tasks"
+    ],
     task_queues=(
         Queue('celery', routing_key='celery'),  # default queue
         Queue('event_dispatch', routing_key='event_dispatch'), # high-throughput event dispatch queue

@@ -20,7 +20,7 @@ from app.config import get_settings
 from app.domain.conversations import service as message_service
 from app.domain.customers import service as customer_service
 from app.domain.customers.models import Customer
-from app.domain.memory import service as memory_service
+from app.domain.memory.service import MemoryService as _MemoryService
 
 from app.events.message_events import AIRequested, AIResponded
 from app.integrations.openai.provider import get_ai_provider
@@ -70,9 +70,23 @@ async def process_with_ai(
     memory_context = await inject_memory(session=session, customer=customer)
     t_memory = int((time.monotonic() - t0) * 1000)
 
-    # Grab memory summary to give the intent extractor extra context
-    memory = await memory_service.get_customer_memory(session, customer.id)
-    memory_summary = memory.summary if memory else None
+    # Grab memory payload to give the intent extractor extra context
+    _mem_svc = _MemoryService()
+    memory = await _mem_svc.get_customer_memory(
+        customer.id,
+        session=session,
+        workspace_id=customer.workspace_id,
+    )
+    memory_summary = None
+    if memory and memory.memory_payload:
+        personal = memory.memory_payload.get("personal_info", {})
+        journey = memory.memory_payload.get("journey_snapshot", {})
+        parts = []
+        if personal.get("full_name"):
+            parts.append(f"Name: {personal['full_name']}")
+        if journey.get("current_stage"):
+            parts.append(f"Stage: {journey['current_stage']}")
+        memory_summary = "; ".join(parts) or None
 
     # Log Stage 3: memory_loaded
     try:
@@ -82,7 +96,7 @@ async def process_with_ai(
             message_id=message_id,
             step="memory_loaded",
             duration_ms=t_memory,
-            payload={"summary": memory_summary, "message_count": memory.message_count if memory else 0},
+            payload={"summary": memory_summary},
             workspace_id=customer.workspace_id,
         )
     except Exception as e:
@@ -169,43 +183,14 @@ async def process_with_ai(
     # Attach intent result to ai_result for downstream use (Phase 5/6)
     ai_result["intent_result"] = intent_result
 
-    # ── Stage 10: Conditional Memory Update (Phase 2) ─────────────────────────
-    memory = await memory_service.get_or_create_memory(session, customer.id)
-    memory.message_count += 1
-    await session.flush()
-
-    should_update, trigger = memory_service._should_update_memory(
-        message_count=memory.message_count,
-        ai_response=ai_result["content"],
-        interval=settings.memory_update_interval,
-    )
-
+    # ── Stage 10: Track message count in memory metadata ──────────────────────
+    # The old pipeline-era get_or_create_memory/update_customer_memory functions
+    # no longer exist as module-level callables after the CQRS refactor.
+    # Per-message memory extraction is handled by the intelligence pipeline
+    # separately; here we just log that the AI stage completed.
     t_mem_update = 0
-    if should_update:
-        t0 = time.monotonic()
-        logger.info(
-            "memory_update_triggered",
-            customer_id=str(customer.id),
-            trigger=trigger,
-            message_count=memory.message_count,
-        )
-        recent_messages = await message_service.get_recent_messages_across_conversations(
-            session, customer.id, limit=20
-        )
-        await memory_service.update_customer_memory(
-            session=session,
-            customer_id=customer.id,
-            conversation_history=recent_messages,
-            ai_response=ai_result["content"],
-            trigger=trigger,
-        )
-        t_mem_update = int((time.monotonic() - t0) * 1000)
-    else:
-        logger.debug(
-            "memory_update_skipped",
-            customer_id=str(customer.id),
-            message_count=memory.message_count,
-        )
+    should_update = False
+    trigger = None
 
     # Log Stage 6: memory_updated
     try:
@@ -214,11 +199,10 @@ async def process_with_ai(
             session=session,
             message_id=message_id,
             step="memory_updated",
-            duration_ms=t_mem_update if should_update else None,
+            duration_ms=t_mem_update,
             payload={
                 "updated": should_update,
                 "trigger": trigger,
-                "current_summary": memory.summary,
             },
             workspace_id=customer.workspace_id,
         )

@@ -79,7 +79,11 @@ class LifecycleManager:
             ValueError:                     EventRecord not found.
             InvalidLifecycleTransitionError: Transition is not in VALID_TRANSITIONS.
         """
-        record = await session.get(EventRecord, event_id)
+        from sqlalchemy import select
+        result = await session.execute(
+            select(EventRecord).where(EventRecord.event_id == event_id).with_for_update()
+        )
+        record = result.scalar_one_or_none()
         if not record:
             raise ValueError(f"EventRecord {event_id} not found.")
 

@@ -25,10 +25,10 @@ class IntelligenceEventConsumer(EventConsumer):
             return
 
         # Do not recursively trigger intelligence on our own events
-        if event.metadata.category.value in ["FRICTION", "INTELLIGENCE"]:
+        if event.category.value in ["FRICTION", "INTELLIGENCE"]:
             return
 
-        logger.debug(f"IntelligenceEventConsumer handling event: {event.metadata.event_type}")
+        logger.debug(f"IntelligenceEventConsumer handling event: {event.event_name}")
 
         async with get_session() as session:
             try:
@@ -37,7 +37,7 @@ class IntelligenceEventConsumer(EventConsumer):
                 await session.commit()
             except Exception as e:
                 await session.rollback()
-                logger.error(f"Error in Operational Intelligence Pipeline for event {event.metadata.event_type}: {str(e)}", exc_info=True)
+                logger.error(f"Error in Operational Intelligence Pipeline for event {event.event_name}: {str(e)}", exc_info=True)
 
     async def register(self, bus: EventBus) -> None:
         await bus.subscribe(self)

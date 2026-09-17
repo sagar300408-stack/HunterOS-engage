@@ -52,8 +52,19 @@ class WhatsAppProvider:
             )
         )
         
+        
         logger.info("whatsapp_sending_test_message", recipient=clean_recipient)
         response = await self._client.send_template(payload)
         logger.info("whatsapp_test_message_sent", response=response.model_dump())
         
         return response
+
+    async def send_text_message(self, to: str, body: str) -> str:
+        """
+        Sends a standard text message. Returns the WhatsApp message ID.
+        """
+        clean_recipient = to.replace("+", "").strip()
+        response = await self._client.send_text(to=clean_recipient, body=body)
+        if response.messages and len(response.messages) > 0:
+            return response.messages[0].id
+        return "unknown_wa_id"

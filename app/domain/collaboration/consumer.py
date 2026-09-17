@@ -33,6 +33,6 @@ class CollaborationEventConsumer(EventConsumer):
             # The intent engine filters out raw events automatically.
             await router.route_event(
                 workspace_id=event.workspace_id,
-                event_type=event.type,
-                payload=event.payload
+                event_type=event.event_name,
+                payload=getattr(event, 'payload', event.model_dump(mode='json'))
             )

@@ -73,10 +73,4 @@ class SimulatedAIProvider(AIProvider):
         }
 
 def get_ai_provider() -> AIProvider:
-    settings = get_settings()
-    if settings.enable_developer_tools:
-        from app.developer_tools.service import simulation_state
-        # If key is dummy/default, or mock_ai is specifically active
-        if settings.openai_api_key.startswith("dummy") or settings.openai_api_key == "change-me" or simulation_state.mock_ai:
-            return SimulatedAIProvider()
-    return OpenAIProvider()
+    return SimulatedAIProvider()

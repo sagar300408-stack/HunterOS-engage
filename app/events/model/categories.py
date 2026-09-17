@@ -27,3 +27,5 @@ class EventCategory(str, Enum):
     FRICTION = "FRICTION"
     LEAD = "LEAD"
     SLA = "SLA"
+    WORKSPACE = "WORKSPACE"
+    WILDCARD = "WILDCARD"

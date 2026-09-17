@@ -35,14 +35,14 @@ class WhatsAppSendConsumer(EventConsumer):
             )
 
             logger.info(
-                "reply_sent",
-                to_phone=event.to_phone,
-                wa_message_id=wa_message_id,
-                content_preview=event.content[:80],
+                f"reply_sent to_phone={event.to_phone} wa_message_id={wa_message_id} reply_to_id={event.response_message_id}"
             )
 
             async with get_session() as session:
                 reply_event = ReplySent(
+                    workspace_id=event.workspace_id,
+                    actor_type=event.actor_type,
+                    correlation_id=event.correlation_id,
                     to_phone=event.to_phone,
                     content=event.content,
                     wa_message_id=wa_message_id,
@@ -57,10 +57,13 @@ class WhatsAppSendConsumer(EventConsumer):
                 await session.commit()
                 
         except Exception as e:
-            logger.error("whatsapp_send_error", error=str(e))
+            logger.error(f"whatsapp_send_error: {str(e)}")
             # Publish ErrorOccurred
             async with get_session() as session:
                 error_event = ErrorOccurred(
+                    workspace_id=event.workspace_id,
+                    actor_type=event.actor_type,
+                    correlation_id=event.correlation_id,
                     stage="whatsapp_send",
                     error_message=str(e),
                     error_type=type(e).__name__,

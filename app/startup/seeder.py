@@ -30,7 +30,7 @@ async def seed_default_admin() -> None:
                     password_hash=hash_password("admin123"),
                     role=UserRole.admin,
                     workspace_id=DEFAULT_WORKSPACE_ID,
-                    is_active="true",
+                    is_active=True,
                 )
                 session.add(admin)
                 logger.info(

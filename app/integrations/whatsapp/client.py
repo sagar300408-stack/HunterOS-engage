@@ -74,3 +74,21 @@ class WhatsAppClient:
         endpoint = f"/{self.config.phone_number_id}/messages"
         data = await self._request("POST", endpoint, json=payload.model_dump(exclude_none=True))
         return MessageResponse(**data)
+
+    async def send_text(self, to: str, body: str) -> MessageResponse:
+        """
+        Send a text message via the WhatsApp API.
+        """
+        endpoint = f"/{self.config.phone_number_id}/messages"
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "text",
+            "text": {
+                "preview_url": False,
+                "body": body
+            }
+        }
+        data = await self._request("POST", endpoint, json=payload)
+        return MessageResponse(**data)

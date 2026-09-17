@@ -1,3 +1,9 @@
 from .base import AbstractPriorityFactor, PriorityFactor
 from .registry import PriorityFactorRegistry
-from .urgency import *\nfrom .impact import *\nfrom .evidence import *\nfrom .freshness import *\nfrom .blocking import *\nfrom .business_value import *\nfrom .confidence import *
+from .urgency import *
+from .impact import *
+from .evidence import *
+from .freshness import *
+from .blocking import *
+from .business_value import *
+from .confidence import *

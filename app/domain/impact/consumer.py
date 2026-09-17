@@ -32,9 +32,9 @@ class ImpactEventConsumer(EventConsumer):
             # Map HunterEvent to ImpactEvent
             impact_event = ImpactEvent(
                 workspace_id=event.workspace_id,
-                event_type=event.type,
-                source_feature=event.payload.get("source_feature", "unknown"),
-                payload=event.payload
+                event_type=event.event_name,
+                source_feature=getattr(event, 'payload', event.model_dump(mode='json')).get("source_feature", "unknown"),
+                payload=getattr(event, 'payload', event.model_dump(mode='json'))
             )
             
             await ImpactCollector.process_event(repo, impact_event)

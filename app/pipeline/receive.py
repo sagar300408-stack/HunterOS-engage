@@ -97,8 +97,15 @@ async def receive(
     )
 
     mem_svc = MemoryService()
-    memory = await mem_svc.get_customer_memory(customer.id, session=session, workspace_id=customer.workspace_id)
-    if not memory:
+    # Look up by customer_id alone (which is unique) to avoid missing rows
+    # that were created before workspace_id propagation was in place.
+    memory = await mem_svc.get_customer_memory(customer.id, session=session)
+    if memory:
+        # Backfill workspace_id if the row was created without one
+        if customer.workspace_id and not memory.workspace_id:
+            memory.workspace_id = customer.workspace_id
+            await session.flush()
+    else:
         req = CustomerMemoryCreateRequest(
             customer_id=customer.id,
             workspace_id=customer.workspace_id,

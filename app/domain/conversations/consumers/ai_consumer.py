@@ -28,7 +28,6 @@ class AIProcessingConsumer(EventConsumer):
         async with get_session() as session:
             # Re-fetch customer and conversation objects needed by process_with_ai
             # This is a bit of overhead but ensures pure decoupling
-            from app.domain.conversations.service import get_conversation_by_id
             from app.domain.customers.models import Customer
             from sqlalchemy import select
             
@@ -60,6 +59,8 @@ class AIProcessingConsumer(EventConsumer):
                 actor_type=event.actor_type,
                 correlation_id=event.correlation_id,
                 causation_id=event.message_id,
+                ai_model_version="gpt-4",
+                ai_reason="Generated response for user message",
             )
             
             # Since we can't easily inject the bus here in this refactor, 

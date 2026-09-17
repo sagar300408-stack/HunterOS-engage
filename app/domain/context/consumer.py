@@ -27,6 +27,6 @@ class ContextEventConsumer(EventConsumer):
             await ContextLearningEngine.process_event(
                 repo=repo,
                 workspace_id=event.workspace_id,
-                event_type=event.type,
-                payload=event.payload
+                event_type=event.event_name,
+                payload=getattr(event, 'payload', event.model_dump(mode='json'))
             )
