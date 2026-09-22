@@ -511,15 +511,15 @@ async def get_customer_profile(
     mem = customer.memory
     memory_summary = None
     if mem:
-        structured = mem.structured_data or {}
+        structured = mem.memory_payload.get("structured_data", {}) if mem.memory_payload else {}
         memory_summary = MemorySummary(
-            summary=mem.summary,
+            summary=mem.memory_payload.get("summary") if mem.memory_payload else None,
             budget=structured.get("budget"),
             timeline=structured.get("timeline"),
             preferred_location=structured.get("preferred_location"),
             interests=structured.get("interests"),
-            message_count=mem.message_count,
-            last_updated=mem.last_updated,
+            message_count=mem.memory_payload.get("message_count", 0) if mem.memory_payload else 0,
+            last_updated=mem.updated_at,
         )
 
     # Recent intents

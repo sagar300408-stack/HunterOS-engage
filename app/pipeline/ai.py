@@ -151,11 +151,26 @@ async def process_with_ai(
     full_history = memory_context + intent_context + history[:-1]
 
     # ── Call OpenAI conversational response ───────────────────────────────────
+    import os
     t0 = time.monotonic()
-    ai_result = await get_ai_provider().get_ai_response(
-        conversation_history=full_history,
-        user_message=user_content,
-    )
+    if os.environ.get("ENABLE_TEST_AUTO_REPLY", "").lower() == "true":
+        logger.info("test_auto_reply_triggered", extra={"conversation_id": str(conversation_id)})
+        ai_result = {
+            "content": "Welcome to Originyx Business Automation Companies, India. THIS IS A TEST MESSAGE FROM originyx.in",
+            "model": "test-mock-model",
+            "total_tokens": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "latency_ms": 0,
+            "estimated_cost_usd": 0.0,
+            "finish_reason": "stop",
+            "prompt_version": "v1"
+        }
+    else:
+        ai_result = await get_ai_provider().get_ai_response(
+            conversation_history=full_history,
+            user_message=user_content,
+        )
     t_ai = int((time.monotonic() - t0) * 1000)
 
     # Log Stage 5: response_generated
@@ -184,13 +199,31 @@ async def process_with_ai(
     ai_result["intent_result"] = intent_result
 
     # ── Stage 10: Track message count in memory metadata ──────────────────────
-    # The old pipeline-era get_or_create_memory/update_customer_memory functions
-    # no longer exist as module-level callables after the CQRS refactor.
-    # Per-message memory extraction is handled by the intelligence pipeline
-    # separately; here we just log that the AI stage completed.
-    t_mem_update = 0
-    should_update = False
-    trigger = None
+    t0_mem = time.monotonic()
+    
+    from app.domain.memory.service import MemoryService
+    from app.domain.memory.schemas import CustomerMemoryUpdateRequest
+    mem_svc = MemoryService()
+    
+    # We must patch the message_count in the memory payload
+    # fetch existing first
+    existing_mem = await mem_svc.get_customer_memory(customer.id, session=session, workspace_id=customer.workspace_id)
+    current_count = 0
+    if existing_mem and existing_mem.memory_payload:
+        current_count = existing_mem.memory_payload.get("message_count", 0)
+    
+    req = CustomerMemoryUpdateRequest(
+        workspace_id=customer.workspace_id,
+        memory_payload={"message_count": current_count + 1},
+        reason="Increment message count",
+        trigger="message_received",
+        changed_module="pipeline"
+    )
+    await mem_svc.update_customer_memory(customer.id, req, session=session)
+    
+    t_mem_update = int((time.monotonic() - t0_mem) * 1000)
+    should_update = True
+    trigger = "message_received"
 
     # Log Stage 6: memory_updated
     try:

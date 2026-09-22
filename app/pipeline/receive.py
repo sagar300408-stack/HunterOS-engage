@@ -133,6 +133,7 @@ async def receive(
         session,
         customer_phone=from_phone,
         customer_id=customer.id,
+        workspace_id=customer.workspace_id,
     )
 
     # Emit conversation_started event on fresh conversations.

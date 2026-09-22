@@ -37,6 +37,7 @@ async def get_or_create_conversation(
     session: AsyncSession,
     customer_phone: str,
     customer_id: Optional[UUID] = None,
+    workspace_id: Optional[UUID] = None,
 ) -> Conversation:
     """
     Fetch or create a conversation for this customer.
@@ -54,6 +55,7 @@ async def get_or_create_conversation(
         session:       Active async database session.
         customer_phone: Customer's phone number (always stored on Conversation).
         customer_id:   UUID of the Customer row (Phase 2+). None for legacy rows.
+        workspace_id:  UUID of the Workspace for multi-tenancy.
     """
     settings = get_settings()
     idle_cutoff = SystemClock.now() - timedelta(hours=settings.conversation_idle_hours)
@@ -75,9 +77,16 @@ async def get_or_create_conversation(
 
         if conv_created >= idle_cutoff:
             # Within idle window — continue this conversation
+            updated = False
             if customer_id and conversation.customer_id is None:
                 # Back-fill customer_id on legacy Phase 1 rows
                 conversation.customer_id = customer_id
+                updated = True
+            if workspace_id and conversation.workspace_id is None:
+                # Back-fill workspace_id on legacy rows
+                conversation.workspace_id = workspace_id
+                updated = True
+            if updated:
                 await session.flush()
             logger.debug(
                 "conversation_continued",
@@ -99,6 +108,7 @@ async def get_or_create_conversation(
     conversation = Conversation(
         customer_phone=customer_phone,
         customer_id=customer_id,
+        workspace_id=workspace_id,
         created_at=SystemClock.now(),
         is_demo=is_demo_context.get(),
     )
@@ -110,6 +120,7 @@ async def get_or_create_conversation(
         conversation_id=str(conversation.id),
         customer_phone=customer_phone,
         customer_id=str(customer_id) if customer_id else None,
+        workspace_id=str(workspace_id) if workspace_id else None,
     )
 
     return conversation
