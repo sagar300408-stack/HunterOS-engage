@@ -544,9 +544,22 @@ async def test_outbox_poller_orchestration_with_priority_and_health():
 
     # Mock DB session & Celery App
     mock_session = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalars().all.return_value = [e2, e1]
-    mock_session.execute.return_value = mock_result
+    
+    def mock_execute_side_effect(stmt):
+        mock_res = MagicMock()
+        stmt_str = str(stmt).upper()
+        if "SKIP LOCKED" in stmt_str or "FOR UPDATE SKIP LOCKED" in stmt_str or "LIMIT" in stmt_str:
+            mock_res.scalars().all.return_value = [e2, e1]
+        else:
+            # It's the with_for_update inside LifecycleManager._transition
+            # stmt.whereclause contains the event_id condition
+            if str(e1.event_id) in str(stmt):
+                mock_res.scalar_one_or_none.return_value = e1
+            else:
+                mock_res.scalar_one_or_none.return_value = e2
+        return mock_res
+        
+    mock_session.execute.side_effect = mock_execute_side_effect
     mock_session.get.side_effect = lambda model, eid: e1 if eid == e1.event_id else e2
     mock_session_factory = MagicMock()
     mock_session_factory.return_value.__aenter__.return_value = mock_session
