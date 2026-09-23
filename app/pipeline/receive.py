@@ -67,6 +67,8 @@ async def receive(
     from_phone = message_data["from_phone"]
     contact_name = message_data["contact_name"]
 
+    logger.info(f"[WHATSAPP INBOUND] message parsed wa_message_id={wa_message_id}")
+
     logger.info(
         "incoming_message_received",
         from_phone=from_phone,

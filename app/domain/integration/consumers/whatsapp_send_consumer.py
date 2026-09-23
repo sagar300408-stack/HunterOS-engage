@@ -37,6 +37,10 @@ class WhatsAppSendConsumer(EventConsumer):
             logger.info(
                 f"reply_sent to_phone={event.to_phone} wa_message_id={wa_message_id} reply_to_id={event.response_message_id}"
             )
+            
+            # Additional log for test verification
+            if "THIS IS A TEST MESSAGE" in event.content:
+                logger.info(f"[WHATSAPP TEST] response sent successfully wa_message_id={wa_message_id}")
 
             async with get_session() as session:
                 reply_event = ReplySent(

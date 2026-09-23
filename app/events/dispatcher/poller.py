@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from sqlalchemy import select, and_, or_
@@ -89,6 +89,7 @@ class OutboxPoller:
         """
         async with self.session_factory() as session:
             now = datetime.now(timezone.utc)
+            stale_queued_threshold = now - timedelta(minutes=1)
             
             # 1. Select EventRecord entities directly (zero extra DB query needed)
             stmt = (
@@ -102,6 +103,10 @@ class OutboxPoller:
                                 EventRecord.next_retry_at.is_(None),
                                 EventRecord.next_retry_at <= now
                             )
+                        ),
+                        and_(
+                            EventRecord.lifecycle_state == EventLifecycleState.QUEUED.value,
+                            EventRecord.queued_at < stale_queued_threshold
                         )
                     )
                 )
@@ -176,7 +181,23 @@ class OutboxPoller:
                 f"Broker: {self.celery_app.conf.broker_url}"
             )
             
-            # 8. Dispatch Scheduled Events to Celery & Transition to QUEUED
+            # 8. Transition Scheduled Events to QUEUED
+            for item in flow_plan.dispatches_to_execute:
+                try:
+                    # Transition State
+                    await LifecycleManager.queue(session, item.event_id)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to queue event {item.event_id} in DB: {e}",
+                        exc_info=True
+                    )
+                    raise
+            
+            # 9. Commit the batch
+            await session.commit()
+            logger.debug("Batch committed successfully.")
+            
+            # 10. Dispatch to Broker AFTER commit
             for item in flow_plan.dispatches_to_execute:
                 try:
                     logger.debug(
@@ -197,9 +218,6 @@ class OutboxPoller:
                         ],
                         queue="event_dispatch"
                     )
-                    
-                    # Transition State
-                    await LifecycleManager.queue(session, item.event_id)
 
                     # Priority telemetry counter
                     prio_key = f"priority_{item.base_priority.value.lower()}_dispatched"
@@ -214,8 +232,3 @@ class OutboxPoller:
                         f"Broker: {self.celery_app.conf.broker_url} | Error: {e}",
                         exc_info=True
                     )
-                    raise
-            
-            # 9. Commit the batch
-            await session.commit()
-            logger.debug("Batch committed successfully.")

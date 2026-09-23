@@ -59,7 +59,7 @@ class EventLifecycleState(str, Enum):
 VALID_TRANSITIONS: dict[EventLifecycleState, set[EventLifecycleState]] = {
     EventLifecycleState.NEW:          {EventLifecycleState.PERSISTED},
     EventLifecycleState.PERSISTED:    {EventLifecycleState.QUEUED},
-    EventLifecycleState.QUEUED:       {EventLifecycleState.PROCESSING},
+    EventLifecycleState.QUEUED:       {EventLifecycleState.PROCESSING, EventLifecycleState.QUEUED},
     EventLifecycleState.PROCESSING:   {
         EventLifecycleState.COMPLETED,
         EventLifecycleState.RETRYING,    # transient failure — will be re-queued

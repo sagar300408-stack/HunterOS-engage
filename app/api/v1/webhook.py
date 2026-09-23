@@ -66,6 +66,7 @@ async def receive_webhook(
         if payload.get("is_demo"):
             is_demo_context.set(True)
 
+        logger.info("[WHATSAPP INBOUND] webhook received")
         logger.debug(
             "webhook_payload_received",
             object_type=payload.get("object"),
@@ -102,6 +103,9 @@ async def receive_webhook(
         
         # Commit the transaction so the event is persisted (Celery task will pick it up)
         await session.commit()
+        
+        logger.info(f"[WHATSAPP INBOUND] event persisted event_id={event.event_id}")
+        logger.info(f"[WHATSAPP INBOUND] event queued event_id={event.event_id}")
 
         return {"status": "ok", "processed": True}
 
