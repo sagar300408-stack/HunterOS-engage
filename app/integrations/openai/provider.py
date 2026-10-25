@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import os
 from typing import Optional
 from app.config import get_settings
 from app.integrations.openai.client import get_ai_response as real_get_ai_response
@@ -33,32 +34,39 @@ class SimulatedAIProvider(AIProvider):
         from app.developer_tools.service import simulation_state
         
         # Check simulation status
-        if simulation_state.openai_status == "offline":
-            raise Exception("OpenAI API is offline (Simulated)")
-        elif simulation_state.openai_status == "timeout":
-            await asyncio.sleep(10.0)
+        if getattr(simulation_state, "network_delay", 0) > 0:
+            await asyncio.sleep(simulation_state.network_delay)
+
+        if getattr(simulation_state, "error_rate", 0) > 0:
+            import random
+            if random.random() < simulation_state.error_rate:
+                raise Exception("Simulated OpenAI API Error (Rate Limit/500)")
+
+        if getattr(simulation_state, "timeout", False):
             raise Exception("OpenAI API request timed out (Simulated)")
 
         settings = get_settings()
         version = prompt_version or settings.active_prompt_version
         
-        # Generate realistic mock real estate reply
-        import random
-        # If there's a specific mock reply registered for this scenario turn, use it
+        # 1. If explicit next_mock_reply is queued in simulation_state, prioritize it
         if hasattr(simulation_state, "next_mock_reply") and simulation_state.next_mock_reply:
             reply = simulation_state.next_mock_reply
             simulation_state.next_mock_reply = None
         else:
-            mock_replies = [
-                "Hello! Thanks for reaching out. Yes, we have several beautiful 2-bedroom apartments in that location starting at $400,000. Would you like to schedule a site visit?",
-                "That sounds like a great budget. We have a couple of premium villas in your preferred area that match your timeline. Let me know if you would like to see photos.",
-                "Thank you for confirming your budget increase. I have updated your profile. We have some exclusive listings that are now within your range.",
-                "Excellent! I have scheduled a site visit for this weekend. A sales agent will contact you shortly to confirm the exact time.",
-                "I understand your requirements. We can negotiate the down payment terms with the developer. Let me see what we can do.",
-                "Great news! Your booking is confirmed. I am preparing the digital contract now.",
-                "Thank you for your interest. Please let us know if you decide to restart your search in the future."
-            ]
-            reply = random.choice(mock_replies)
+            # 2. Context-aware deterministic reply based on user intent
+            msg_lower = (user_message or "").lower()
+            if any(k in msg_lower for k in ["book", "appointment", "schedule", "visit", "meeting"]):
+                reply = "I would be happy to help schedule an appointment. What date and time works best for you?"
+            elif any(k in msg_lower for k in ["price", "cost", "budget", "pricing"]):
+                reply = "Our properties in that area start at $400,000. Could you share your preferred budget range so I can find matching options?"
+            elif any(k in msg_lower for k in ["bedroom", "bhk", "villa", "apartment", "location"]):
+                reply = "We have several premium listings matching those specifications. Would you like to review their floor plans or schedule a viewing?"
+            elif any(k in msg_lower for k in ["stop", "unsubscribe", "cancel follow", "opt out"]):
+                reply = "You have been unsubscribed from further automated messages. Please let us know if you need any further assistance."
+            elif any(k in msg_lower for k in ["hello", "hi", "hey"]):
+                reply = "Hello! I am your HunterOS assistant. How can I help you find your ideal property today?"
+            else:
+                reply = "Thank you for reaching out. Could you share more details about your requirements so I can assist you better?"
 
         return {
             "content": reply,
@@ -73,4 +81,30 @@ class SimulatedAIProvider(AIProvider):
         }
 
 def get_ai_provider() -> AIProvider:
+    settings = get_settings()
+    provider_override = os.environ.get("AI_PROVIDER", "").lower()
+    if provider_override == "simulated":
+        return SimulatedAIProvider()
+    elif provider_override == "openai":
+        return OpenAIProvider()
+
+    # In testing environment or if API key is a dummy test key, use deterministic SimulatedAIProvider
+    if (
+        settings.app_env == "testing"
+        or not settings.openai_api_key
+        or settings.openai_api_key.startswith("mock-")
+        or settings.openai_api_key == "sk-test"
+    ):
+        return SimulatedAIProvider()
+
+    # In production, require valid non-mock API key
+    if settings.is_production:
+        if not settings.openai_api_key or settings.openai_api_key.startswith("mock-"):
+            raise RuntimeError("OPENAI_API_KEY is not configured for production environment.")
+        return OpenAIProvider()
+
+    # In development:
+    if settings.openai_api_key and not settings.openai_api_key.startswith("mock-"):
+        return OpenAIProvider()
+
     return SimulatedAIProvider()

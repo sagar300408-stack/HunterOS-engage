@@ -210,9 +210,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
-class Base(DeclarativeBase):
-    """Shared declarative base for all ORM models."""
-    pass
+from app.domain.base import Base
 
 
 class MessageDirection(str, enum.Enum):

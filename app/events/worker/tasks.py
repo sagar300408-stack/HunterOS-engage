@@ -14,7 +14,7 @@ from app.events.schema import schema_registry
 from app.events.observability.metrics import event_metrics
 from app.events.partitioning.lock_manager import get_lock_manager
 from app.events.partitioning.ordering import OrderingPolicy
-from app.events.worker.orchestrator import ConsumerOrchestrator
+from app.events.worker.orchestrator import ConsumerOrchestrator, ConsumerStatus
 from app.events.worker.planner import PlanBuilder
 from app.utils.logger import get_logger
 
@@ -116,14 +116,26 @@ async def _dispatch_async(
                 )
 
                 # 6. Execute all consumers stage-by-stage via orchestration engine
+                meta = dict(record.metadata_payload or {})
+                prior_completed = set(meta.get("completed_consumers", []))
+                for span in meta.get("consumer_spans", []):
+                    if isinstance(span, dict) and span.get("status") == "SUCCESS" and span.get("consumer"):
+                        prior_completed.add(span["consumer"])
+
                 report = await ConsumerOrchestrator.run_plan(
                     event=event,
                     plan=plan,
                     event_id=event_id,
+                    completed_consumers=prior_completed,
                 )
 
-                # Record Consumer Spans in metadata_payload
-                meta = dict(record.metadata_payload or {})
+                # Record Consumer Spans and Completed Consumers in metadata_payload
+                newly_completed = {
+                    r.consumer_name for r in report.results
+                    if r.status == ConsumerStatus.SUCCESS
+                }
+                all_completed = prior_completed | newly_completed
+                meta["completed_consumers"] = sorted(list(all_completed))
                 meta["consumer_spans"] = [r.to_dict() for r in report.results]
                 record.metadata_payload = meta
 

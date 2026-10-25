@@ -18,7 +18,7 @@ from sqlalchemy import Column, DateTime, Enum, Index, String, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.domain.conversations.models import Base
+from app.domain.base import Base
 
 
 class CustomerStatus(str, enum.Enum):

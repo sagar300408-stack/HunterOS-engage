@@ -18,7 +18,7 @@ from uuid import UUID
 
 from app.events.bus.interfaces import EventConsumer, ExecutionPolicy
 from app.events.model.base_event import UniversalBaseEvent
-from app.events.message_events import MessageStored, ReplySent
+from app.events.message_events import MessageStored, MessageReceived, ReplySent
 
 from app.integrations.postgres.database import get_session
 from app.domain.followup.service import schedule_followup
@@ -40,14 +40,14 @@ class FollowUpMessageStoredConsumer(EventConsumer):
     """Triggered when a customer message is received and saved."""
     
     def get_subscriptions(self) -> List[Type[UniversalBaseEvent]]:
-        return [MessageStored]
+        return [MessageReceived, MessageStored]
         
     def get_execution_policy(self) -> ExecutionPolicy:
         # Background task that shouldn't block the main webhook pipeline
         return ExecutionPolicy.BACKGROUND
 
     async def handle_event(self, event: UniversalBaseEvent) -> None:
-        if not isinstance(event, MessageStored):
+        if not isinstance(event, (MessageReceived, MessageStored)):
             return
             
         if not event.conversation_id:
@@ -61,15 +61,16 @@ class FollowUpMessageStoredConsumer(EventConsumer):
                     return
                 
                 customer_id = conv.customer_id
+                target_workspace_id = event.workspace_id or getattr(conv, "workspace_id", None) or DEFAULT_WORKSPACE_ID
                 
                 # 2. Update health score
-                await upsert_health_score(session, customer_id, DEFAULT_WORKSPACE_ID)
+                await upsert_health_score(session, customer_id, target_workspace_id)
                 
                 # 3. Re-evaluate follow-up needs
-                await schedule_followup(session, customer_id, event.conversation_id, DEFAULT_WORKSPACE_ID)
+                await schedule_followup(session, customer_id, event.conversation_id, target_workspace_id)
                 
                 # 4. Record customer replied milestone
-                await record_customer_replied(session, customer_id, DEFAULT_WORKSPACE_ID)
+                await record_customer_replied(session, customer_id, target_workspace_id)
                 
                 # Find any executing follow-ups and mark as replied
                 fu = await session.scalar(

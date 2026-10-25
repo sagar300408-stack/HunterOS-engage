@@ -42,7 +42,7 @@ import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, List, Optional, Sequence
+from typing import TYPE_CHECKING, List, Optional, Sequence, Set
 from uuid import UUID
 
 from app.events.bus.interfaces import EventConsumer, ExecutionPolicy
@@ -186,6 +186,7 @@ class ConsumerOrchestrator:
         event: UniversalBaseEvent,
         consumers: Sequence[EventConsumer],
         event_id: UUID,
+        completed_consumers: Optional[Set[str]] = None,
     ) -> ExecutionReport:
         """
         Flat execution path — no dependency graph.
@@ -196,9 +197,11 @@ class ConsumerOrchestrator:
         the inner stage execution logic used by run_plan().
 
         Args:
-            event:     Reconstructed domain event object.
-            consumers: All consumers registered for this event class.
-            event_id:  UUID of the EventRecord (for log correlation).
+            event:               Reconstructed domain event object.
+            consumers:           All consumers registered for this event class.
+            event_id:            UUID of the EventRecord (for log correlation).
+            completed_consumers: Set of consumer class names that already completed
+                                 in a prior attempt of this event and should be skipped.
 
         Returns:
             ExecutionReport with per-consumer results and aggregate status.
@@ -209,6 +212,7 @@ class ConsumerOrchestrator:
             consumers=list(consumers),
             event_id=event_id,
             stage_index=None,
+            completed_consumers=completed_consumers,
         )
         wall_end  = time.monotonic()
         return cls._build_report(event, event_id, all_results, wall_start, wall_end)
@@ -219,6 +223,7 @@ class ConsumerOrchestrator:
         event: UniversalBaseEvent,
         plan: "ExecutionPlan",
         event_id: UUID,
+        completed_consumers: Optional[Set[str]] = None,
     ) -> ExecutionReport:
         """
         Stage-aware execution path — uses an ExecutionPlan produced by PlanBuilder.
@@ -237,9 +242,11 @@ class ConsumerOrchestrator:
             fire-and-monitor side-effects in this context but proper dependents.
 
         Args:
-            event:    Reconstructed domain event object.
-            plan:     ExecutionPlan from PlanBuilder.build().
-            event_id: UUID of the EventRecord.
+            event:               Reconstructed domain event object.
+            plan:                ExecutionPlan from PlanBuilder.build().
+            event_id:            UUID of the EventRecord.
+            completed_consumers: Set of consumer class names that already completed
+                                 in a prior attempt of this event and should be skipped.
 
         Returns:
             ExecutionReport with per-consumer results and aggregate status.
@@ -278,6 +285,7 @@ class ConsumerOrchestrator:
                 consumers=stage_consumers,
                 event_id=event_id,
                 stage_index=stage.index,
+                completed_consumers=completed_consumers,
             )
             all_results.extend(stage_results)
 
@@ -312,6 +320,7 @@ class ConsumerOrchestrator:
         consumers: List[EventConsumer],
         event_id: UUID,
         stage_index: Optional[int],
+        completed_consumers: Optional[Set[str]] = None,
     ) -> tuple[List[ConsumerResult], bool]:
         """
         Execute a flat list of consumers through Phase 1/2/3 bucketing.
@@ -341,6 +350,27 @@ class ConsumerOrchestrator:
 
         # Phase 1 — ORDERED + CRITICAL (serial)
         for consumer in ordered:
+            name = consumer.__class__.__name__
+            if completed_consumers and name in completed_consumers:
+                logger.info(
+                    "consumer_skipped_already_completed",
+                    event_id=str(event_id),
+                    event_name=event.event_name,
+                    consumer=name,
+                    stage=stage_index,
+                )
+                stage_results.append(
+                    ConsumerResult(
+                        consumer_name=name,
+                        policy=consumer.get_execution_policy(),
+                        priority=consumer.get_priority(),
+                        status=ConsumerStatus.SUCCESS,
+                        duration_ms=0,
+                        stage_index=stage_index,
+                    )
+                )
+                continue
+
             result = await cls._run_one(event, consumer, event_id, stage_index)
             stage_results.append(result)
             if result.failed and consumer.get_execution_policy() == ExecutionPolicy.CRITICAL:
@@ -357,8 +387,34 @@ class ConsumerOrchestrator:
 
         # Phase 2 — PARALLEL (skipped if CRITICAL failed)
         if parallel and not critical_failed:
-            parallel_results = await cls._run_group(event, parallel, event_id, stage_index)
-            stage_results.extend(parallel_results)
+            to_run = []
+            for consumer in parallel:
+                name = consumer.__class__.__name__
+                if completed_consumers and name in completed_consumers:
+                    logger.info(
+                        "consumer_skipped_already_completed",
+                        event_id=str(event_id),
+                        event_name=event.event_name,
+                        consumer=name,
+                        stage=stage_index,
+                    )
+                    stage_results.append(
+                        ConsumerResult(
+                            consumer_name=name,
+                            policy=consumer.get_execution_policy(),
+                            priority=consumer.get_priority(),
+                            status=ConsumerStatus.SUCCESS,
+                            duration_ms=0,
+                            stage_index=stage_index,
+                        )
+                    )
+                else:
+                    to_run.append(consumer)
+
+            if to_run:
+                parallel_results = await cls._run_group(event, to_run, event_id, stage_index)
+                stage_results.extend(parallel_results)
+
         elif parallel and critical_failed:
             logger.warning(
                 "consumer_parallel_phase_skipped_due_to_critical_failure",
@@ -371,8 +427,33 @@ class ConsumerOrchestrator:
 
         # Phase 3 — BACKGROUND (always runs)
         if background:
-            bg_results = await cls._run_group(event, background, event_id, stage_index)
-            stage_results.extend(bg_results)
+            to_run = []
+            for consumer in background:
+                name = consumer.__class__.__name__
+                if completed_consumers and name in completed_consumers:
+                    logger.info(
+                        "consumer_skipped_already_completed",
+                        event_id=str(event_id),
+                        event_name=event.event_name,
+                        consumer=name,
+                        stage=stage_index,
+                    )
+                    stage_results.append(
+                        ConsumerResult(
+                            consumer_name=name,
+                            policy=consumer.get_execution_policy(),
+                            priority=consumer.get_priority(),
+                            status=ConsumerStatus.SUCCESS,
+                            duration_ms=0,
+                            stage_index=stage_index,
+                        )
+                    )
+                else:
+                    to_run.append(consumer)
+
+            if to_run:
+                bg_results = await cls._run_group(event, to_run, event_id, stage_index)
+                stage_results.extend(bg_results)
 
         return stage_results, critical_failed
 

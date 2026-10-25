@@ -153,7 +153,7 @@ async def process_with_ai(
     # ── Call OpenAI conversational response ───────────────────────────────────
     import os
     t0 = time.monotonic()
-    if os.environ.get("WHATSAPP_TEST_AUTO_REPLY", "").lower() == "true":
+    if os.environ.get("ENABLE_WHATSAPP_TEST_AUTO_REPLY", "").lower() == "true":
         logger.info(f"[WHATSAPP TEST] sending test response conversation_id={conversation_id}")
         ai_result = {
             "content": "Welcome to Originyx Business Automation Companies, India. THIS IS A TEST MESSAGE FROM originyx.in",

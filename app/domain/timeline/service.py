@@ -51,12 +51,23 @@ class TimelineProjection(BaseEventProjection):
         
         structured_data = strategy.extract_structured_data(event)
         
+        action_id = None
+        action_id_raw = structured_data.get("action_id") if isinstance(structured_data, dict) else None
+        if not action_id_raw and event.metadata:
+            action_id_raw = event.metadata.get("action_id")
+        if action_id_raw:
+            try:
+                action_id = UUID(str(action_id_raw))
+            except (ValueError, TypeError):
+                action_id = None
+
         entry = TimelineEntry(
             event_id=event.event_id,
             workspace_id=event.workspace_id,
             customer_id=event.customer_id,
             conversation_id=event.conversation_id,
             lead_id=event.lead_id,
+            action_id=action_id,
             occurred_at=event.occurred_at,
             activity_type=strategy.activity_type,
             severity=strategy.default_severity,

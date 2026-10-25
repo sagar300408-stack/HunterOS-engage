@@ -143,10 +143,10 @@ async def _execute_followup(followup_id):
             conversation_id=str(conversation_id),
             workspace_id=fu.workspace_id,
             customer_id=fu.customer_id,
-            message_id=outgoing_msg.id,
             actor_type=ActorType.SYSTEM,
             correlation_id=fu.id,
             causation_id=fu.id,
+            metadata={"message_id": str(outgoing_msg.id)},
         )
         
         local_bus = EventBus(EventStoreService(EventStoreRepository()))

@@ -100,7 +100,25 @@ async def schedule_followup(
     policy = get_workspace_policy(workspace_id)
     max_attempts = policy.effective_max_attempts(latest_intent.buying_stage if latest_intent else None)
 
-    # 2. Evaluate
+    # 2. Check Opt-Out & Evaluate
+    last_in_msg = await session.scalar(
+        select(Message.content).join(Conversation).where(
+            Conversation.customer_id == customer_id, Message.direction == "incoming"
+        ).order_by(Message.timestamp.desc()).limit(1)
+    )
+    is_opted_out = False
+    if last_in_msg:
+        cleaned_msg = last_in_msg.strip().upper()
+        if cleaned_msg in {"STOP", "UNSUBSCRIBE", "OPT OUT", "OPTOUT", "QUIT", "CANCEL"}:
+            is_opted_out = True
+
+    from app.domain.customers.models import Customer, CustomerStatus
+    customer_record = await session.get(Customer, customer_id)
+    if customer_record and customer_record.status == CustomerStatus.inactive:
+        is_opted_out = True
+    elif is_opted_out and customer_record:
+        customer_record.status = CustomerStatus.inactive
+
     decision = evaluate(
         customer_id=customer_id,
         conversation_id=conversation_id,
@@ -119,18 +137,25 @@ async def schedule_followup(
         budget_mentioned=False,
         budget_paused=False,
         max_attempts=max_attempts,
+        is_opted_out=is_opted_out,
     )
 
-    if not decision.should_follow_up:
-        return None
-
-    # Cancel any existing scheduled follow-ups
+    # Cancel any existing scheduled follow-ups (DEF-10 Fix: must run before returning None)
     existing = await session.execute(
         select(FollowUpQueue).where(FollowUpQueue.customer_id == customer_id, FollowUpQueue.status == "scheduled")
     )
+    cancellation_reason = (
+        "Customer opted out" if is_opted_out else (
+            f"Follow-up criteria not met: {decision.reason}" if not decision.should_follow_up
+            else "Superseded by new evaluation"
+        )
+    )
     for ext in existing.scalars().all():
         ext.status = transition(ext.status, "cancelled")
-        ext.cancellation_reason = "Superseded by new evaluation"
+        ext.cancellation_reason = cancellation_reason
+
+    if not decision.should_follow_up:
+        return None
 
     # 3. Strategy
     strategy_dec = select_strategy(

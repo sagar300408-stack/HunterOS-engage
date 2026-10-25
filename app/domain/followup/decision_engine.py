@@ -21,6 +21,7 @@ def evaluate(
     budget_mentioned: bool,
     budget_paused: bool,
     max_attempts: int,
+    is_opted_out: bool = False,
 ) -> FollowUpDecision:
     """
     Evaluates whether a lead needs a follow-up.
@@ -33,7 +34,21 @@ def evaluate(
         "buying_stage": buying_stage,
         "followup_attempts": followup_attempt_count,
         "max_attempts": max_attempts,
+        "is_opted_out": is_opted_out,
     }
+
+    if is_opted_out:
+        logger.info(f"[TRACE] Decision Engine returned: abort, reason: Customer opted out")
+        return FollowUpDecision(
+            should_follow_up=False,
+            reason="Customer opted out",
+            explainability=FollowUpExplainability(
+                policy_applied="Opt-Out Policy",
+                decision_reason="Customer sent STOP/UNSUBSCRIBE or opted out",
+                factors_considered=factors,
+                confidence=100
+            )
+        )
 
     if has_confirmed_meeting and next_meeting_at and next_meeting_at > now:
         # Don't follow up if they have an upcoming meeting, unless it's a reminder
