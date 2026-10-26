@@ -150,14 +150,54 @@ async def process_with_ai(
     # Order: memory blocks → intent block → conversation history
     full_history = memory_context + intent_context + history[:-1]
 
-    # ── Call OpenAI conversational response ───────────────────────────────────
+    # ── Controlled Test-Only Auto-Reply Check ─────────────────────────────────
     import os
+    from app.utils.helpers import normalize_phone
+
+    test_mode_enabled = (
+        os.environ.get("ENABLE_WHATSAPP_TEST_AUTO_REPLY", "").lower() == "true"
+        or os.environ.get("WHATSAPP_TEST_AUTO_REPLY", "").lower() == "true"
+    )
+    authorized_recipient = normalize_phone(os.environ.get("WHATSAPP_TEST_RECIPIENT_PHONE", "919108976764"))
+    sender_phone = normalize_phone(customer.phone) if customer and customer.phone else ""
+    is_authorized_recipient = bool(sender_phone and sender_phone == authorized_recipient)
+    is_hi_message = bool(user_content and user_content.strip().lower() == "hi")
+
+    # Verify event has not already been processed for this test
+    is_test_already_processed = False
+    if test_mode_enabled and is_authorized_recipient and is_hi_message:
+        from sqlalchemy import select
+        from app.events.store.models import EventRecord
+        
+        existing_event_stmt = select(EventRecord.event_id).where(
+            EventRecord.causation_id == message_id,
+            EventRecord.event_name.in_(["MessageReadyToSendEvent", "ReplySent", "AIResponded"]),
+        ).limit(1)
+        res = await session.execute(existing_event_stmt)
+        if res.scalar_one_or_none() is not None:
+            is_test_already_processed = True
+            logger.info(
+                "whatsapp_test_reply_already_processed",
+                message_id=str(message_id),
+                conversation_id=str(conversation_id),
+            )
+
+    is_test_reply_triggered = (
+        test_mode_enabled
+        and is_authorized_recipient
+        and is_hi_message
+        and not is_test_already_processed
+    )
+
     t0 = time.monotonic()
-    if os.environ.get("ENABLE_WHATSAPP_TEST_AUTO_REPLY", "").lower() == "true":
-        logger.info(f"[WHATSAPP TEST] sending test response conversation_id={conversation_id}")
+    if is_test_reply_triggered:
+        test_response_text = "TEST SUCCESSFULL, THIS WAS A TEST MESSAGE FROM HUNTEROS ENGAGE"
+        logger.info(
+            f"[WHATSAPP TEST] triggered controlled test response conversation_id={conversation_id} recipient={sender_phone}"
+        )
         ai_result = {
-            "content": "Welcome to Originyx Business Automation Companies, India. THIS IS A TEST MESSAGE FROM originyx.in",
-            "model": "test-mock-model",
+            "content": test_response_text,
+            "model": "test-controlled-response",
             "total_tokens": 0,
             "prompt_tokens": 0,
             "completion_tokens": 0,

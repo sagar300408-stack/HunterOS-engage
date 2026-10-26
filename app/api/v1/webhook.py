@@ -16,7 +16,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.integrations.meta.webhook import verify_hub_challenge
+from app.integrations.meta.webhook import verify_hub_challenge, verify_webhook_signature
+import json
 from app.integrations.postgres.database import get_db
 from app.utils.logger import get_logger
 from app.utils.context import is_demo_context
@@ -62,7 +63,18 @@ async def receive_webhook(
     It publishes a RawWebhookEvent and returns 200 immediately.
     """
     try:
-        payload = await request.json()
+        raw_body = await request.body()
+        signature_header = request.headers.get("X-Hub-Signature-256") or request.headers.get("x-hub-signature-256")
+        if signature_header:
+            if not verify_webhook_signature(signature_header, raw_body):
+                logger.warning(
+                    "webhook_signature_verification_failed",
+                    received_prefix=signature_header[:16] if signature_header else None,
+                )
+                return Response(status_code=403, content="Invalid webhook signature")
+            logger.info("[WHATSAPP INBOUND] signature verified successfully")
+
+        payload = json.loads(raw_body) if raw_body else {}
         if payload.get("is_demo"):
             is_demo_context.set(True)
 

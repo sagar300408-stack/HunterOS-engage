@@ -57,11 +57,12 @@ def verify_webhook_signature(
     """
     Validate the X-Hub-Signature-256 header from Meta.
 
-    Uses HMAC-SHA256 with the WhatsApp access token as the secret.
+    Uses HMAC-SHA256 with configured secret (WHATSAPP_APP_SECRET or WhatsApp access token).
     Always use hmac.compare_digest to prevent timing attacks.
 
     Returns True if the signature is valid, False otherwise.
     """
+    import os
     settings = get_settings()
 
     if not signature_header or not signature_header.startswith("sha256="):
@@ -73,18 +74,25 @@ def verify_webhook_signature(
 
     received_sig = signature_header[7:]  # strip "sha256=" prefix
 
-    expected_sig = hmac.new(
-        settings.whatsapp_access_token.encode("utf-8"),
-        raw_body,
-        hashlib.sha256,
-    ).hexdigest()
+    secrets_to_try = []
+    app_secret = os.environ.get("WHATSAPP_APP_SECRET") or os.environ.get("META_APP_SECRET")
+    if app_secret:
+        secrets_to_try.append(app_secret)
+    if settings.whatsapp_access_token:
+        secrets_to_try.append(settings.whatsapp_access_token)
 
-    is_valid = hmac.compare_digest(received_sig, expected_sig)
+    for secret in secrets_to_try:
+        expected_sig = hmac.new(
+            secret.encode("utf-8"),
+            raw_body,
+            hashlib.sha256,
+        ).hexdigest()
 
-    if not is_valid:
-        logger.warning(
-            "webhook_signature_invalid",
-            received_prefix=received_sig[:8],
-        )
+        if hmac.compare_digest(received_sig, expected_sig):
+            return True
 
-    return is_valid
+    logger.warning(
+        "webhook_signature_invalid",
+        received_prefix=received_sig[:8],
+    )
+    return False
