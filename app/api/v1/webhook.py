@@ -12,12 +12,12 @@ Why 200 always on POST?
 """
 
 from typing import Annotated
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.meta.webhook import verify_hub_challenge, verify_webhook_signature
-import json
 from app.integrations.postgres.database import get_db
 from app.utils.logger import get_logger
 from app.utils.context import is_demo_context
@@ -55,25 +55,22 @@ async def receive_webhook(
     request: Request,
     session: AsyncSession = Depends(get_db),
 ) -> dict:
-    print("🔥 POST webhook reached")
     """
     POST /api/v1/webhook — receive incoming WhatsApp messages.
     
     Phase 7 Architecture: This is a pure controller. 
     It publishes a RawWebhookEvent and returns 200 immediately.
     """
-    try:
-        raw_body = await request.body()
-        signature_header = request.headers.get("X-Hub-Signature-256") or request.headers.get("x-hub-signature-256")
-        if signature_header:
-            if not verify_webhook_signature(signature_header, raw_body):
-                logger.warning(
-                    "webhook_signature_verification_failed",
-                    received_prefix=signature_header[:16] if signature_header else None,
-                )
-                return Response(status_code=403, content="Invalid webhook signature")
-            logger.info("[WHATSAPP INBOUND] signature verified successfully")
+    raw_body = await request.body()
+    signature_header = request.headers.get("X-Hub-Signature-256") or request.headers.get("x-hub-signature-256")
 
+    if not verify_webhook_signature(signature_header, raw_body):
+        logger.warning("webhook_signature_verification_failed")
+        return Response(status_code=403, content="Invalid webhook signature")
+
+    logger.info("[WHATSAPP INBOUND] signature verified successfully")
+
+    try:
         payload = json.loads(raw_body) if raw_body else {}
         if payload.get("is_demo"):
             is_demo_context.set(True)

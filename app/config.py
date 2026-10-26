@@ -6,8 +6,9 @@ Never hardcode credentials. Use .env for local development.
 """
 
 from functools import lru_cache
+from typing import Any
 
-from pydantic import Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,18 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str = Field(..., alias="WHATSAPP_PHONE_NUMBER_ID")
     whatsapp_verify_token: str = Field(..., alias="WHATSAPP_VERIFY_TOKEN")
     whatsapp_api_version: str = Field(default="v20.0", alias="WHATSAPP_API_VERSION")
+    whatsapp_app_secret: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("WHATSAPP_APP_SECRET", "META_APP_SECRET"),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_app_secret_fallback(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("WHATSAPP_APP_SECRET") and data.get("META_APP_SECRET"):
+                data["WHATSAPP_APP_SECRET"] = data["META_APP_SECRET"]
+        return data
 
     # ── Database ──────────────────────────────────────────────────────────────
     database_url: str = Field(..., alias="DATABASE_URL")
