@@ -41,7 +41,7 @@ async def test_controlled_test_reply_triggers_only_on_hi_and_authorized():
                                             user_content="  Hi  ",
                                             session=mock_session,
                                         )
-                                        assert res["content"] == "TEST SUCCESSFULL, THIS WAS A TEST MESSAGE FROM HUNTEROS ENGAGE"
+                                        assert res["content"] == "THIS IS A TEST MESSAGE FROM HUNTEROS ENGAGE, BACKEND VERIFIED"
                                         mock_get_ai.assert_not_called()
 
     # 2. Non-matching text: "hello" from 919108976764

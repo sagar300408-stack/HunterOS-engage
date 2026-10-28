@@ -191,7 +191,7 @@ async def process_with_ai(
 
     t0 = time.monotonic()
     if is_test_reply_triggered:
-        test_response_text = "TEST SUCCESSFULL, THIS WAS A TEST MESSAGE FROM HUNTEROS ENGAGE"
+        test_response_text = "THIS IS A TEST MESSAGE FROM HUNTEROS ENGAGE, BACKEND VERIFIED"
         logger.info(
             f"[WHATSAPP TEST] triggered controlled test response conversation_id={conversation_id} recipient={sender_phone}"
         )

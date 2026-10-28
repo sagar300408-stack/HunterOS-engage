@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import warnings
 from celery import Celery
 from kombu import Queue
 
@@ -34,7 +36,7 @@ celery_app.conf.update(
     )
 )
 
-from celery.signals import worker_process_init
+from celery.signals import worker_process_init, worker_process_shutdown
 
 @worker_process_init.connect
 def init_worker(**kwargs):
@@ -54,6 +56,15 @@ def init_worker(**kwargs):
             registry.register(event_class, consumer)
 
     logger.info("Declarative ConsumerRegistry successfully initialized.")
+
+
+@worker_process_shutdown.connect
+def shutdown_worker(**kwargs):
+    """
+    Cleanup async database engine connection pool on worker process shutdown.
+    """
+    from app.integrations.postgres.database import reset_engine
+    reset_engine()
 
 
 # Register all Celery tasks
@@ -89,15 +100,38 @@ def generate_weekly_roi_report(workspace_id: str):
     return {"status": "success", "workspace_id": workspace_id}
 
 
-@celery_app.task
+def get_worker_event_loop() -> asyncio.AbstractEventLoop:
+    """
+    Get or create a persistent event loop for the current Celery worker process.
+
+    Reusing a long-lived event loop ensures that pooled asyncpg connections
+    associated with the shared SQLAlchemy AsyncEngine remain bound to a single,
+    open event loop across sequential task executions.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                from app.integrations.postgres.database import reset_engine
+                reset_engine()
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    return loop
+
+
+@celery_app.task(name="app.celery_app.process_due_followups_task")
 def process_due_followups_task():
     """
     Periodic task triggered by Celery Beat to execute due follow-up messages.
     """
-    import asyncio
-    from app.worker.followup_worker import process_due_followups
-    loop = asyncio.new_event_loop()
     try:
+        from app.worker.followup_worker import process_due_followups
+        loop = get_worker_event_loop()
         return loop.run_until_complete(process_due_followups())
-    finally:
-        loop.close()
+    except Exception as exc:
+        logger.error(f"process_due_followups_task_error: {exc}", exc_info=True)
+        raise

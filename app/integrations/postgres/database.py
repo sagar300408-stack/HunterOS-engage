@@ -179,8 +179,24 @@ async def create_tables() -> None:
 
 async def dispose_engine() -> None:
     """Dispose of the engine connection pool on application shutdown."""
-    global _engine
+    global _engine, _session_factory
     if _engine:
         await _engine.dispose()
         logger.info("database_engine_disposed")
         _engine = None
+        _session_factory = None
+
+
+def reset_engine() -> None:
+    """
+    Synchronously dispose of the engine connection pool and reset singletons.
+    Safe for use across Celery worker process boundaries and event-loop transitions.
+    """
+    global _engine, _session_factory
+    if _engine is not None:
+        try:
+            _engine.sync_engine.dispose()
+        except Exception as e:
+            logger.warning("database_engine_dispose_error", error=str(e))
+        _engine = None
+    _session_factory = None

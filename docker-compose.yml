@@ -3,6 +3,7 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -19,6 +20,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - '6379:6379'
     healthcheck:
@@ -29,6 +31,7 @@ services:
 
   api:
     build: .
+    restart: unless-stopped
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports:
       - '8000:8000'
@@ -49,6 +52,7 @@ services:
 
   worker:
     build: .
+    restart: unless-stopped
     command: python -m celery -A app.celery_app worker -Q event_dispatch,celery --loglevel=info
     env_file:
       - .env
@@ -67,7 +71,8 @@ services:
 
   scheduler:
     build: .
-    command: python -m celery -A app.celery_app beat --loglevel=info
+    restart: unless-stopped
+    command: python -m celery -A app.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/hunteros
       - REDIS_URL=redis://redis:6379/0
@@ -83,6 +88,7 @@ services:
 
   dispatcher:
     build: .
+    restart: unless-stopped
     command: python -m app.events.dispatcher.main
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/hunteros
