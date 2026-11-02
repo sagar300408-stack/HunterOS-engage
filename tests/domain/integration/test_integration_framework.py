@@ -53,8 +53,9 @@ async def test_integration_engine_connect_valid():
         assert connection.status == ConnectionStatus.CONNECTED.value
         assert connection.error_message is None
         
-        # Verify provider set correctly
-        assert connection.credentials_json == credentials
+        # Verify credentials stored encrypted and retrieved via provider
+        assert connection.credentials_json.get("__encrypted__") is True
+        assert engine.cred_provider.retrieve_credentials(connection) == credentials
         
         # Verify event was published
         mock_event_bus.publish.assert_called_once()

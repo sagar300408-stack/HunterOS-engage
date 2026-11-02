@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     google_client_secret: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
     microsoft_client_id: str | None = Field(default=None, alias="MICROSOFT_CLIENT_ID")
     microsoft_client_secret: str | None = Field(default=None, alias="MICROSOFT_CLIENT_SECRET")
+    oauth_encryption_key: str | None = Field(default=None, alias="OAUTH_ENCRYPTION_KEY")
+    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     # Default workspace UUID for single-tenant bootstrapping.
     # Existing rows without workspace_id are treated as belonging to this workspace.
     default_workspace_id: str = Field(

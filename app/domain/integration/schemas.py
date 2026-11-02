@@ -51,3 +51,8 @@ class ConnectRequest(BaseModel):
     name: str
     credentials: Dict[str, Any]
     settings: Dict[str, Any] = {}
+
+
+class UpdateIntegrationRequest(BaseModel):
+    name: Optional[str] = None
+    settings: Optional[Dict[str, Any]] = None

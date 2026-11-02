@@ -2,7 +2,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 
 from app.domain.integration.models import IntegrationConnection
 
@@ -11,8 +11,10 @@ class IntegrationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_connection(self, connection_id: UUID) -> Optional[IntegrationConnection]:
+    async def get_connection(self, connection_id: UUID, workspace_id: Optional[UUID] = None) -> Optional[IntegrationConnection]:
         stmt = select(IntegrationConnection).where(IntegrationConnection.id == connection_id)
+        if workspace_id is not None:
+            stmt = stmt.where(IntegrationConnection.workspace_id == workspace_id)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -41,9 +43,20 @@ class IntegrationRepository:
         await self.session.refresh(connection)
         return connection
         
-    async def update_connection_status(self, connection_id: UUID, status: str, error_message: Optional[str] = None) -> None:
-        stmt = update(IntegrationConnection).where(
-            IntegrationConnection.id == connection_id
-        ).values(status=status, error_message=error_message)
+    async def update_connection_status(
+        self, connection_id: UUID, status: str, error_message: Optional[str] = None, workspace_id: Optional[UUID] = None
+    ) -> None:
+        stmt = update(IntegrationConnection).where(IntegrationConnection.id == connection_id)
+        if workspace_id is not None:
+            stmt = stmt.where(IntegrationConnection.workspace_id == workspace_id)
+        stmt = stmt.values(status=status, error_message=error_message)
         await self.session.execute(stmt)
         await self.session.commit()
+
+    async def delete_connection(self, connection_id: UUID, workspace_id: Optional[UUID] = None) -> bool:
+        stmt = delete(IntegrationConnection).where(IntegrationConnection.id == connection_id)
+        if workspace_id is not None:
+            stmt = stmt.where(IntegrationConnection.workspace_id == workspace_id)
+        result = await self.session.execute(stmt)
+        await self.session.commit()
+        return result.rowcount > 0
