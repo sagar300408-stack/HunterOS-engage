@@ -735,7 +735,14 @@ async def oauth_callback(
         )
 
     settings = get_settings()
-    redirect_uri = str(request.url_for("oauth_callback")) if request else "http://testserver/callback"
+    redirect_uri = (
+        settings.google_redirect_uri
+        if connection.provider == "google"
+        else settings.microsoft_redirect_uri
+    )
+
+    if not redirect_uri:
+        redirect_uri = str(request.url_for("oauth_callback")) if request else "http://testserver/callback"
 
     token_url = ""
     data = {

@@ -787,3 +787,89 @@ class TestEmailRouterEndpoints:
             assert mock_conn.settings["display_name"] == "Executive Officer"
             assert mock_conn.settings["provider_account_id"] == "google_sub_999"
             assert mock_conn.credentials_json.get("__encrypted__") is True
+
+    async def test_oauth_callback_uses_configured_redirect_uri(
+        self, state_mgr, workspace_a
+    ):
+        """Verifies callback uses GOOGLE_REDIRECT_URI / MICROSOFT_REDIRECT_URI over request.url_for."""
+        # 1. Google test with configured HTTPS redirect URI behind HTTP proxy
+        g_id = uuid4()
+        g_state = await state_mgr.create_state(workspace_id=workspace_a, integration_id=g_id, provider="google")
+        g_conn = IntegrationConnection(id=g_id, workspace_id=workspace_a, provider="google", settings={})
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = g_conn
+        db = AsyncMock()
+        db.execute.return_value = mock_result
+
+        # Request behind reverse proxy generated HTTP URL
+        http_request = AsyncMock(spec=Request)
+        http_request.url_for.return_value = "http://webhook.originyx.in/api/v1/integrations/oauth/callback"
+
+        configured_https_redirect = "https://webhook.originyx.in/api/v1/integrations/oauth/callback"
+
+        mock_post_resp = MagicMock(status_code=200)
+        mock_post_resp.json.return_value = {
+            "access_token": "g_tok",
+            "refresh_token": "g_ref",
+            "scope": f"{GOOGLE_CALENDAR_SCOPE} {GOOGLE_GMAIL_READONLY_SCOPE} {GOOGLE_GMAIL_SEND_SCOPE}",
+        }
+
+        with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
+             patch("app.domain.integration.router.get_settings") as mock_settings, \
+             patch.object(GoogleGmailOAuthProvider, "get_account_identity", return_value={"email": "u@g.com"}):
+            mock_settings.return_value.google_client_id = "g_cid"
+            mock_settings.return_value.google_client_secret = "g_sec"
+            mock_settings.return_value.google_redirect_uri = configured_https_redirect
+            mock_settings.return_value.microsoft_redirect_uri = None
+            mock_settings.return_value.microsoft_tenant_id = "common"
+            mock_post.return_value = mock_post_resp
+
+            await oauth_callback(
+                request=http_request,
+                state=g_state,
+                code="g_code",
+                db=db,
+                state_manager=state_mgr,
+            )
+
+            # Assert the token exchange POST request used the configured HTTPS redirect URI
+            mock_post.assert_called_once()
+            call_kwargs = mock_post.call_args.kwargs
+            assert call_kwargs["data"]["redirect_uri"] == configured_https_redirect
+
+        # 2. Microsoft test with configured redirect URI
+        ms_id = uuid4()
+        ms_state = await state_mgr.create_state(workspace_id=workspace_a, integration_id=ms_id, provider="microsoft")
+        ms_conn = IntegrationConnection(id=ms_id, workspace_id=workspace_a, provider="microsoft", settings={})
+        mock_result.scalar_one_or_none.return_value = ms_conn
+
+        ms_redirect = "https://webhook.originyx.in/api/v1/integrations/oauth/callback"
+        ms_post_resp = MagicMock(status_code=200)
+        ms_post_resp.json.return_value = {
+            "access_token": "ms_tok",
+            "refresh_token": "ms_ref",
+            "scope": f"{MICROSOFT_CALENDAR_SCOPE} {MICROSOFT_MAIL_READ_SCOPE} {MICROSOFT_MAIL_SEND_SCOPE}",
+        }
+
+        with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
+             patch("app.domain.integration.router.get_settings") as mock_settings, \
+             patch.object(MicrosoftGraphOAuthProvider, "get_account_identity", return_value={"email": "u@ms.com"}):
+            mock_settings.return_value.microsoft_client_id = "ms_cid"
+            mock_settings.return_value.microsoft_client_secret = "ms_sec"
+            mock_settings.return_value.microsoft_redirect_uri = ms_redirect
+            mock_settings.return_value.google_redirect_uri = None
+            mock_settings.return_value.microsoft_tenant_id = "common"
+            mock_post.return_value = ms_post_resp
+
+            await oauth_callback(
+                request=http_request,
+                state=ms_state,
+                code="ms_code",
+                db=db,
+                state_manager=state_mgr,
+            )
+
+            mock_post.assert_called_once()
+            call_kwargs = mock_post.call_args.kwargs
+            assert call_kwargs["data"]["redirect_uri"] == ms_redirect
