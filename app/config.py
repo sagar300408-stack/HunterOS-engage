@@ -76,8 +76,11 @@ class Settings(BaseSettings):
     # ── External Integrations (OAuth) ──────────────────────────────────────────
     google_client_id: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
     google_client_secret: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
+    google_redirect_uri: str | None = Field(default=None, alias="GOOGLE_REDIRECT_URI")
     microsoft_client_id: str | None = Field(default=None, alias="MICROSOFT_CLIENT_ID")
     microsoft_client_secret: str | None = Field(default=None, alias="MICROSOFT_CLIENT_SECRET")
+    microsoft_tenant_id: str = Field(default="common", alias="MICROSOFT_TENANT_ID")
+    microsoft_redirect_uri: str | None = Field(default=None, alias="MICROSOFT_REDIRECT_URI")
     oauth_encryption_key: str | None = Field(default=None, alias="OAUTH_ENCRYPTION_KEY")
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     # Default workspace UUID for single-tenant bootstrapping.

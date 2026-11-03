@@ -56,3 +56,28 @@ class ConnectRequest(BaseModel):
 class UpdateIntegrationRequest(BaseModel):
     name: Optional[str] = None
     settings: Optional[Dict[str, Any]] = None
+
+
+class EmailIntegrationStatusResponse(BaseModel):
+    id: UUID
+    workspace_id: UUID
+    provider: str
+    connector_id: str
+    name: str
+    status: str
+    email: Optional[str] = None
+    display_name: Optional[str] = None
+    last_sync_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EmailAuthorizeResponse(BaseModel):
+    authorize_url: str
+    connection_id: UUID
+    provider: str
+    state: str

@@ -27,6 +27,8 @@ from app.domain.integration.oauth_state import (
 )
 from app.domain.integration.schemas import (
     ConnectRequest,
+    EmailAuthorizeResponse,
+    EmailIntegrationStatusResponse,
     IntegrationConnectionResponse,
     UpdateIntegrationRequest,
 )
@@ -100,6 +102,148 @@ async def list_integrations(
     )
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+# ── Email Integration Endpoints (E1) ──────────────────────────────────────────
+
+@router.get("/email/status", response_model=List[EmailIntegrationStatusResponse])
+async def list_email_integrations_status(
+    user: User = Depends(RequirePermissions("view_all")),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns the status of all email integrations connected to the authenticated workspace.
+    Explicitly filters by workspace_id and ensures NO credentials or tokens are exposed.
+    """
+    stmt = (
+        select(IntegrationConnection)
+        .where(
+            IntegrationConnection.workspace_id == user.workspace_id,
+            (IntegrationConnection.connector_type == "email")
+            | (IntegrationConnection.provider.in_(["google", "microsoft"])),
+        )
+        .order_by(IntegrationConnection.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    connections = result.scalars().all()
+
+    responses = []
+    for conn in connections:
+        settings = conn.settings or {}
+        responses.append(
+            EmailIntegrationStatusResponse(
+                id=conn.id,
+                workspace_id=conn.workspace_id,
+                provider=conn.provider,
+                connector_id=conn.connector_id,
+                name=conn.name,
+                status=conn.status,
+                email=settings.get("email"),
+                display_name=settings.get("display_name"),
+                last_sync_at=conn.last_sync_at,
+                error_message=conn.error_message,
+                created_at=conn.created_at,
+                updated_at=conn.updated_at,
+            )
+        )
+    return responses
+
+
+@router.get("/email/{provider}/authorize", response_model=EmailAuthorizeResponse)
+async def email_authorize(
+    provider: str,
+    request: Request,
+    user: User = Depends(RequirePermissions("edit_all")),
+    db: AsyncSession = Depends(get_db),
+    state_manager: OAuthStateManager = Depends(get_oauth_state_manager),
+):
+    """
+    Initiates email provider OAuth authorization for the authenticated workspace.
+    Supports 'google' and 'microsoft'.
+    Creates a pending integration connection if one does not already exist,
+    generates a secure state in Redis, and returns the provider's authorization URL.
+    """
+    provider_norm = provider.lower().strip()
+    if provider_norm not in ["google", "microsoft"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported email provider: '{provider}'. Supported: google, microsoft.",
+        )
+
+    connector_id = "google_gmail_v1" if provider_norm == "google" else "outlook_mail_v1"
+    default_name = "Google Gmail" if provider_norm == "google" else "Microsoft Outlook"
+
+    # Check for existing pending connection or create new pending connection
+    stmt = select(IntegrationConnection).where(
+        IntegrationConnection.workspace_id == user.workspace_id,
+        IntegrationConnection.connector_id == connector_id,
+        IntegrationConnection.status == ConnectionStatus.PENDING.value,
+    )
+    result = await db.execute(stmt)
+    connection = result.scalar_one_or_none()
+
+    if not connection:
+        connection = IntegrationConnection(
+            id=uuid.uuid4(),
+            workspace_id=user.workspace_id,
+            connector_id=connector_id,
+            connector_type="email",
+            provider=provider_norm,
+            name=default_name,
+            status=ConnectionStatus.PENDING.value,
+            credentials_json={},
+            settings={},
+        )
+        db.add(connection)
+        await db.commit()
+        try:
+            await db.refresh(connection)
+        except Exception:
+            pass
+
+    # Generate state in Redis
+    try:
+        state_token = await state_manager.create_state(
+            workspace_id=user.workspace_id,
+            integration_id=connection.id,
+            provider=provider_norm,
+            user_id=user.id,
+            ttl_seconds=600,
+        )
+    except OAuthStateStorageError as e:
+        logger.error(f"Failed to persist email OAuth state in Redis: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"OAuth state storage unavailable: {e}",
+        )
+
+    settings = get_settings()
+    redirect_uri = settings.google_redirect_uri if provider_norm == "google" else settings.microsoft_redirect_uri
+    if not redirect_uri:
+        redirect_uri = str(request.url_for("oauth_callback")) if request else "http://testserver/callback"
+
+    from app.domain.integration.email_auth.provider import get_email_oauth_provider
+    oauth_provider = get_email_oauth_provider(provider_norm, tenant_id=settings.microsoft_tenant_id)
+
+    client_id = settings.google_client_id if provider_norm == "google" else settings.microsoft_client_id
+    if not client_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Client ID for {provider_norm} is not configured.",
+        )
+
+    auth_url = oauth_provider.get_authorization_url(
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        state_token=state_token,
+    )
+
+    return EmailAuthorizeResponse(
+        authorize_url=auth_url,
+        connection_id=connection.id,
+        provider=provider_norm,
+        state=state_token,
+    )
 
 
 @router.get("/{integration_id}", response_model=IntegrationConnectionResponse)
@@ -220,6 +364,137 @@ async def delete_integration(
     connection.status = ConnectionStatus.DISCONNECTED.value
     await db.commit()
     return {"status": "success", "message": "Integration disconnected successfully"}
+
+
+@router.post("/{integration_id}/disconnect")
+async def disconnect_integration(
+    integration_id: uuid.UUID,
+    user: User = Depends(RequirePermissions("edit_all")),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Disconnects an integration within the user's workspace.
+    Wipes stored encrypted credentials and sets status to DISCONNECTED.
+    """
+    stmt = select(IntegrationConnection).where(
+        IntegrationConnection.id == integration_id,
+        IntegrationConnection.workspace_id == user.workspace_id,
+    )
+    result = await db.execute(stmt)
+    connection = result.scalar_one_or_none()
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Integration connection not found",
+        )
+
+    cred_provider = EncryptedCredentialProvider()
+    cred_provider.clear_credentials(connection)
+    connection.status = ConnectionStatus.DISCONNECTED.value
+    await db.commit()
+    return {"status": "success", "message": "Integration disconnected successfully"}
+
+
+@router.post("/{integration_id}/health-check")
+async def check_integration_health(
+    integration_id: uuid.UUID,
+    user: User = Depends(RequirePermissions("view_all")),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Validates connection health against upstream provider.
+    Scoped strictly to authenticated user's workspace.
+    Attempts automatic token refresh if token expired.
+    """
+    stmt = select(IntegrationConnection).where(
+        IntegrationConnection.id == integration_id,
+        IntegrationConnection.workspace_id == user.workspace_id,
+    )
+    result = await db.execute(stmt)
+    connection = result.scalar_one_or_none()
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Integration connection not found",
+        )
+
+    cred_provider = EncryptedCredentialProvider()
+    creds = cred_provider.retrieve_credentials(connection)
+
+    from app.domain.integration.connectors.registry import connector_registry
+    connector = connector_registry.get_connector(connection.connector_id)
+    if not connector:
+        connector = connector_registry.get_connector_for_provider(connection.provider)
+
+    if not connector:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No connector registered for {connection.connector_id or connection.provider}",
+        )
+
+    status_val, err_msg = await connector.health_check(creds, connection.settings or {})
+    connection.status = status_val
+    connection.error_message = err_msg
+    await db.commit()
+
+    return {
+        "integration_id": str(connection.id),
+        "status": status_val,
+        "healthy": status_val == ConnectionStatus.CONNECTED.value,
+        "error": err_msg,
+    }
+
+
+@router.post("/{integration_id}/refresh")
+async def refresh_integration_token(
+    integration_id: uuid.UUID,
+    user: User = Depends(RequirePermissions("edit_all")),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Forces a manual refresh of the OAuth access token.
+    Uses distributed Redis locking and updates connection status.
+    """
+    stmt = select(IntegrationConnection).where(
+        IntegrationConnection.id == integration_id,
+        IntegrationConnection.workspace_id == user.workspace_id,
+    )
+    result = await db.execute(stmt)
+    connection = result.scalar_one_or_none()
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Integration connection not found",
+        )
+
+    from app.domain.integration.email_auth.manager import EmailTokenManager
+    from app.domain.integration.email_auth.provider import EmailOAuthError, OAuthReauthRequiredError
+
+    cred_provider = EncryptedCredentialProvider()
+    token_mgr = EmailTokenManager(db=db, cred_provider=cred_provider)
+
+    try:
+        updated_creds = await token_mgr.refresh_token(connection)
+        return {
+            "integration_id": str(connection.id),
+            "status": "success",
+            "connection_status": connection.status,
+            "message": "Token refreshed successfully",
+        }
+    except OAuthReauthRequiredError as e:
+        logger.warning(f"Re-authorization required for connection {connection.id}: {e}")
+        return {
+            "integration_id": str(connection.id),
+            "status": "reauth_required",
+            "connection_status": ConnectionStatus.REAUTH_REQUIRED.value,
+            "message": str(e),
+        }
+    except EmailOAuthError as e:
+        logger.error(f"Failed to refresh token for connection {connection.id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Token refresh failed: {e}",
+        )
 
 
 @router.post("/{integration_id}/webhook")
@@ -520,9 +795,31 @@ async def oauth_callback(
     cred_provider.store_credentials(connection, token_data)
 
     connection.status = ConnectionStatus.CONNECTED.value
+    new_settings = dict(connection.settings or {})
     if granted_scopes:
-        connection.settings = {**connection.settings, "granted_scopes": list(granted_scopes)}
+        new_settings["granted_scopes"] = list(granted_scopes)
 
+    # E1: Extract account identity from provider and update settings / name
+    access_token = token_data.get("access_token")
+    if access_token and connection.provider in ["google", "microsoft"]:
+        try:
+            from app.domain.integration.email_auth.provider import get_email_oauth_provider
+            oauth_provider = get_email_oauth_provider(connection.provider, tenant_id=settings.microsoft_tenant_id)
+            identity = await oauth_provider.get_account_identity(access_token)
+            if identity.get("email"):
+                new_settings["email"] = identity["email"]
+                new_settings["display_name"] = identity.get("display_name")
+                new_settings["provider_account_id"] = identity.get("provider_account_id")
+                if identity.get("metadata"):
+                    new_settings["identity_metadata"] = identity.get("metadata")
+
+                provider_title = "Google Gmail" if connection.provider == "google" else "Microsoft Outlook"
+                if not connection.name or connection.name in ["Google Gmail", "Microsoft Outlook", "Gmail", "Outlook", "Default Connection"]:
+                    connection.name = f"{provider_title} ({identity['email']})"
+        except Exception as e:
+            logger.warning(f"Could not retrieve account identity during OAuth callback: {e}")
+
+    connection.settings = new_settings
     await db.commit()
     logger.info(f"OAuth flow completed securely for integration {integration_id} (workspace={workspace_id})")
 

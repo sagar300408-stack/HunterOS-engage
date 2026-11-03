@@ -16,6 +16,10 @@ class ConnectionStatus(str, enum.Enum):
     DEGRADED = "degraded"
     ERROR = "error"
     PENDING = "pending"
+    TOKEN_REFRESHING = "token_refreshing"
+    TOKEN_EXPIRED = "token_expired"
+    REAUTH_REQUIRED = "reauth_required"
+    CONNECTION_ERROR = "connection_error"
 
 
 class IntegrationConnection(Base):
